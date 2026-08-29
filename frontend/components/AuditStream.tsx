@@ -1,15 +1,13 @@
 "use client";
 
 /**
- * The decision stream, grouped.
+ * The decision stream, grouped by (outcome, reason template).
  *
- * Eight names abstaining every five minutes with near-identical sentences is
- * noise that buries the signal. Consecutive abstentions collapse to one line
- * with a count badge, expanding on click to the full entries.
- *
- * FILLS AND REFUSALS NEVER COLLAPSE. They render in full, complete reason
- * text, every time — those two are the product; the abstentions are context
- * until asked for.
+ * Eight consecutive identical budget refusals teach nothing seven times.
+ * Runs whose sentences differ only in their particulars — the numbers, the
+ * ticker — show the FIRST entry in full and fold the rest into "+N more,
+ * same reason", expandable. A genuinely distinct reason never matches the
+ * template and always renders in full. Fills never collapse at all.
  */
 
 import { useMemo, useState } from "react";
@@ -25,45 +23,58 @@ const ACTION_STYLE: Record<DecisionAction, { color: string; label: string }> = {
 
 type Group =
   | { kind: "single"; entry: Decision }
-  | { kind: "collapsed"; entries: Decision[]; key: string };
+  | { kind: "run"; first: Decision; rest: Decision[]; key: string };
 
-/** Consecutive ABSTAINED runs of 2+ collapse; everything else stands alone. */
+/**
+ * The template of a reason: the sentence with its particulars removed.
+ *
+ * "Max loss $310 fits the tier 0 budget…" and "Max loss $412 fits the tier 0
+ * budget…" are the SAME decision made about different numbers, and eight of
+ * them in a row teach nothing seven times. Numbers, tickers and dates are
+ * masked; a genuinely different sentence — a different failing gate, a
+ * different rule — never matches and always renders in full.
+ */
+function reasonTemplate(reason: string): string {
+  return reason
+    .replace(/[A-Z][A-Z.]{1,5}/g, "#") // tickers (and stray acronyms — fine)
+    .replace(/[−-]?\$?\d[\d,]*(\.\d+)?%?/g, "#") // dollars, counts, percentages
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Consecutive entries with the same (outcome, reason template) collapse: the
+ * first renders IN FULL, the rest fold into "+N more, same reason". Fills
+ * never collapse, whatever their text.
+ */
 function groupDecisions(decisions: Decision[]): Group[] {
   const groups: Group[] = [];
   let run: Decision[] = [];
+  let runKey: string | null = null;
 
   const flush = () => {
     if (run.length >= 2) {
-      groups.push({ kind: "collapsed", entries: run, key: run[0]!.id });
+      groups.push({ kind: "run", first: run[0]!, rest: run.slice(1), key: run[0]!.id });
     } else {
       run.forEach((entry) => groups.push({ kind: "single", entry }));
     }
     run = [];
+    runKey = null;
   };
 
   for (const decision of decisions) {
-    if (decision.action === "ABSTAINED") {
-      run.push(decision);
-    } else {
+    if (decision.action === "EXECUTED") {
       flush();
       groups.push({ kind: "single", entry: decision });
+      continue;
     }
+    const key = `${decision.action}|${reasonTemplate(decision.reason)}`;
+    if (key !== runKey) flush();
+    runKey = key;
+    run.push(decision);
   }
   flush();
   return groups;
-}
-
-/** A short shared label when the run's reasons rhyme; honest when they don't. */
-function runLabel(entries: Decision[]): string {
-  const reasons = entries.map((e) => e.reason);
-  if (reasons.every((r) => r.includes("fairly priced"))) return "volatility fairly priced";
-  if (reasons.every((r) => r.includes("refused by the gate chain"))) {
-    return "all candidates refused by the gate chain";
-  }
-  if (reasons.every((r) => r.includes("percentile"))) return "realized vol too hot";
-  if (reasons.every((r) => r.includes("selector"))) return "selector abstained";
-  if (reasons.every((r) => r.includes("DRY RUN"))) return "dry run";
-  return "mixed reasons";
 }
 
 function Marker({ color }: { color: string }) {
@@ -113,54 +124,50 @@ function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boole
   );
 }
 
-function CollapsedRun({ entries }: { entries: Decision[] }) {
+function Run({ first, rest, isNewest }: { first: Decision; rest: Decision[]; isNewest: boolean }) {
   const [open, setOpen] = useState(false);
-  const newest = entries[0]!;
-  const symbols = entries.map((e) => e.symbol).filter(Boolean);
 
   return (
-    <li className="border-t border-[color:var(--line)] py-2 first:border-t-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="t-fast flex w-full items-center gap-2 text-left"
-      >
-        <time className="mono shrink-0 text-[10px] text-[color:var(--text-dim)]" dateTime={newest.ts}>
-          {clockTime(newest.ts)}
-        </time>
-        <Marker color="var(--line)" />
-        <span className="min-w-0 flex-1 truncate text-[11px] text-[color:var(--text-dim)]">
-          {symbols.length > 0 ? `${symbols.length} names abstained` : `${entries.length} abstentions`}
-          {" — "}
-          {runLabel(entries)}
-        </span>
-        <span
-          className="mono shrink-0 border border-[color:var(--line)] px-1 text-[9px] text-[color:var(--text-dim)]"
-          style={{ borderRadius: "var(--radius)" }}
+    <>
+      {/* The first of the run renders in full — a refusal's reason is the
+          product, and it appears once at full strength rather than N times. */}
+      <FullEntry decision={first} isNewest={isNewest} />
+      <li className="py-1 pl-5">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="t-fast mono flex items-center gap-2 text-[10px] text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
         >
-          {open ? "−" : `+${entries.length}`}
-        </span>
-      </button>
-
-      {open && (
-        <ul className="mt-1 border-l border-[color:var(--line)] pl-2">
-          {entries.map((entry) => (
-            <li key={entry.id} className="py-1">
-              <p className="mono text-[10px] text-[color:var(--text-dim)]">
-                {clockTime(entry.ts)} · {entry.symbol ?? "—"}
-              </p>
-              <p className="text-[11px] leading-snug text-[color:var(--text)]">{entry.reason}</p>
-              {entry.model_rationale && (
-                <p className="mt-0.5 text-[10px] italic leading-snug text-[color:var(--text-dim)]">
-                  {entry.model_rationale}
+          <span
+            className="border border-[color:var(--line)] px-1 text-[9px]"
+            style={{ borderRadius: "var(--radius)" }}
+          >
+            {open ? "−" : `+${rest.length}`}
+          </span>
+          {open ? "collapse" : `${rest.length} more, same reason`}
+        </button>
+        {open && (
+          <ul className="mt-1 border-l border-[color:var(--line)] pl-2">
+            {rest.map((entry) => (
+              <li key={entry.id} className="py-1">
+                <p className="mono text-[10px] text-[color:var(--text-dim)]">
+                  {clockTime(entry.ts)} · {entry.symbol ?? "—"}
                 </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
+                <p className="text-[11px] leading-snug text-[color:var(--text)]">
+                  {entry.reason}
+                </p>
+                {entry.model_rationale && (
+                  <p className="mt-0.5 text-[10px] italic leading-snug text-[color:var(--text-dim)]">
+                    {entry.model_rationale}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </li>
+    </>
   );
 }
 
@@ -197,7 +204,7 @@ export function AuditStream({ decisions, counts }: Props) {
             group.kind === "single" ? (
               <FullEntry key={group.entry.id} decision={group.entry} isNewest={i === 0} />
             ) : (
-              <CollapsedRun key={group.key} entries={group.entries} />
+              <Run key={group.key} first={group.first} rest={group.rest} isNewest={i === 0} />
             ),
           )}
         </ul>

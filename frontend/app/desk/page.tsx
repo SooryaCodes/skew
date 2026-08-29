@@ -68,13 +68,24 @@ export default function DeskPage() {
 
   const states = useMemo(() => universe ?? [], [universe]);
 
-  // Focus the widest gap by default — that is where the desk has something to say.
+  // DEFAULT SELECTION is a separate concern from rail sorting. The rail sorts
+  // by |VRP|; the default opens on the most ACTIONABLE symbol — the widest-gap
+  // name with surviving candidates, else with any candidates, else the widest
+  // gap. NVDA topping the rail while abstaining with zero candidates used to
+  // open the desk on an empty state.
   useEffect(() => {
-    if (selected === null && states.length > 0) {
-      const widest = [...states].sort((a, b) => Math.abs(b.vrp) - Math.abs(a.vrp))[0];
-      if (widest) setSelected(widest.symbol);
-    }
-  }, [states, selected]);
+    if (selected !== null || states.length === 0 || candidates === undefined) return;
+    const byGap = [...states].sort((a, b) => Math.abs(b.vrp) - Math.abs(a.vrp));
+    const has = (symbol: string, survivorsOnly: boolean) =>
+      candidates.some(
+        (c) => c.structure.symbol === symbol && (!survivorsOnly || c.passed_all),
+      );
+    const pick =
+      byGap.find((s) => has(s.symbol, true)) ??
+      byGap.find((s) => has(s.symbol, false)) ??
+      byGap[0];
+    if (pick) setSelected(pick.symbol);
+  }, [states, candidates, selected]);
 
   const focused = states.find((s) => s.symbol === selected);
   const focusedCandidates = useMemo(
