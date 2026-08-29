@@ -92,6 +92,22 @@ class Settings(BaseSettings):
     min_volume: int = 0
     # Earnings blackout, in calendar days either side of the report.
     earnings_blackout_days: int = 7
+    # Alpaca serves no earnings calendar. When a single name has no confirmed
+    # date, block premium selling rather than assume it is clear. See
+    # skew/gates/earnings.py before turning this off.
+    earnings_unknown_blocks: bool = True
+    # Used only by the stress engine's Black-Scholes repricing. Not a market
+    # observation — a parameter, and a shift of 100bp moves a 30-day option by
+    # pennies, so it is set rather than fetched.
+    risk_free_rate: float = 0.042
+    # Target strike width as a fraction of spot.
+    target_width_pct: float = 0.0075
+    # Stress engine, routine-move check. A move of this many sigma must not
+    # already reach more than this fraction of the structure's own max loss —
+    # the check that separates two structures with the same max loss but very
+    # different odds of reaching it. See skew/stress/scenarios.py.
+    routine_sigma: float = 1.0
+    routine_max_loss_pct: float = 0.60
     # Exit rules.
     profit_target_pct: float = 0.50
     loss_limit_multiple: float = 2.0

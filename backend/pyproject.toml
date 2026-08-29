@@ -24,12 +24,19 @@ select = [
     "SIM", # simplify
     "RUF",
     "T20", # no print() in library code
+    "BLE", # no blind `except Exception` without a deliberate noqa
+    "TRY", # exception antipatterns
 ]
 ignore = [
     "B008",   # FastAPI Depends() in defaults is idiomatic
     "RUF001", # ambiguous unicode in copy strings (we use — and σ deliberately)
     "RUF002",
     "RUF003",
+    # This project deliberately raises with long, human-readable messages:
+    # docs/06-DATA-CONTRACTS.md requires reason strings to be user-facing copy,
+    # and CLAUDE.md requires abstentions to be loud. Terse exception classes
+    # would be the wrong trade here.
+    "TRY003",
 ]
 
 [tool.ruff.lint.per-file-ignores]

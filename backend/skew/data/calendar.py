@@ -214,8 +214,8 @@ class EarningsCalendar:
             return {}
         try:
             raw: dict[str, Any] = json.loads(self.path.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
-            log.error("Could not read earnings file %s: %s", self.path, exc)
+        except (OSError, json.JSONDecodeError):
+            log.exception("Could not read earnings file %s", self.path)
             return {}
 
         out: dict[str, list[date]] = {}
@@ -284,7 +284,7 @@ class MarketCalendar:
         if self._broker is not None and getattr(self._broker, "available", False):
             try:
                 return bool(self._broker.is_market_open())
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — a dead clock must not stop the loop
                 log.warning("Alpaca clock unavailable, falling back to static hours: %s", exc)
         return is_regular_session(moment)
 

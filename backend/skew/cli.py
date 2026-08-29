@@ -112,7 +112,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
                 iv_history=iv_series(symbol),
                 iv_history_window_days=history_window_days(symbol),
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — reported per symbol, never silent
             failures.append((symbol, str(exc)))
             print(f"{symbol:<6} {BREACH}{'ABSTAIN — ' + str(exc)[:70]}{RESET}")
             continue

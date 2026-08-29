@@ -163,7 +163,7 @@ class Broker:
             price = float(getattr(trades.get(symbol), "price", 0.0) or 0.0)
             if price > 0:
                 return price
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — falls back to the quote mid below
             log.warning("latest trade unavailable for %s: %s", symbol, exc)
 
         quotes = self.stock_data.get_stock_latest_quote(

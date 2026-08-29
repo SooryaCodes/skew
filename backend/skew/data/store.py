@@ -176,6 +176,6 @@ class IVPoller:
                     term_slope=slope.slope if slope else 0.0,
                 ):
                     stored[symbol] = atm.iv
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — one bad symbol must not stop the poll
                 log.warning("IV poll failed for %s: %s", symbol, exc)
         return stored
