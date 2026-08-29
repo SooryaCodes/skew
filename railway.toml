@@ -3,7 +3,7 @@
 #
 # Set in the Railway dashboard, never in this file:
 #   ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_ACCOUNT_NUMBER
-#   ANTHROPIC_API_KEY, ANTHROPIC_WORKSPACE_ID
+#   ANTHROPIC_API_KEY
 #   ADMIN_TOKEN
 #
 # ALPACA_BASE_URL is fixed to the paper endpoint and startup refuses anything

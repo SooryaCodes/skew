@@ -84,18 +84,19 @@ export function Header({ focused, status, tab }: Props) {
               kill switch engaged
             </span>
           )}
-          {/* An armed desk whose selection step is down looks exactly like a
-              calm market from outside. Say so where it cannot be missed. */}
-          {status?.auto_execute && status?.selector_error && (
+          {/* "armed" comes from the server, which gates it on a startup
+              preflight call to the selector — the desk never claims it can
+              trade on configuration alone. */}
+          {status?.auto_execute && !status.armed && (
             <span
               className="mono text-[10px] uppercase tracking-wider"
               style={{ color: "var(--rich)" }}
-              title={status.selector_error}
+              title={status.selector_error ?? undefined}
             >
-              armed · selector unreachable
+              selector down — not armed
             </span>
           )}
-          {status?.auto_execute && !status?.selector_error && (
+          {status?.armed && (
             <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--muted)]">
               armed
             </span>

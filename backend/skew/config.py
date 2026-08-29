@@ -52,9 +52,6 @@ class Settings(BaseSettings):
     # ---- Anthropic (bounded selector model) ----
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"
-    # Identity-linked API keys must name the workspace they act in, or every
-    # request returns 400. Blank for a standard key.
-    anthropic_workspace_id: str = ""
 
     # ---- Runtime ----
     universe: str = "SPY,QQQ,IWM,AAPL,MSFT,NVDA,AMD,TSLA"

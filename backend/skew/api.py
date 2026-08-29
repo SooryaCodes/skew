@@ -43,6 +43,22 @@ limiter = Limiter(key_func=get_remote_address, default_limits=[settings.rate_lim
 _CACHE: dict[str, Any] = {"vol_states": [], "candidates": [], "as_of": None}
 
 
+def _configure_logging() -> None:
+    """Give the skew loggers a real handler.
+
+    Uvicorn configures only its own loggers, and Python silently drops INFO
+    records from unconfigured ones — which meant the selector preflight result
+    and every cycle summary vanished. Operational logs the operator cannot see
+    are how a desk burns a day looking healthy.
+    """
+    root = logging.getLogger()
+    if not root.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s"))
+        root.addHandler(handler)
+    root.setLevel(logging.INFO)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Start the desk alongside the API.
@@ -53,7 +69,22 @@ async def lifespan(_app: FastAPI):
     scheduler's own thread, so the dashboard has something to render within a
     few seconds of boot instead of waiting for the first interval.
     """
+    _configure_logging()
     init_db()
+
+    # Preflight the bounded selector with one cheap real call. An armed desk
+    # whose selection step cannot be reached would otherwise abstain its way
+    # through an entire market day while looking exactly like a calm market.
+    # A failure here is loud, and the desk refuses to report itself as armed.
+    from skew.agent.bounded import preflight
+
+    error = preflight(settings)
+    loop.get_selector(settings).last_error = error
+    if error:
+        log.error("SELECTOR PREFLIGHT FAILED — the desk will NOT trade: %s", error)
+    else:
+        log.info("selector preflight ok — model %s reachable", settings.anthropic_model)
+
     scheduler = None
     if settings.run_scheduler:
         from datetime import timedelta
@@ -167,9 +198,12 @@ def get_status() -> dict[str, Any]:
         "auto_execute": settings.auto_execute,
         "scheduler_running": settings.run_scheduler,
         # An armed desk whose selection step is unreachable looks exactly like a
-        # calm market from outside. Say so plainly rather than making an
-        # operator read logs to find out nothing can trade.
+        # calm market from outside. selector_error carries the specific failure
+        # (status code and body, not an exception class), and "armed" is the
+        # server's own verdict: configured to trade AND the selector answered
+        # the startup preflight. The UI renders armed only from this field.
         "selector_error": loop.get_selector().last_error,
+        "armed": settings.auto_execute and loop.get_selector().last_error is None,
         "version": VERSION,
     }
 

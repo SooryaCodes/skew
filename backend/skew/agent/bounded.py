@@ -35,7 +35,10 @@ from skew.models import Candidate, ModelSelection, RiskAuthority, VolState
 
 log = logging.getLogger(__name__)
 
-MAX_TOKENS = 400
+# 400 truncated some replies mid-rationale, leaving unparseable JSON that the
+# boundary correctly treated as abstention — but a lost trade to a token cap is
+# an own goal. 800 leaves generous room; the schema is still one small object.
+MAX_TOKENS = 800
 MAX_RATIONALE_CHARS = 600
 # Long enough for a slow response, short enough that a hung API cannot stall the
 # trading loop past its next tick.
@@ -96,7 +99,13 @@ def validate_selection(raw: str, allowed_ids: list[str]) -> ModelSelection:
     """
     payload = extract_json(raw)
     if payload is None:
-        log.warning("bounded selector returned unparseable output; treating as abstention")
+        # Log what actually came back — "malformed" with no evidence is
+        # undiagnosable, and the raw text is data we already paid for.
+        log.warning(
+            "bounded selector returned unparseable output (%d chars): %r",
+            len(raw or ""),
+            (raw or "")[:300],
+        )
         return _abstain(
             "Model returned malformed output. Treated as an abstention.", malformed=True
         )
@@ -163,18 +172,17 @@ class BoundedSelector:
 
         import anthropic
 
-        headers: dict[str, str] = {}
-        # Identity-linked API keys require the workspace to be named explicitly.
-        # Without it every request 400s, so it is surfaced as configuration
-        # rather than discovered at the first live trade.
-        if self.settings.anthropic_workspace_id:
-            headers["anthropic-workspace-id"] = self.settings.anthropic_workspace_id
-
+        # base_url is PINNED. The SDK silently honours ANTHROPIC_BASE_URL from
+        # the process environment, and a desk launched from a shell that carries
+        # one (an agent harness, a corporate proxy) would send every prompt to
+        # that endpoint instead of Anthropic — which is exactly what happened
+        # during the build: the proxy's error read as an API error and cost a
+        # day. The desk's model traffic goes to Anthropic, full stop.
         self._client = anthropic.Anthropic(
             api_key=self.settings.anthropic_api_key,
+            base_url="https://api.anthropic.com",
             timeout=TIMEOUT_SECONDS,
             max_retries=1,
-            default_headers=headers or None,
         )
         return self._client
 
@@ -210,11 +218,20 @@ class BoundedSelector:
                 messages=[{"role": "user", "content": message}],
             )
         except Exception as exc:  # noqa: BLE001 — any API failure is an abstention
-            log.warning("bounded selector call failed: %s: %s", type(exc).__name__, exc)
-            self.last_error = f"{type(exc).__name__}: {str(exc)[:200]}"
+            # Capture the status code and the actual response body, not just the
+            # exception class. "BadRequestError" in an audit entry is a day of
+            # debugging; the body is the diagnosis.
+            status = getattr(exc, "status_code", None)
+            body = getattr(exc, "body", None) or getattr(exc, "message", None) or str(exc)
+            detail = f"{type(exc).__name__}"
+            if status is not None:
+                detail += f" HTTP {status}"
+            detail += f": {str(body)[:300]}"
+            log.warning("bounded selector call failed: %s", detail)
+            self.last_error = detail
             return _abstain(
-                f"Bounded selector could not be reached ({type(exc).__name__}). "
-                f"Abstaining — the desk does not trade when the selection step is down."
+                f"Bounded selector unreachable — {detail}. Abstaining; the desk does "
+                f"not trade when the selection step is down."
             )
 
         self.last_error = None
@@ -236,6 +253,30 @@ class BoundedSelector:
             self.last_usage.get("output_tokens", 0),
         )
         return selection
+
+
+def preflight(settings: Settings | None = None) -> str | None:
+    """One cheap real call to the selector's model. None on success, error text on failure.
+
+    Run at startup so an armed desk whose selection step cannot be reached is
+    caught at boot, loudly, instead of abstaining its way through a market day.
+    The result also gates whether /api/status reports the desk as armed.
+    """
+    selector = BoundedSelector(settings)
+    if not selector.available:
+        return "no ANTHROPIC_API_KEY configured"
+    try:
+        client = selector._get_client()
+        client.messages.create(
+            model=selector.settings.anthropic_model,
+            max_tokens=8,
+            messages=[{"role": "user", "content": "Reply with the single word OK."}],
+        )
+    except Exception as exc:  # noqa: BLE001 — the whole point is to report it
+        status = getattr(exc, "status_code", None)
+        body = getattr(exc, "body", None) or str(exc)
+        return f"{type(exc).__name__}{f' HTTP {status}' if status else ''}: {str(body)[:300]}"
+    return None
 
 
 def pick_candidate(candidates: list[Candidate], selection: ModelSelection) -> Candidate | None:

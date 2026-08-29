@@ -287,12 +287,27 @@ def test_a_non_string_rationale_does_not_crash():
 # ====================================================================
 
 
-def test_an_api_error_becomes_an_abstention_not_a_crash(vol_state, candidates, risk):
-    selector = BoundedSelector(client=ExplodingClient(RuntimeError("503 overloaded")))
+def test_an_api_error_becomes_an_abstention_that_carries_the_diagnosis(vol_state, candidates, risk):
+    """The abstention must carry the status and body, not a bare exception class.
+
+    "BadRequestError" in an audit entry cost a day of debugging; the body is the
+    diagnosis, so it travels into the rationale and into last_error.
+    """
+
+    class ApiExc(RuntimeError):
+        def __init__(self, msg):
+            super().__init__(msg)
+            self.status_code = 400
+            self.body = {"error": {"type": "invalid_request_error", "message": "the actual reason"}}
+
+    selector = BoundedSelector(client=ExplodingClient(ApiExc("boom")))
     result = selector.select(vol_state, candidates, risk)
     assert result.abstained
-    assert "could not be reached" in result.rationale
+    assert "HTTP 400" in result.rationale
+    assert "the actual reason" in result.rationale
     assert "does not trade when the selection step is down" in result.rationale
+    assert selector.last_error is not None
+    assert "HTTP 400" in selector.last_error
 
 
 def test_no_credentials_abstains_rather_than_trading_unselected(vol_state, candidates, risk):

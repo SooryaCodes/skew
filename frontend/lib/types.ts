@@ -192,5 +192,7 @@ export interface SystemStatus {
   scheduler_running: boolean;
   /** Non-null when the bounded selector is unreachable — the desk cannot trade. */
   selector_error: string | null;
+  /** The server's verdict: configured to trade AND the selector passed preflight. */
+  armed: boolean;
   version: string;
 }
