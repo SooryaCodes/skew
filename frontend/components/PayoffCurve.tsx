@@ -75,8 +75,8 @@ export function PayoffCurve({ structure }: { structure: Structure }) {
         <ComposedChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
           <defs>
             <linearGradient id="payoff-up" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--cheap)" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="var(--cheap)" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--steel)" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="var(--steel)" stopOpacity="0" />
             </linearGradient>
           </defs>
 
@@ -84,7 +84,7 @@ export function PayoffCurve({ structure }: { structure: Structure }) {
             dataKey="price"
             type="number"
             domain={["dataMin", "dataMax"]}
-            tick={{ fill: "var(--muted)", fontSize: 9 }}
+            tick={{ fill: "var(--text-dim)", fontSize: 9 }}
             tickFormatter={(v: number) => num(v, 0)}
             axisLine={{ stroke: "var(--line)" }}
             tickLine={false}
@@ -96,7 +96,7 @@ export function PayoffCurve({ structure }: { structure: Structure }) {
           <ReferenceLine y={0} stroke="var(--line)" strokeWidth={1} />
           <ReferenceLine
             x={structure.spot}
-            stroke="var(--muted)"
+            stroke="var(--text-dim)"
             strokeWidth={1}
             strokeDasharray="2 3"
           />
@@ -123,7 +123,7 @@ export function PayoffCurve({ structure }: { structure: Structure }) {
           <Tooltip
             cursor={{ stroke: "var(--line)" }}
             contentStyle={{
-              background: "var(--surface-raised)",
+              background: "var(--panel-alt)",
               border: "1px solid var(--line)",
               borderRadius: "var(--radius)",
               fontSize: 11,

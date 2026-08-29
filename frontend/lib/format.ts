@@ -106,12 +106,12 @@ export function clockTime(iso: string): string {
  * Anyone looking at the screen understands the temperature before reading a
  * number.
  *
- * Note what is absent: `--breach` red. It appears nowhere except a failed gate.
+ * Note what is absent: `--oxide` red. It appears nowhere except a failed gate.
  */
 export function regimeColor(regime: string): string {
-  if (regime === "SELL_VOL") return "var(--rich)";
-  if (regime === "BUY_VOL") return "var(--cheap)";
-  return "var(--muted)";
+  if (regime === "SELL_VOL") return "var(--brass)";
+  if (regime === "BUY_VOL") return "var(--steel)";
+  return "var(--text-dim)";
 }
 
 export function regimeLabel(regime: string): string {

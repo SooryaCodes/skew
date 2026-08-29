@@ -1,21 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo, IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
-// Three roles, three faces — docs/03-DESIGN-SYSTEM.md.
-// Display: section headers, the symbol under focus. Body: prose, gate reasons,
-// model rationale. Data: every number, every contract symbol, the audit log.
-const archivo = Archivo({
+// Three roles, three faces.
+// Display: Instrument Serif — hero numerals and headlines, read as values on a
+// dial. UI: IBM Plex Sans — labels, prose, gate reasons. Data: IBM Plex Mono,
+// tabular — every figure, contract symbol and log line.
+const serif = Instrument_Serif({
   subsets: ["latin"],
-  weight: ["600", "700"],
-  variable: "--font-archivo",
+  weight: "400",
+  variable: "--font-serif",
   display: "swap",
 });
 
-const instrument = Instrument_Sans({
+const sans = IBM_Plex_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
-  variable: "--font-instrument",
+  variable: "--font-sans",
   display: "swap",
 });
 
@@ -35,17 +36,35 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0B0E1A",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#101318" },
+    { media: "(prefers-color-scheme: light)", color: "#EDEBE6" },
+  ],
   width: "device-width",
   initialScale: 1,
 };
+
+// Runs before paint: localStorage first, prefers-color-scheme as the default.
+// Inline so there is no flash of the wrong theme; try/catch because storage
+// access can throw in private windows.
+const THEME_BOOT = `(function(){try{var t=localStorage.getItem("skew-theme");if(t!=="dark"&&t!=="light"){t=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","dark");}})();`;
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${archivo.variable} ${instrument.variable} ${plexMono.variable}`}>
-      <body className="min-h-screen bg-ground text-text antialiased">{children}</body>
+    // suppressHydrationWarning: the boot script rewrites data-theme before
+    // hydration, and that one attribute diff is deliberate.
+    <html
+      lang="en"
+      data-theme="dark"
+      suppressHydrationWarning
+      className={`${serif.variable} ${sans.variable} ${plexMono.variable}`}
+    >
+      <body className="min-h-screen bg-ground text-text antialiased">
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+        {children}
+      </body>
     </html>
   );
 }

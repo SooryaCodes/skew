@@ -10,6 +10,7 @@ import { regimeColor, timeAgo } from "@/lib/format";
 import type { SystemStatus, VolState } from "@/lib/types";
 
 import { SkewCurve } from "./SkewCurve";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface Props {
   focused: VolState | undefined;
@@ -19,10 +20,10 @@ interface Props {
 
 function Dot({ on, label }: { on: boolean; label: string }) {
   return (
-    <span className="mono inline-flex items-center gap-1 text-[10px] text-[color:var(--muted)]">
+    <span className="mono inline-flex items-center gap-1 text-[10px] text-[color:var(--text-dim)]">
       <span
         className="inline-block h-1.5 w-1.5 rounded-full"
-        style={{ background: on ? "var(--cheap)" : "var(--line)" }}
+        style={{ background: on ? "var(--steel)" : "var(--line)" }}
         aria-hidden
       />
       {label}
@@ -31,7 +32,7 @@ function Dot({ on, label }: { on: boolean; label: string }) {
 }
 
 export function Header({ focused, status, tab }: Props) {
-  const accent = focused ? regimeColor(focused.regime) : "var(--muted)";
+  const accent = focused ? regimeColor(focused.regime) : "var(--text-dim)";
 
   return (
     // min-height so the 72px curve has room to be the spine rather than a
@@ -56,20 +57,20 @@ export function Header({ focused, status, tab }: Props) {
           <Link
             href="/"
             className="mono t-fast text-[11px] uppercase tracking-wider"
-            style={{ color: tab === "desk" ? "var(--text)" : "var(--muted)" }}
+            style={{ color: tab === "desk" ? "var(--text)" : "var(--text-dim)" }}
           >
             desk
           </Link>
           <Link
             href="/positions"
             className="mono t-fast text-[11px] uppercase tracking-wider"
-            style={{ color: tab === "positions" ? "var(--text)" : "var(--muted)" }}
+            style={{ color: tab === "positions" ? "var(--text)" : "var(--text-dim)" }}
           >
             positions
           </Link>
         </nav>
 
-        <p className="mono hidden text-[10px] text-[color:var(--muted)] lg:block">
+        <p className="mono hidden text-[10px] text-[color:var(--text-dim)] lg:block">
           implied volatility across strikes
         </p>
 
@@ -77,38 +78,46 @@ export function Header({ focused, status, tab }: Props) {
           <Dot on={status?.broker_connected ?? false} label="broker" />
           <Dot on={status?.market_open ?? false} label={status?.market_open ? "open" : "closed"} />
           {status?.kill_switch && (
-            <span
-              className="mono text-[10px] uppercase tracking-wider"
-              style={{ color: "var(--rich)" }}
-            >
-              kill switch engaged
+            <span className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-[7px] w-[7px]"
+                style={{ background: "var(--brass)", borderRadius: "1px" }}
+                aria-hidden
+              />
+              <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text)]">
+                kill switch engaged
+              </span>
             </span>
           )}
           {/* "armed" comes from the server, which gates it on a startup
               preflight call to the selector — the desk never claims it can
               trade on configuration alone. */}
           {status?.auto_execute && !status.armed && (
-            <span
-              className="mono text-[10px] uppercase tracking-wider"
-              style={{ color: "var(--rich)" }}
-              title={status.selector_error ?? undefined}
-            >
-              selector down — not armed
+            <span className="flex items-center gap-1.5" title={status.selector_error ?? undefined}>
+              <span
+                className="inline-block h-[7px] w-[7px]"
+                style={{ background: "var(--brass)", borderRadius: "1px" }}
+                aria-hidden
+              />
+              <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text)]">
+                selector down — not armed
+              </span>
             </span>
           )}
           {status?.armed && (
-            <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--muted)]">
+            <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
               armed
             </span>
           )}
-          <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--muted)]">
+          <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
             paper only
           </span>
           {status?.last_cycle && (
-            <span className="mono text-[10px] text-[color:var(--muted)]">
+            <span className="mono text-[10px] text-[color:var(--text-dim)]">
               cycle {timeAgo(status.last_cycle)}
             </span>
           )}
+          <ThemeToggle />
         </div>
       </div>
     </header>

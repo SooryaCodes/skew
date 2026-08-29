@@ -57,7 +57,7 @@ function catmullRomPath(coords: Array<[number, number]>): string {
   return d;
 }
 
-export function SkewCurve({ points, spot, accent = "var(--rich)", redrawKey }: Props) {
+export function SkewCurve({ points, spot, accent = "var(--brass)", redrawKey }: Props) {
   const pathRef = useRef<SVGPathElement | null>(null);
   const [length, setLength] = useState(1200);
 
@@ -99,7 +99,7 @@ export function SkewCurve({ points, spot, accent = "var(--rich)", redrawKey }: P
   if (!geometry) {
     return (
       <div
-        className="flex h-[84px] items-center text-[color:var(--muted)] text-xs"
+        className="flex h-[84px] items-center text-[color:var(--text-dim)] text-xs"
         aria-label="Skew curve unavailable"
       >
         <span className="mono">awaiting chain data</span>

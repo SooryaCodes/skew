@@ -81,13 +81,13 @@ export default function DeskPage() {
         {/* decide */}
         <main className="min-w-0 p-4">
           {universeError ? (
-            <p className="text-sm text-[color:var(--muted)]">
+            <p className="text-sm text-[color:var(--text-dim)]">
               Cannot reach the desk API. Start the backend with{" "}
               <span className="mono">uvicorn skew.api:app</span> and check{" "}
               <span className="mono">NEXT_PUBLIC_API_BASE</span>.
             </p>
           ) : !focused ? (
-            <p className="text-sm text-[color:var(--muted)]">
+            <p className="text-sm text-[color:var(--text-dim)]">
               {universeLoading
                 ? "Scanning — the first cycle takes a few seconds."
                 : "Select a symbol to see its volatility state."}
@@ -98,11 +98,11 @@ export default function DeskPage() {
 
               <section className="mt-6" aria-label="Candidates">
                 <div className="mb-3 flex items-baseline justify-between">
-                  <h2 className="mono text-[10px] uppercase tracking-widest text-[color:var(--muted)]">
+                  <h2 className="mono text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
                     candidates
                   </h2>
                   {focusedCandidates.length > 0 && (
-                    <span className="mono text-[10px] text-[color:var(--muted)]">
+                    <span className="mono text-[10px] text-[color:var(--text-dim)]">
                       {focusedCandidates.filter((c) => c.passed_all).length} of{" "}
                       {focusedCandidates.length} survived the gate chain
                     </span>
@@ -111,7 +111,7 @@ export default function DeskPage() {
 
                 {focusedCandidates.length === 0 ? (
                   // Empty states are instructions, not "No data".
-                  <p className="text-sm text-[color:var(--muted)]">
+                  <p className="text-sm text-[color:var(--text-dim)]">
                     {abstainCopy ??
                       `No candidates for ${focused.symbol} — ${focused.note}`}
                   </p>
@@ -137,7 +137,7 @@ export default function DeskPage() {
       </div>
 
       <footer className="border-t border-[color:var(--line)] px-4 py-2">
-        <p className="mono text-[10px] text-[color:var(--muted)]">
+        <p className="mono text-[10px] text-[color:var(--text-dim)]">
           {states.length > 0 && (
             <>
               {states.length} names scanned · widest VRP{" "}

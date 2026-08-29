@@ -5,12 +5,12 @@
  *
  * 7 columns of price shock by 4 rows of IV shock, each cell a small square
  * shaded by outcome. Almost always calm. When one cell breaches it goes
- * `--breach`, and the candidate card desaturates around it.
+ * `--oxide`, and the candidate card desaturates around it.
  *
  * Hand-rolled CSS grid rather than a chart library. It is 28 squares — a chart
  * library would be more friction than help, per docs/02-TECH-STACK.md.
  *
- * `--breach` red appears here and only here in the whole interface, and only on
+ * `--oxide` red appears here and only here in the whole interface, and only on
  * a genuinely breaching cell. That is the rule that makes the refusal land: the
  * eye goes straight to it because nothing else on the screen is that colour.
  */
@@ -35,19 +35,21 @@ interface Props {
 /** Cell background: calm cells barely register, so a breach is unmissable. */
 function cellStyle(cell: StressCell, worstPnl: number, maxLoss: number): React.CSSProperties {
   if (cell.breached) {
-    return { background: "var(--breach)", color: "#fff" };
+    // Field + outline come from .cell-breach; ink stays --text so the numeral
+    // clears 4.5:1 in both themes. Solid oxide under a numeral does not.
+    return { color: "var(--text)" };
   }
   if (cell.pnl >= 0) {
     const strength = Math.min(1, cell.pnl / Math.max(1, Math.abs(worstPnl) * 0.25));
     return {
-      background: `color-mix(in srgb, var(--cheap) ${8 + strength * 16}%, var(--surface-raised))`,
+      background: `color-mix(in srgb, var(--steel) ${8 + strength * 16}%, var(--panel-alt))`,
       color: "var(--text)",
     };
   }
   const severity = Math.min(1, Math.abs(cell.pnl) / Math.max(1, maxLoss));
   return {
-    background: `color-mix(in srgb, var(--rich) ${6 + severity * 30}%, var(--surface-raised))`,
-    color: severity > 0.6 ? "var(--text)" : "var(--muted)",
+    background: `color-mix(in srgb, var(--brass) ${6 + severity * 30}%, var(--panel-alt))`,
+    color: severity > 0.6 ? "var(--text)" : "var(--text-dim)",
   };
 }
 
@@ -69,7 +71,7 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
 
   if (cells.length === 0) {
     return (
-      <p className="text-xs text-[color:var(--muted)]">
+      <p className="text-xs text-[color:var(--text-dim)]">
         No stress grid — the candidate was refused before it was priced.
       </p>
     );
@@ -80,7 +82,7 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <span className="mono text-[11px] uppercase tracking-widest text-[color:var(--muted)]">
+        <span className="mono text-[11px] uppercase tracking-widest text-[color:var(--text-dim)]">
           stress · {cells.length} scenarios
         </span>
         <div className="flex gap-1" role="tablist" aria-label="Time point">
@@ -93,7 +95,7 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
               onClick={() => setTimePoint(tp.key)}
               className="mono t-fast px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
               style={{
-                color: timePoint === tp.key ? "var(--text)" : "var(--muted)",
+                color: timePoint === tp.key ? "var(--text)" : "var(--text-dim)",
                 borderBottom:
                   timePoint === tp.key ? "1px solid var(--text)" : "1px solid transparent",
               }}
@@ -113,7 +115,7 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
         {view.priceShocks.map((shock) => (
           <span
             key={`h-${shock}`}
-            className="mono pb-1 text-center text-[10px] text-[color:var(--muted)]"
+            className="mono pb-1 text-center text-[10px] text-[color:var(--text-dim)]"
           >
             {shock > 0 ? `+${shock}` : shock}σ
           </span>
@@ -121,7 +123,7 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
 
         {view.ivShocks.map((iv) => (
           <div key={`row-${iv}`} className="contents">
-            <span className="mono self-center pr-1 text-right text-[10px] text-[color:var(--muted)]">
+            <span className="mono self-center pr-1 text-right text-[10px] text-[color:var(--text-dim)]">
               ×{iv.toFixed(1)}
             </span>
             {view.priceShocks.map((px) => {
@@ -159,7 +161,7 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
       </div>
 
       {detail && (
-        <p className="mt-2 text-[11px] text-[color:var(--muted)]">
+        <p className="mt-2 text-[11px] text-[color:var(--text-dim)]">
           <span className="mono">
             {detail.price_shock > 0 ? `+${detail.price_shock}` : detail.price_shock}σ
           </span>
@@ -172,17 +174,17 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
                 ).toFixed(0)}%`}
           </span>
           {" → "}
-          <span className="mono" style={{ color: detail.breached ? "var(--breach)" : undefined }}>
+          <span className="mono" style={{ color: detail.breached ? "var(--oxide)" : undefined }}>
             {money(detail.pnl, 0)}
           </span>
           {detail === view.worst && !hovered && (
-            <span className="text-[color:var(--muted)]">
+            <span className="text-[color:var(--text-dim)]">
               {" "}
               · worst cell at this time point
             </span>
           )}
           {refused && detail.breached && (
-            <span style={{ color: "var(--breach)" }}> · breaches the tier budget</span>
+            <span style={{ color: "var(--oxide)" }}> · breaches the tier budget</span>
           )}
         </p>
       )}

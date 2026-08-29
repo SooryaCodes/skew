@@ -1,65 +1,121 @@
 @import "tailwindcss";
 
 /* ------------------------------------------------------------------
-   SKEW design tokens — docs/03-DESIGN-SYSTEM.md
+   SKEW — brass and steel on graphite.
 
-   Two poles, because the product has exactly two states: volatility is
-   expensive, or volatility is cheap. Colour carries meaning here; it is not
-   decoration.
+   Instruments are made of brass and steel; their readings print on paper.
+   The metals are muted and slightly dirty, not saturated data-viz hues:
 
-   THE RULE THAT MAKES THE DEMO WORK: --breach appears nowhere in the interface
-   except a failed gate. Not for losses, not for down days, not for sell orders.
-   It is the only red on the screen, so when a stress cell breaches the eye goes
-   straight to it. Spend that colour once.
+     --brass      volatility is EXPENSIVE — sell premium
+     --steel      volatility is CHEAP — buy premium
+     --oxide      a gate FAILED. Nowhere else in the app, ever.
+     --verdigris  a good outcome: a fill, a profit region
+
+   Light is NOT an inversion. Brass and steel darken on paper, and the -dim
+   variants become tints rather than shades. Every colour in the app resolves
+   from one of these tokens; there is no hardcoded hex anywhere downstream.
+
+   USAGE RULE, from the contrast audit: the metals are for glyphs, markers,
+   strokes, fills and large numerals (>=24px, the WCAG 3:1 tier — every metal
+   clears it in both themes). Small text is always --text or --text-dim; state
+   at small sizes is a colored marker beside neutral ink. Metals as small text
+   fail 4.5:1 in one theme or the other (steel and oxide in dark, brass in
+   light) and are not shipped that way. --text-faint is decorative only and is
+   never used for words.
+
+   Theme: data-theme on <html>, set before paint by the boot script in
+   layout.tsx — localStorage first, prefers-color-scheme as the default.
    ------------------------------------------------------------------ */
 
+/* Fallback = dark, so a failed boot script still renders a legible page. */
 :root {
-  --ground: #0b0e1a; /* deep indigo-black — not pure black; has a temperature */
-  --surface: #131829; /* raised panels */
-  --line: #232b45; /* hairlines, grid, dividers */
-  --text: #e6e9f2; /* primary */
-  --muted: #7a85a8; /* labels, axes, secondary */
+  --ground: #101318;
+  --panel: #171b22;
+  --panel-alt: #1c212a;
+  --line: #242a34;
+  --line-soft: #1b2028;
+  --text: #e4e6ea;
+  --text-dim: #8b93a1;
+  --text-faint: #5a6270;
+  --brass: #c8a44d;
+  --brass-dim: #6e5c2c;
+  --steel: #5b7c99;
+  --steel-dim: #33475a;
+  --oxide: #c4453c;
+  --verdigris: #4e8a76;
+}
 
-  --rich: #e8a33d; /* amber — vol is EXPENSIVE, sell premium */
-  --cheap: #4da5c4; /* cool blue — vol is CHEAP, buy premium */
-  --breach: #d9534f; /* a gate FAILED — nothing else, ever */
+:root[data-theme="dark"] {
+  --ground: #101318;
+  --panel: #171b22;
+  --panel-alt: #1c212a;
+  --line: #242a34;
+  --line-soft: #1b2028;
+  --text: #e4e6ea;
+  --text-dim: #8b93a1;
+  --text-faint: #5a6270;
+  --brass: #c8a44d;
+  --brass-dim: #6e5c2c;
+  --steel: #5b7c99;
+  --steel-dim: #33475a;
+  --oxide: #c4453c;
+  --verdigris: #4e8a76;
+}
 
-  /* Derived surfaces. Kept few and deliberate. */
-  --surface-raised: #1a2038;
-  --rich-dim: color-mix(in srgb, var(--rich) 18%, var(--ground));
-  --cheap-dim: color-mix(in srgb, var(--cheap) 18%, var(--ground));
-  --breach-dim: color-mix(in srgb, var(--breach) 22%, var(--ground));
+:root[data-theme="light"] {
+  --ground: #edebe6;
+  --panel: #f7f6f3;
+  --panel-alt: #e6e3dc;
+  --line: #d2cec5;
+  --line-soft: #e0ddd5;
+  --text: #14171c;
+  --text-dim: #575d68;
+  --text-faint: #8a8f99;
+  --brass: #8a6d1f;
+  --brass-dim: #c9b77e;
+  --steel: #3a5a75;
+  --steel-dim: #94aabc;
+  --oxide: #a33028;
+  --verdigris: #2f6350;
+}
 
-  /* Type scale: 12 / 14 / 16 / 20 / 28 / 40 / 64 */
+@theme inline {
+  --color-ground: var(--ground);
+  --color-panel: var(--panel);
+  --color-panel-alt: var(--panel-alt);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-text: var(--text);
+  --color-text-dim: var(--text-dim);
+  --color-text-faint: var(--text-faint);
+  --color-brass: var(--brass);
+  --color-brass-dim: var(--brass-dim);
+  --color-steel: var(--steel);
+  --color-steel-dim: var(--steel-dim);
+  --color-oxide: var(--oxide);
+  --color-verdigris: var(--verdigris);
+
+  --font-display: var(--font-serif), "Instrument Serif", Georgia, serif;
+  --font-body: var(--font-sans), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  --radius-panel: var(--radius);
+}
+
+:root {
+  /* Type scale: 11 / 12 / 14 / 16 / 20 / 28, plus the hero dial size.  */
   --fs-xs: 0.75rem;
   --fs-sm: 0.875rem;
   --fs-base: 1rem;
   --fs-md: 1.25rem;
   --fs-lg: 1.75rem;
   --fs-xl: 2.5rem;
-  --fs-2xl: 4rem;
+  /* The one deliberate risk: hero metrics as serif numerals at dial size. */
+  --fs-hero: 3.75rem;
 
   --radius: 2px;
   --dur-fast: 120ms;
   --dur-curve: 400ms;
-}
-
-@theme inline {
-  --color-ground: var(--ground);
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
-  --color-line: var(--line);
-  --color-text: var(--text);
-  --color-muted: var(--muted);
-  --color-rich: var(--rich);
-  --color-cheap: var(--cheap);
-  --color-breach: var(--breach);
-
-  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
-  --font-body: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
-
-  --radius-panel: var(--radius);
 }
 
 * {
@@ -73,39 +129,44 @@ body {
 }
 
 body {
-  font-family: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   font-size: var(--fs-sm);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Display face: section headers, the symbol under focus, the title card. */
+/* Display face: Instrument Serif. Hero numerals and landing headlines read as
+   values on a dial, not stats in an app. Everything else stays sans or mono. */
 .font-display {
-  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
-  font-weight: 700;
+  font-family: var(--font-serif), "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.hero-num {
+  font-family: var(--font-serif), "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  font-size: var(--fs-hero);
+  line-height: 0.95;
   letter-spacing: -0.02em;
 }
 
 /* Data face. Tabular numerals are non-negotiable on anything numeric —
-   prices that jitter horizontally as digits change look amateur instantly. */
+   figures that jitter horizontally as digits change read as amateur. */
 .mono,
 .font-mono {
-  font-family: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, Menlo, monospace;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
 
-/* Panels: --surface on --ground, 1px --line border, 2px radius. Nearly square
-   corners; this is an instrument, not a consumer app. No shadows anywhere —
-   depth comes from the border and the background step. */
+/* Panels: --panel on --ground, 1px --line, 2px radius. No shadows anywhere —
+   depth comes from the border and the background step. An instrument, not an
+   app. */
 .panel {
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-}
-
-.hairline {
-  border-color: var(--line);
 }
 
 /* Contract symbols: always mono, always uppercase, never wrapped. */
@@ -116,17 +177,15 @@ body {
   white-space: nowrap;
 }
 
-/* Visible keyboard focus rings — part of the quality floor. */
 :focus-visible {
-  outline: 2px solid var(--cheap);
+  outline: 2px solid var(--steel);
   outline-offset: 2px;
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--cheap) 35%, transparent);
+  background: color-mix(in srgb, var(--steel) 35%, transparent);
 }
 
-/* Scrollbars, tuned to the instrument look rather than left default. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
@@ -144,8 +203,8 @@ body {
 }
 
 /* ------------------------------------------------------------------
-   Motion. One orchestrated moment, not scattered effects.
-   Everything ambient is 120ms opacity. Nothing bounces. Nothing pulses.
+   Motion. One orchestrated moment; everything else is 120ms opacity.
+   Nothing bounces. Nothing pulses.
    ------------------------------------------------------------------ */
 
 .t-fast {
@@ -156,20 +215,24 @@ body {
     border-color var(--dur-fast) ease;
 }
 
-/* The refusal — the only animation with any drama in it.
-   Breaching cell fades to --breach over 200ms, then the candidate card
-   desaturates over 300ms, then the audit entry slides in. 700ms, choreographed. */
+/* The refusal: breaching cell to --oxide over 200ms, card desaturates over
+   300ms, audit entry slides in. 700ms, choreographed. The only drama. */
+/* A breached cell reads oxide without putting a numeral on solid oxide, which
+   fails 4.5:1 in dark. Tinted field plus a solid oxide outline: unmistakably
+   the failure colour, and the number inside stays legible ink. */
 @keyframes breach-in {
   from {
-    background-color: var(--surface-raised);
+    background-color: var(--panel-alt);
   }
   to {
-    background-color: var(--breach);
+    background-color: color-mix(in srgb, var(--oxide) 32%, var(--panel-alt));
   }
 }
 
 .cell-breach {
   animation: breach-in 200ms ease forwards;
+  outline: 1.5px solid var(--oxide);
+  outline-offset: -1.5px;
 }
 
 .card-refused {
@@ -204,12 +267,10 @@ body {
   }
 }
 
-/* The skew curve redraws with a 400ms ease when data updates. Ambient, subtle. */
 .curve-redraw {
   animation: curve-draw var(--dur-curve) ease-out both;
 }
 
-/* Respect prefers-reduced-motion: skip the desaturation, keep the colour change. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -4,7 +4,7 @@
  * One candidate: what it is, what it risks, and every gate that judged it.
  *
  * The refusal choreography lives here — the 700ms sequence from
- * docs/03-DESIGN-SYSTEM.md. A breaching stress cell fades to `--breach` over
+ * docs/03-DESIGN-SYSTEM.md. A breaching stress cell fades to `--oxide` over
  * 200ms, then this card desaturates over 300ms, then the audit entry slides in.
  * It is the only animation in the interface with any drama in it.
  *
@@ -24,10 +24,10 @@ function GateRow({ gate }: { gate: GateResult }) {
   const glyph = state === "skipped" ? "—" : state === "pass" ? "✓" : "✗";
   const color =
     state === "fail"
-      ? "var(--breach)"
+      ? "var(--oxide)"
       : state === "skipped"
-        ? "var(--muted)"
-        : "var(--cheap)";
+        ? "var(--text-dim)"
+        : "var(--verdigris)";
 
   return (
     <li className="flex gap-2 py-1">
@@ -38,12 +38,15 @@ function GateRow({ gate }: { gate: GateResult }) {
       >
         {glyph}
       </span>
-      <span className="mono w-16 shrink-0 text-[11px] uppercase leading-5 tracking-wider text-[color:var(--muted)]">
+      <span className="mono w-16 shrink-0 text-[11px] uppercase leading-5 tracking-wider text-[color:var(--text-dim)]">
         {gate.gate}
       </span>
+      {/* Reason text stays ink in both states — oxide as 12px text fails 4.5:1
+          in dark. The glyph carries the state; a failure also gets weight. */}
       <span
-        className="text-[12px] leading-5"
-        style={{ color: state === "fail" ? "var(--breach)" : "var(--text)" }}
+        className={`text-[12px] leading-5 text-[color:var(--text)] ${
+          state === "fail" ? "font-medium" : ""
+        }`}
       >
         <span className="sr-only">{state === "fail" ? "Failed: " : "Passed: "}</span>
         {gate.reason}
@@ -67,14 +70,14 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3 className="font-display text-[length:var(--fs-base)]">
           {structureLabel(s.kind)}
-          <span className="mono ml-2 text-[color:var(--muted)] text-xs">
+          <span className="mono ml-2 text-[color:var(--text-dim)] text-xs">
             {s.legs
               .map((l) => l.strike)
               .sort((a, b) => a - b)
               .join(" / ")}
           </span>
         </h3>
-        <span className="mono text-[11px] text-[color:var(--muted)]">
+        <span className="mono text-[11px] text-[color:var(--text-dim)]">
           {s.dte}d · {s.qty}x
         </span>
       </header>
@@ -85,17 +88,22 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
           .sort((a, b) => a.right.localeCompare(b.right) || a.strike - b.strike)
           .map((leg) => (
             <li key={leg.symbol} className="flex items-baseline gap-2 text-[11px]">
-              <span
-                className="mono w-8 shrink-0 uppercase"
-                style={{ color: leg.side === "SELL" ? "var(--rich)" : "var(--cheap)" }}
-              >
-                {leg.side}
+              <span className="flex w-11 shrink-0 items-center gap-1">
+                <span
+                  className="inline-block h-[6px] w-[6px] shrink-0"
+                  style={{
+                    background: leg.side === "SELL" ? "var(--brass)" : "var(--steel)",
+                    borderRadius: "1px",
+                  }}
+                  aria-hidden
+                />
+                <span className="mono uppercase text-[color:var(--text-dim)]">{leg.side}</span>
               </span>
-              <span className="contract flex-1 truncate text-[color:var(--muted)]">
+              <span className="contract flex-1 truncate text-[color:var(--text-dim)]">
                 {contractLabel(leg.symbol)}
               </span>
-              <span className="mono text-[color:var(--muted)]">{num(leg.mid, 2)}</span>
-              <span className="mono w-12 text-right text-[color:var(--muted)]">
+              <span className="mono text-[color:var(--text-dim)]">{num(leg.mid, 2)}</span>
+              <span className="mono w-12 text-right text-[color:var(--text-dim)]">
                 Δ {signed(leg.delta, 2)}
               </span>
             </li>
@@ -105,26 +113,26 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
       {/* The three numbers that matter */}
       <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-[color:var(--line)] pt-3">
         <div>
-          <dt className="mono text-[10px] uppercase tracking-wider text-[color:var(--muted)]">
+          <dt className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
             {s.net_credit >= 0 ? "credit" : "debit"}
           </dt>
           <dd className="mono text-[length:var(--fs-base)]">{dollars(s.net_credit, 2)}</dd>
         </div>
         <div>
-          <dt className="mono text-[10px] uppercase tracking-wider text-[color:var(--muted)]">
+          <dt className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
             max loss
           </dt>
           <dd className="mono text-[length:var(--fs-base)]">{dollars(s.max_loss, 2)}</dd>
         </div>
         <div>
-          <dt className="mono text-[10px] uppercase tracking-wider text-[color:var(--muted)]">
+          <dt className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
             net vega
           </dt>
           <dd className="mono text-[length:var(--fs-base)]">{signed(s.net_vega, 1)}</dd>
         </div>
       </dl>
 
-      <p className="mono mt-2 text-[10px] text-[color:var(--muted)]">
+      <p className="mono mt-2 text-[10px] text-[color:var(--text-dim)]">
         breakeven {s.breakevens.map((b) => num(b, 2)).join(" / ")} · max profit{" "}
         {dollars(s.max_profit, 2)} · theta {signed(s.net_theta, 2)}
       </p>
@@ -144,18 +152,19 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
       </ul>
 
       <footer className="mt-2 border-t border-[color:var(--line)] pt-2">
-        {refused ? (
-          <p className="mono text-[11px] uppercase tracking-wider" style={{ color: "var(--breach)" }}>
-            refused — {failed.map((g) => g.gate).join(", ") || "unknown"}
-          </p>
-        ) : (
-          <p
-            className="mono text-[11px] uppercase tracking-wider"
-            style={{ color: "var(--cheap)" }}
-          >
-            passed all gates · worst case {money(candidate.worst_case, 0)}
-          </p>
-        )}
+        <p className="mono flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[color:var(--text)]">
+          <span
+            className="inline-block h-[7px] w-[7px] shrink-0"
+            style={{
+              background: refused ? "var(--oxide)" : "var(--verdigris)",
+              borderRadius: "1px",
+            }}
+            aria-hidden
+          />
+          {refused
+            ? `refused — ${failed.map((g) => g.gate).join(", ") || "unknown"}`
+            : `passed all gates · worst case ${money(candidate.worst_case, 0)}`}
+        </p>
       </footer>
     </article>
   );
