@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   SKEW design tokens — docs/03-DESIGN-SYSTEM.md
+
+   Two poles, because the product has exactly two states: volatility is
+   expensive, or volatility is cheap. Colour carries meaning here; it is not
+   decoration.
+
+   THE RULE THAT MAKES THE DEMO WORK: --breach appears nowhere in the interface
+   except a failed gate. Not for losses, not for down days, not for sell orders.
+   It is the only red on the screen, so when a stress cell breaches the eye goes
+   straight to it. Spend that colour once.
+   ------------------------------------------------------------------ */
+
+:root {
+  --ground: #0b0e1a; /* deep indigo-black — not pure black; has a temperature */
+  --surface: #131829; /* raised panels */
+  --line: #232b45; /* hairlines, grid, dividers */
+  --text: #e6e9f2; /* primary */
+  --muted: #7a85a8; /* labels, axes, secondary */
+
+  --rich: #e8a33d; /* amber — vol is EXPENSIVE, sell premium */
+  --cheap: #4da5c4; /* cool blue — vol is CHEAP, buy premium */
+  --breach: #d9534f; /* a gate FAILED — nothing else, ever */
+
+  /* Derived surfaces. Kept few and deliberate. */
+  --surface-raised: #1a2038;
+  --rich-dim: color-mix(in srgb, var(--rich) 18%, var(--ground));
+  --cheap-dim: color-mix(in srgb, var(--cheap) 18%, var(--ground));
+  --breach-dim: color-mix(in srgb, var(--breach) 22%, var(--ground));
+
+  /* Type scale: 12 / 14 / 16 / 20 / 28 / 40 / 64 */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-base: 1rem;
+  --fs-md: 1.25rem;
+  --fs-lg: 1.75rem;
+  --fs-xl: 2.5rem;
+  --fs-2xl: 4rem;
+
+  --radius: 2px;
+  --dur-fast: 120ms;
+  --dur-curve: 400ms;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-rich: var(--rich);
+  --color-cheap: var(--cheap);
+  --color-breach: var(--breach);
+
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-panel: var(--radius);
+}
+
+* {
+  border-color: var(--line);
+}
+
+html,
+body {
+  background: var(--ground);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--fs-sm);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display face: section headers, the symbol under focus, the title card. */
+.font-display {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Data face. Tabular numerals are non-negotiable on anything numeric —
+   prices that jitter horizontally as digits change look amateur instantly. */
+.mono,
+.font-mono {
+  font-family: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Panels: --surface on --ground, 1px --line border, 2px radius. Nearly square
+   corners; this is an instrument, not a consumer app. No shadows anywhere —
+   depth comes from the border and the background step. */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.hairline {
+  border-color: var(--line);
+}
+
+/* Contract symbols: always mono, always uppercase, never wrapped. */
+.contract {
+  font-family: var(--font-plex-mono), ui-monospace, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Visible keyboard focus rings — part of the quality floor. */
+:focus-visible {
+  outline: 2px solid var(--cheap);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--cheap) 35%, transparent);
+}
+
+/* Scrollbars, tuned to the instrument look rather than left default. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: var(--radius);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ------------------------------------------------------------------
+   Motion. One orchestrated moment, not scattered effects.
+   Everything ambient is 120ms opacity. Nothing bounces. Nothing pulses.
+   ------------------------------------------------------------------ */
+
+.t-fast {
+  transition:
+    opacity var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease;
+}
+
+/* The refusal — the only animation with any drama in it.
+   Breaching cell fades to --breach over 200ms, then the candidate card
+   desaturates over 300ms, then the audit entry slides in. 700ms, choreographed. */
+@keyframes breach-in {
+  from {
+    background-color: var(--surface-raised);
+  }
+  to {
+    background-color: var(--breach);
+  }
+}
+
+.cell-breach {
+  animation: breach-in 200ms ease forwards;
+}
+
+.card-refused {
+  transition:
+    filter 300ms ease 200ms,
+    opacity 300ms ease 200ms;
+  filter: saturate(0.4);
+  opacity: 0.55;
+}
+
+@keyframes audit-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.audit-enter {
+  animation: audit-slide-in 200ms ease 500ms both;
+}
+
+@keyframes curve-draw {
+  from {
+    stroke-dashoffset: var(--dash, 1200);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* The skew curve redraws with a 400ms ease when data updates. Ambient, subtle. */
+.curve-redraw {
+  animation: curve-draw var(--dur-curve) ease-out both;
+}
+
+/* Respect prefers-reduced-motion: skip the desaturation, keep the colour change. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .card-refused {
+    filter: none;
+    opacity: 1;
+  }
+}

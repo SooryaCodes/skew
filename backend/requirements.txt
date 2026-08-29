@@ -1,0 +1,31 @@
+# SKEW backend — exact pins. See docs/02-TECH-STACK.md.
+# Resolved on Python 3.11. Do not float these during the build window.
+
+# --- Broker / market data ---
+alpaca-py==0.44.0
+
+# --- API ---
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+slowapi==0.1.10
+
+# --- Models / settings ---
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.3
+
+# --- Math ---
+numpy==2.4.6
+scipy==1.17.1
+pandas==3.0.5
+
+# --- Scheduling / storage ---
+APScheduler==3.11.3
+SQLAlchemy==2.0.52
+
+# --- Model + MCP ---
+anthropic==1.2.0
+fastmcp==3.4.7
+
+# --- HTTP ---
+httpx==0.28.1

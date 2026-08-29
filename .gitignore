@@ -1,0 +1,46 @@
+# Hackathon strategy — never commit. Judges read this repo.
+hackathon/
+
+# Build prompt series — the how-it-was-made scaffolding, not the product.
+prompts/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Data / runtime
+*.db
+*.sqlite3
+data/cache/
+data/snapshots/
+logs/
+*.log
+
+# Node / Next
+node_modules/
+.next/
+out/
+.vercel/
+.turbo/
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

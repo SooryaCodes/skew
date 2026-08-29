@@ -1,0 +1,50 @@
+[project]
+name = "skew"
+version = "0.1.0"
+description = "SKEW — an autonomous options volatility desk. Paper trading only."
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+include = ["skew*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "__pycache__", "tests/fixtures"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "C4",  # comprehensions
+    "SIM", # simplify
+    "RUF",
+    "T20", # no print() in library code
+]
+ignore = [
+    "B008",   # FastAPI Depends() in defaults is idiomatic
+    "RUF001", # ambiguous unicode in copy strings (we use — and σ deliberately)
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Scripts and tests are allowed to print and to use asserts freely.
+"tests/*" = ["T20"]
+"skew/cli.py" = ["T20"]
+"scripts/*" = ["T20"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+asyncio_mode = "auto"
+markers = [
+    "integration: hits the live Alpaca paper API. Excluded from CI.",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
