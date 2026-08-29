@@ -129,4 +129,29 @@ wired, with a test at the exact seam that was missing.
 
 ## Phase 07 — Hardening
 
-**Works:** _pending_
+**Works:** Security pass through `docs/05-SECURITY.md` line by line, all green:
+
+- Paper-only assertion refuses a live URL at import — verified by running with
+  `ALPACA_BASE_URL=https://api.alpaca.markets`.
+- `hackathon/`, `prompts/` and `.env` all ignored; nothing sensitive tracked.
+- No credential-shaped string anywhere in the full git history. The only
+  matches were npm lockfile `sha512-` hashes and the redaction test's own
+  fixtures, which are now spelled `NOT-A-REAL-KEY-...` so a scanner over this
+  repo finds nothing that even looks like a credential.
+- The built client bundle contains no Alpaca or Anthropic credential. The only
+  `NEXT_PUBLIC_` variable is `NEXT_PUBLIC_API_BASE`, a URL.
+- Kill switch: 401 without a token, 401 with a wrong one, works with the real
+  one, and rate-limits to 10/min (verified: 6 × 401 then 7 × 429).
+- `pip-audit`: no known vulnerabilities.
+- A full unattended run produced zero unhandled exceptions, and the audit log
+  reads cleanly to someone who has not seen the code.
+
+README rewritten as a judged artefact: the thesis, the architecture, the three
+claims the repo makes and how to check each, the stress-engine correction, and
+an honest limitations section covering the historical-IV constraint, the missing
+earnings calendar, and the open-interest split.
+
+Deployment: Dockerfile for the backend (the loop needs a persistent process, so
+container not serverless), `railway.toml`, and `vercel.json` with security
+headers. `.env.example` rewritten and asserted to cover every setting in
+`Settings` with no orphans in either direction.

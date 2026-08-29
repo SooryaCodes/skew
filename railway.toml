@@ -1,0 +1,20 @@
+# Railway deploys the backend. The loop needs a persistent process, so this is a
+# long-running container rather than a serverless function.
+#
+# Set in the Railway dashboard, never in this file:
+#   ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_ACCOUNT_NUMBER
+#   ANTHROPIC_API_KEY, ANTHROPIC_WORKSPACE_ID
+#   ADMIN_TOKEN
+#
+# ALPACA_BASE_URL is fixed to the paper endpoint and startup refuses anything
+# else, so there is no environment in which this deploys against a live account.
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "backend/Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5

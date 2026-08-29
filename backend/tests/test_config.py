@@ -37,14 +37,21 @@ def test_paper_url_is_normalised():
 
 
 def test_redacted_never_emits_a_credential():
+    # Deliberately not key-shaped. A secret scanner run over this repo should
+    # find nothing that even looks like a credential, including in the tests.
     s = Settings(
-        alpaca_api_key="PKTESTKEY123456",
-        alpaca_api_secret="supersecretvalue",
-        anthropic_api_key="sk-ant-abcdef",
-        admin_token="hunter2",
+        alpaca_api_key="NOT-A-REAL-KEY-fixture-only",
+        alpaca_api_secret="NOT-A-REAL-SECRET-fixture-only",
+        anthropic_api_key="NOT-A-REAL-ANTHROPIC-KEY-fixture-only",
+        admin_token="NOT-A-REAL-TOKEN-fixture-only",
     )
     blob = repr(s.redacted())
-    for secret in ("PKTESTKEY123456", "supersecretvalue", "sk-ant-abcdef", "hunter2"):
+    for secret in (
+        "NOT-A-REAL-KEY-fixture-only",
+        "NOT-A-REAL-SECRET-fixture-only",
+        "NOT-A-REAL-ANTHROPIC-KEY-fixture-only",
+        "NOT-A-REAL-TOKEN-fixture-only",
+    ):
         assert secret not in blob
     assert s.redacted()["alpaca_api_key"] == "***set***"
     assert Settings().redacted()["alpaca_api_key"] == "***unset***"
