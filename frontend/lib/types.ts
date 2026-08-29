@@ -215,7 +215,48 @@ export interface SystemStatus {
   selector_error: string | null;
   /** The server's verdict: configured to trade AND the selector passed preflight. */
   armed: boolean;
+  /** The most recent trading session — what the closed-market header names. */
+  last_session: string;
   version: string;
+}
+
+export interface CycleProgress {
+  running: boolean;
+  phase: string;
+  symbol: string | null;
+  index: number;
+  total: number;
+  started_at: string | null;
+  finished_at: string | null;
+  error: string | null;
+}
+
+export interface CycleStatus {
+  progress: CycleProgress;
+  last_cycle: {
+    ts: string;
+    scanned: number;
+    candidates: number;
+    decisions: number;
+    errors: number;
+  } | null;
+}
+
+export interface SessionSummary {
+  session_date: string;
+  market_open: boolean;
+  scanned: number;
+  candidates_built: number;
+  survivors: number;
+  counts: Record<string, number>;
+  as_of: string | null;
+  last_fill: {
+    ts: string;
+    symbol: string | null;
+    reason: string;
+    model_rationale: string | null;
+    order_id: string | null;
+  } | null;
 }
 
 export interface VrpHistoryRow {

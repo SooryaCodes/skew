@@ -14,10 +14,10 @@ from __future__ import annotations
 import logging
 import secrets
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, FastAPI, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -142,6 +142,27 @@ app.add_middleware(
 api = APIRouter(prefix="/api")
 
 
+def require_operator(
+    x_operator_token: str = Header(default=""),
+    x_admin_token: str = Header(default=""),
+) -> None:
+    """Auth for every ACTION endpoint. Reads stay fully public.
+
+    No accounts and no login wall — this is a single-operator desk, and judges
+    must reach the dashboard in one click. A shared token in a header, compared
+    in constant time, is the entire ceremony. ADMIN_TOKEN is a legacy alias.
+    """
+    expected = settings.operator_token or settings.admin_token
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="OPERATOR_TOKEN is not configured, so action endpoints are disabled.",
+        )
+    provided = x_operator_token or x_admin_token
+    if not secrets.compare_digest(provided or "", expected):
+        raise HTTPException(status_code=401, detail="Invalid operator token.")
+
+
 def _refresh_cache() -> None:
     """Pull the latest cycle's view into the cache."""
     report = loop.last_cycle()
@@ -183,6 +204,16 @@ def get_status() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001 — status must never 500
         log.warning("market status unavailable: %s", exc)
 
+    from skew.data.calendar import EASTERN, is_trading_day
+    from skew.universe import effective_universe
+
+    # The most recent trading session: today when the market has opened at all
+    # today, otherwise walk back. This is what the closed-market header names.
+    eastern_today = datetime.now(UTC).astimezone(EASTERN).date()
+    session_day = eastern_today
+    while not is_trading_day(session_day):
+        session_day -= timedelta(days=1)
+
     return {
         "ok": True,
         # Not a computed value. There is no configuration of this service that
@@ -193,7 +224,8 @@ def get_status() -> dict[str, Any]:
         "market_open": market_open,
         "broker_connected": desk.broker.available,
         "model_connected": settings.has_model_credentials,
-        "universe": settings.universe_symbols,
+        "universe": effective_universe(settings),
+        "last_session": session_day.isoformat(),
         "last_cycle": report.ts.isoformat() if report else None,
         "auto_execute": settings.auto_execute,
         "scheduler_running": settings.run_scheduler,
@@ -337,27 +369,163 @@ def get_vrp_history(symbol: str) -> dict[str, Any]:
     }
 
 
-@api.post("/kill", summary="Kill switch — halts new entries. Requires auth.")
-@limiter.limit("10/minute")
-def post_kill(
+@api.get("/cycle/status", summary="What the desk is doing right now")
+def get_cycle_status() -> dict[str, Any]:
+    """Live progress of the running cycle, and a summary of the last one.
+
+    Public: watching the desk think is the product's best demo, and reads cost
+    nothing.
+    """
+    report = loop.last_cycle()
+    return {
+        "progress": dict(loop.CYCLE_PROGRESS),
+        "last_cycle": (
+            {
+                "ts": report.ts.isoformat(),
+                "scanned": len(report.scanned),
+                "candidates": len(report.candidates),
+                "decisions": len(report.decisions),
+                "errors": len(report.errors),
+            }
+            if report
+            else None
+        ),
+    }
+
+
+@api.post(
+    "/cycle",
+    summary="Run a cycle now. Requires the operator token.",
+    dependencies=[Depends(require_operator)],
+)
+@limiter.limit("6/minute")
+def post_cycle(request: Request) -> dict[str, Any]:
+    """Trigger an immediate scan in the background.
+
+    The cycle honours every safety rule the scheduled one does: it downgrades
+    itself to a dry run when the market is closed, re-runs gates before any
+    submission, and respects the kill switch. Poll /api/cycle/status to watch.
+    """
+    if loop.CYCLE_PROGRESS.get("running"):
+        raise HTTPException(status_code=409, detail="A cycle is already running.")
+
+    def _run() -> None:
+        try:
+            loop.run_cycle(dry_run=not settings.auto_execute, settings=settings)
+        except loop.CycleInProgress:
+            pass  # lost the race to the scheduler's tick — that cycle serves
+        except Exception:
+            log.exception("operator-triggered cycle failed")
+            loop.CYCLE_PROGRESS.update(running=False, phase="error")
+
+    import threading
+
+    threading.Thread(target=_run, name="operator-cycle", daemon=True).start()
+    audit.record(
+        action="ABSTAINED",
+        reason="Operator triggered an immediate cycle.",
+        risk_tier=_risk().tier,
+        detail={"source": "operator"},
+    )
+    return {"started": True}
+
+
+@api.post(
+    "/universe",
+    summary="Add or remove a symbol. Requires the operator token.",
+    dependencies=[Depends(require_operator)],
+)
+@limiter.limit("20/minute")
+def post_universe(
     request: Request,
-    engage: bool = Query(default=True),
-    x_admin_token: str = Header(default=""),
+    symbol: str = Query(min_length=1, max_length=8),
+    action: str = Query(pattern="^(add|remove)$"),
 ) -> dict[str, Any]:
+    """Edit the universe. Persisted; takes effect on the next cycle.
+
+    This is the entire scope of runtime configuration. Risk tiers, budgets and
+    gate thresholds are deliberately not editable — an editable limit is not an
+    earned one.
+    """
+    from skew import universe
+
+    try:
+        symbols = (
+            universe.add_symbol(symbol, settings)
+            if action == "add"
+            else universe.remove_symbol(symbol, settings)
+        )
+    except universe.UniverseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    audit.record(
+        action="ABSTAINED",
+        reason=f"Operator {'added' if action == 'add' else 'removed'} "
+        f"{universe.validate_symbol(symbol)} — universe is now {', '.join(symbols)}. "
+        f"Takes effect next cycle.",
+        risk_tier=_risk().tier,
+        detail={"source": "operator", "universe": symbols},
+    )
+    return {"universe": symbols, "effective": "next cycle"}
+
+
+@api.get("/session", summary="The shape of the most recent session")
+def get_session() -> dict[str, Any]:
+    """A working day at a glance: what was scanned, built, refused, executed —
+    plus the most recent fill ever, which is the proof the submission rests on.
+    """
+    from skew.data.calendar import EASTERN, is_trading_day
+
+    eastern_now = datetime.now(UTC).astimezone(EASTERN)
+    session_day = eastern_now.date()
+    while not is_trading_day(session_day):
+        session_day -= timedelta(days=1)
+    session_start = datetime.combine(session_day, datetime.min.time(), tzinfo=EASTERN)
+
+    counts = audit.counts_since(session_start.astimezone(UTC))
+    report = loop.last_cycle()
+    last_fill = audit.recent(limit=1, action="EXECUTED")
+
+    market_open = False
+    try:
+        market_open = loop.get_desk().market_open()
+    except Exception as exc:  # noqa: BLE001 — the summary must never 500
+        log.warning("session summary: market state unavailable: %s", exc)
+
+    return {
+        "session_date": session_day.isoformat(),
+        "market_open": market_open,
+        "scanned": len(report.scanned) if report else 0,
+        "candidates_built": len(report.candidates) if report else 0,
+        "survivors": (sum(1 for c in report.candidates if c.passed_all) if report else 0),
+        "counts": counts,
+        "as_of": report.ts.isoformat() if report else None,
+        "last_fill": (
+            {
+                "ts": last_fill[0].ts.isoformat(),
+                "symbol": last_fill[0].symbol,
+                "reason": last_fill[0].reason,
+                "model_rationale": last_fill[0].model_rationale,
+                "order_id": last_fill[0].order_id,
+            }
+            if last_fill
+            else None
+        ),
+    }
+
+
+@api.post(
+    "/kill",
+    summary="Kill switch — halts new entries. Requires auth.",
+    dependencies=[Depends(require_operator)],
+)
+@limiter.limit("10/minute")
+def post_kill(request: Request, engage: bool = Query(default=True)) -> dict[str, Any]:
     """Halt new entries immediately. Monitoring of open positions continues.
 
-    Authenticated with a shared secret, compared in constant time. Also settable
-    by environment variable so the state survives a restart.
+    Authenticated with the operator token, compared in constant time. Also
+    settable by environment variable so the state survives a restart.
     """
-    expected = settings.admin_token
-    if not expected:
-        raise HTTPException(
-            status_code=503,
-            detail="ADMIN_TOKEN is not configured, so the kill switch cannot be authenticated.",
-        )
-    if not secrets.compare_digest(x_admin_token or "", expected):
-        raise HTTPException(status_code=401, detail="Invalid admin token.")
-
     settings.kill_switch = bool(engage)
     audit.record(
         action="REFUSED" if engage else "ABSTAINED",

@@ -138,6 +138,20 @@ class PositionRow(Base):
     structure: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
+class KVRow(Base):
+    """Small operator-set values that must survive a restart.
+
+    Currently holds one key — the universe override. Not a general config
+    store: risk tiers and budgets are deliberately NOT editable at runtime,
+    because an editable limit is not an earned one.
+    """
+
+    __tablename__ = "kv"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
 class EquityRow(Base):
     """Account equity samples, for the drawdown term in the risk authority."""
 

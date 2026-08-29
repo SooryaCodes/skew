@@ -203,6 +203,21 @@ def by_id(decision_id: str) -> Decision | None:
         return _to_model(row) if row else None
 
 
+def counts_since(moment: datetime) -> dict[str, int]:
+    """Executions, refusals and abstentions since a specific instant."""
+    with session_scope() as session:
+        rows = session.execute(
+            select(DecisionRow.action, func.count(DecisionRow.id))
+            .where(DecisionRow.ts >= moment)
+            .group_by(DecisionRow.action)
+        ).all()
+    out = {"EXECUTED": 0, "REFUSED": 0, "ABSTAINED": 0}
+    for action, count in rows:
+        out[action] = int(count)
+    out["TOTAL"] = sum(v for k, v in out.items() if k != "TOTAL")
+    return out
+
+
 def counts(since_hours: int | None = None) -> dict[str, int]:
     """Executions, refusals and abstentions.
 

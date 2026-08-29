@@ -109,11 +109,15 @@ def test_iv_history_labels_its_own_window(client):
 
 def test_kill_switch_requires_a_token(client, monkeypatch):
     monkeypatch.setattr(settings, "admin_token", "s3cret")
+    monkeypatch.setattr(settings, "operator_token", "")
     assert client.post("/api/kill").status_code == 401
     assert client.post("/api/kill", headers={"x-admin-token": "wrong"}).status_code == 401
 
 
 def test_kill_switch_engages_with_the_right_token(client, monkeypatch):
+    # The singleton read the real .env at import; clear operator_token so the
+    # legacy-alias path under test is actually the one exercised.
+    monkeypatch.setattr(settings, "operator_token", "")
     monkeypatch.setattr(settings, "admin_token", "s3cret")
 
     response = client.post("/api/kill", headers={"x-admin-token": "s3cret"})
@@ -126,6 +130,9 @@ def test_kill_switch_engages_with_the_right_token(client, monkeypatch):
 
 
 def test_engaging_the_kill_switch_is_audited(client, monkeypatch):
+    # The singleton read the real .env at import; clear operator_token so the
+    # legacy-alias path under test is actually the one exercised.
+    monkeypatch.setattr(settings, "operator_token", "")
     monkeypatch.setattr(settings, "admin_token", "s3cret")
     client.post("/api/kill", headers={"x-admin-token": "s3cret"})
 
@@ -136,13 +143,14 @@ def test_engaging_the_kill_switch_is_audited(client, monkeypatch):
 def test_kill_switch_refuses_when_no_token_is_configured(client, monkeypatch):
     """Better to fail closed than to expose an unauthenticated write endpoint."""
     monkeypatch.setattr(settings, "admin_token", "")
+    monkeypatch.setattr(settings, "operator_token", "")
     response = client.post("/api/kill", headers={"x-admin-token": "anything"})
     assert response.status_code == 503
     assert "not configured" in response.json()["detail"]
 
 
-def test_the_only_write_endpoint_is_the_kill_switch(client):
-    """Every other route is read-only.
+def test_every_write_endpoint_requires_the_operator_token(client, monkeypatch):
+    """The action surface is exactly three endpoints, all token-gated.
 
     Asserted against the OpenAPI schema rather than app.routes, because that is
     the actual documented public surface — and because this FastAPI version
@@ -156,7 +164,28 @@ def test_the_only_write_endpoint_is_the_kill_switch(client):
         for method in methods
         if method.lower() not in ("get", "head", "options")
     )
-    assert writes == [("/api/kill", "POST")]
+    assert writes == [("/api/cycle", "POST"), ("/api/kill", "POST"), ("/api/universe", "POST")]
+
+    # And every one of them 401s without the token, 503s when none configured.
+    monkeypatch.setattr(settings, "operator_token", "op-secret")
+    monkeypatch.setattr(settings, "admin_token", "")
+    for path, query in (
+        ("/api/cycle", ""),
+        ("/api/kill", ""),
+        ("/api/universe", "?symbol=SPY&action=add"),
+    ):
+        assert client.post(path + query).status_code == 401, path
+        assert (
+            client.post(path + query, headers={"x-operator-token": "wrong"}).status_code == 401
+        ), path
+
+    monkeypatch.setattr(settings, "operator_token", "")
+    for path, query in (
+        ("/api/cycle", ""),
+        ("/api/kill", ""),
+        ("/api/universe", "?symbol=SPY&action=add"),
+    ):
+        assert client.post(path + query).status_code == 503, path
 
 
 def test_every_documented_endpoint_is_reachable(client):
@@ -236,3 +265,83 @@ def test_vrp_history_labels_its_window_honestly(client):
     # the endpoint must degrade rather than 500.
     for row in body["series"]:
         assert set(row) == {"date", "iv", "rv"}
+
+
+# ------------------------------------------------------------------ operator
+
+
+def test_universe_edits_persist_and_validate(client, monkeypatch):
+    monkeypatch.setattr(settings, "operator_token", "op-secret")
+    auth = {"x-operator-token": "op-secret"}
+
+    body = client.post("/api/universe?symbol=xom&action=add", headers=auth).json()
+    assert "XOM" in body["universe"]
+    assert body["effective"] == "next cycle"
+
+    # Persisted: a fresh read of the effective universe includes it.
+    from skew.universe import effective_universe
+
+    assert "XOM" in effective_universe(settings)
+
+    body = client.post("/api/universe?symbol=XOM&action=remove", headers=auth).json()
+    assert "XOM" not in body["universe"]
+
+    # Garbage is refused with a reason, not stored. (Anything longer than 8
+    # chars is cut off even earlier by the query-parameter schema.)
+    response = client.post("/api/universe?symbol=1BAD&action=add", headers=auth)
+    assert response.status_code == 422
+    assert "plausible ticker" in response.json()["detail"]
+
+
+def test_universe_cannot_be_emptied(client, monkeypatch):
+    monkeypatch.setattr(settings, "operator_token", "op-secret")
+    monkeypatch.setattr(settings, "universe", "SPY")
+    auth = {"x-operator-token": "op-secret"}
+    response = client.post("/api/universe?symbol=SPY&action=remove", headers=auth)
+    assert response.status_code == 422
+    assert "cannot be emptied" in response.json()["detail"]
+
+
+def test_risk_tier_has_no_write_endpoint(client):
+    """The earned-authority story: risk limits are strictly read-only. There is
+    no route that can set a tier, a budget, or a gate threshold."""
+    paths = client.get("/openapi.json").json()["paths"]
+    for path, methods in paths.items():
+        if "risk" in path or "tier" in path or "budget" in path:
+            assert set(methods) <= {"get"}, f"{path} must be read-only"
+
+
+def test_cycle_status_is_public_and_shaped(client):
+    body = client.get("/api/cycle/status").json()
+    assert set(body) == {"progress", "last_cycle"}
+    assert body["progress"]["running"] is False
+    assert "phase" in body["progress"]
+
+
+def test_session_summary_is_public_and_names_the_session(client):
+    from skew.audit import log as audit_log
+
+    audit_log.record(
+        action="EXECUTED",
+        reason="Submitted a thing.",
+        risk_tier=0,
+        symbol="AAPL",
+        order_id="skew-test-1",
+    )
+    body = client.get("/api/session").json()
+    assert body["session_date"]
+    assert body["counts"]["EXECUTED"] >= 1
+    assert body["last_fill"]["symbol"] == "AAPL"
+    assert body["last_fill"]["order_id"] == "skew-test-1"
+
+
+def test_status_names_the_last_session(client):
+    body = client.get("/api/status").json()
+    assert "last_session" in body
+    # ISO date, and never a weekend/holiday.
+    import datetime
+
+    day = datetime.date.fromisoformat(body["last_session"])
+    from skew.data.calendar import is_trading_day
+
+    assert is_trading_day(day)

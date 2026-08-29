@@ -18,6 +18,7 @@ of the survivors — if any — to take.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
@@ -133,12 +134,21 @@ class Desk:
             settings=cfg,
         )
 
-    def evaluate_symbol(self, symbol: str, as_of: date | None = None) -> SymbolResult:
+    def evaluate_symbol(
+        self,
+        symbol: str,
+        as_of: date | None = None,
+        on_stage: Callable[[str], None] | None = None,
+    ) -> SymbolResult:
         """The full deterministic pipeline for one underlying.
 
         Never raises: a symbol whose data is unusable produces a result carrying
         the reason, so the loop logs an abstention rather than dying.
+
+        ``on_stage`` reports coarse progress — scanning, building, gating — so
+        the operator's RUN CYCLE NOW control can show the desk thinking.
         """
+        stage = on_stage or (lambda _s: None)
         cfg = self.settings
         symbol = symbol.upper()
         result = SymbolResult(symbol=symbol)
@@ -150,6 +160,7 @@ class Desk:
             return result
 
         try:
+            stage("scanning")
             chain = self.chains.get_chain(
                 symbol, dte_min=cfg.target_dte_min, dte_max=cfg.target_dte_max + 60
             )
@@ -173,6 +184,7 @@ class Desk:
             result.error = vol_state.note
             return result
 
+        stage("building")
         structures = self._build_structures(chain, vol_state, ref)
         if not structures:
             result.error = (
@@ -201,6 +213,7 @@ class Desk:
             max_concurrent_positions=cfg.max_concurrent_positions,
         )
 
+        stage("gating")
         for structure in structures:
             candidate = Candidate(structure=structure, vol_state=vol_state)
             result.candidates.append(run_gates(candidate, context))
@@ -236,8 +249,10 @@ class Desk:
 
     def scan(self, symbols: list[str] | None = None) -> list[SymbolResult]:
         """Evaluate the whole universe."""
+        from skew.universe import effective_universe
+
         self.start_cycle()
-        return [self.evaluate_symbol(s) for s in (symbols or self.settings.universe_symbols)]
+        return [self.evaluate_symbol(s) for s in (symbols or effective_universe(self.settings))]
 
     def market_open(self) -> bool:
         return self.calendar.is_open(datetime.now(UTC))

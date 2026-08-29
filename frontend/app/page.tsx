@@ -12,6 +12,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { AuditStream } from "@/components/AuditStream";
+import { ControlStrip } from "@/components/ControlStrip";
+import { KillBanner, SessionStrip } from "@/components/SessionStrip";
 import { CandidateCard } from "@/components/CandidateCard";
 import { Header } from "@/components/Header";
 import { RiskPanel } from "@/components/RiskPanel";
@@ -25,7 +27,8 @@ import {
   useStatus,
   useUniverse,
 } from "@/lib/api";
-import { volPoints } from "@/lib/format";
+import { clockTime, volPoints } from "@/lib/format";
+import { captureOperatorToken, isOperator } from "@/lib/operator";
 
 export default function DeskPage() {
   const { data: status } = useStatus();
@@ -36,6 +39,13 @@ export default function DeskPage() {
   const { data: counts } = useAuditCounts();
 
   const [selected, setSelected] = useState<string | null>(null);
+  // Token capture happens once, client-side, and the URL is scrubbed. The
+  // operator flag only flips after mount so SSR and hydration agree.
+  const [operator, setOperator] = useState(false);
+  useEffect(() => {
+    captureOperatorToken();
+    setOperator(isOperator());
+  }, []);
 
   const states = useMemo(() => universe ?? [], [universe]);
 
@@ -66,6 +76,9 @@ export default function DeskPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header status={status} tab="desk" />
+      <KillBanner />
+      {operator && <ControlStrip />}
+      <SessionStrip />
 
       <div className="grid flex-1 grid-cols-1 lg:grid-cols-[13rem_minmax(0,1fr)_19rem]">
         {/* scan */}
@@ -94,6 +107,11 @@ export default function DeskPage() {
             </p>
           ) : (
             <>
+              {status && !status.market_open && (
+                <p className="mono mb-2 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
+                  as of {clockTime(focused.as_of)} · last session
+                </p>
+              )}
               <VolReadout state={focused} />
 
               <section className="mt-6" aria-label="Candidates">

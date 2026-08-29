@@ -68,7 +68,9 @@ class Settings(BaseSettings):
     # Container binding. Only read endpoints are public; the one write endpoint is authed.
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    # Shared secret for the single write endpoint (POST /api/kill).
+    # Shared secret for every action endpoint (cycle trigger, kill switch,
+    # universe edits). ADMIN_TOKEN is accepted as a legacy alias.
+    operator_token: str = ""
     admin_token: str = ""
     cors_origins: str = "*"
     rate_limit: str = "120/minute"

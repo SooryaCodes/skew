@@ -24,6 +24,7 @@ than a script:
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import UTC, datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -48,6 +49,32 @@ log = logging.getLogger(__name__)
 
 # Module-level so the API can read the last cycle without re-running one.
 _LAST_CYCLE: CycleReport | None = None
+
+# One cycle at a time, whether the scheduler or the operator asked for it.
+_CYCLE_LOCK = threading.Lock()
+
+# Live progress for the RUN CYCLE NOW control — what the desk is doing right
+# now, so a visitor can watch it think instead of staring at a static page.
+CYCLE_PROGRESS: dict = {
+    "running": False,
+    "phase": "idle",
+    "symbol": None,
+    "index": 0,
+    "total": 0,
+    "started_at": None,
+    "finished_at": None,
+    "error": None,
+}
+
+
+class CycleInProgress(RuntimeError):
+    """A cycle is already running; the trigger should say so, not queue up."""
+
+
+def _progress(**updates) -> None:
+    CYCLE_PROGRESS.update(updates)
+
+
 _DESK: Desk | None = None
 _SELECTOR: BoundedSelector | None = None
 
@@ -86,10 +113,24 @@ def run_cycle(
     """
     global _LAST_CYCLE
 
+    if not _CYCLE_LOCK.acquire(blocking=False):
+        raise CycleInProgress("A cycle is already running.")
+
     cfg = settings or default_settings
     desk = desk or get_desk(cfg)
     selector = selector or get_selector(cfg)
     report = CycleReport(ts=datetime.now(UTC))
+
+    _progress(
+        running=True,
+        phase="starting",
+        symbol=None,
+        index=0,
+        total=0,
+        started_at=report.ts.isoformat(),
+        finished_at=None,
+        error=None,
+    )
 
     init_db()
     desk.start_cycle()
@@ -110,18 +151,32 @@ def run_cycle(
         log.exception("position monitoring failed")
         report.errors.append(f"monitor: {exc}")
 
-    for symbol in cfg.universe_symbols:
-        report.scanned.append(symbol)
-        try:
-            report.decisions.extend(
-                _evaluate_and_act(desk, selector, symbol, report, dry_run=dry_run, settings=cfg)
-            )
-        except Exception as exc:
-            log.exception("cycle failed on %s", symbol)
-            report.errors.append(f"{symbol}: {exc}")
+    from skew.universe import effective_universe
 
-    _LAST_CYCLE = report
-    return report
+    symbols = effective_universe(cfg)
+    _progress(total=len(symbols))
+    try:
+        for index, symbol in enumerate(symbols):
+            report.scanned.append(symbol)
+            _progress(phase="scanning", symbol=symbol, index=index + 1)
+            try:
+                report.decisions.extend(
+                    _evaluate_and_act(desk, selector, symbol, report, dry_run=dry_run, settings=cfg)
+                )
+            except Exception as exc:
+                log.exception("cycle failed on %s", symbol)
+                report.errors.append(f"{symbol}: {exc}")
+
+        _LAST_CYCLE = report
+        return report
+    finally:
+        _progress(
+            running=False,
+            phase="decided",
+            symbol=None,
+            finished_at=datetime.now(UTC).isoformat(),
+        )
+        _CYCLE_LOCK.release()
 
 
 def _evaluate_and_act(
@@ -134,7 +189,7 @@ def _evaluate_and_act(
 ):
     """Everything the desk does about one symbol in one cycle."""
     decisions = []
-    result = desk.evaluate_symbol(symbol)
+    result = desk.evaluate_symbol(symbol, on_stage=lambda stage: _progress(phase=stage))
     tier = result.risk.tier
 
     if result.vol_state is not None:
@@ -178,6 +233,7 @@ def _evaluate_and_act(
         return decisions
 
     # The model sees only pre-validated candidates, and may pick one or abstain.
+    _progress(phase="deciding")
     selection = selector.select(result.vol_state, survivors, result.risk)
     chosen = pick_candidate(survivors, selection)
 
@@ -373,6 +429,9 @@ def build_scheduler(settings: Settings | None = None) -> BackgroundScheduler:
 
     def iv_tick() -> None:
         try:
+            from skew.universe import effective_universe
+
+            poller.symbols = effective_universe(cfg)
             stored = poller.poll_once()
             log.debug("IV poll stored %d symbols", len(stored))
         except Exception:
