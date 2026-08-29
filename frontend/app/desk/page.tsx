@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AuditStream } from "@/components/AuditStream";
 import { CandidateCard } from "@/components/CandidateCard";
-import { CandidateLine } from "@/components/CandidateLine";
+import { CandidateTabs, panelId } from "@/components/CandidateTabs";
 import { ControlStrip } from "@/components/ControlStrip";
 import { Header } from "@/components/Header";
 import { RiskPanel } from "@/components/RiskPanel";
@@ -108,8 +108,6 @@ export default function DeskPage() {
     );
   }, [focusedCandidates, focusId]);
 
-  const waiting = focusedCandidates.filter((c) => c !== stagedCandidate);
-
   return (
     <div className="flex min-h-screen flex-col">
       <Header status={status} tab="desk" />
@@ -194,21 +192,25 @@ export default function DeskPage() {
                   </p>
                 ) : (
                   <>
-                    <CandidateCard
-                      key={stagedCandidate.structure.id}
-                      candidate={stagedCandidate}
-                    />
-                    {waiting.length > 0 && (
-                      <div className="mt-3">
-                        {waiting.map((candidate) => (
-                          <CandidateLine
-                            key={candidate.structure.id}
-                            candidate={candidate}
-                            onFocus={setFocusId}
-                          />
-                        ))}
+                    {focusedCandidates.length > 1 && (
+                      <div className="mb-3">
+                        <CandidateTabs
+                          candidates={focusedCandidates}
+                          activeId={stagedCandidate.structure.id}
+                          onSelect={setFocusId}
+                        />
                       </div>
                     )}
+                    <div
+                      role="tabpanel"
+                      id={panelId(stagedCandidate.structure.id)}
+                      aria-label={`${stagedCandidate.structure.kind} detail`}
+                    >
+                      <CandidateCard
+                        key={stagedCandidate.structure.id}
+                        candidate={stagedCandidate}
+                      />
+                    </div>
                   </>
                 )}
               </section>
