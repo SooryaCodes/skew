@@ -18,7 +18,14 @@ from datetime import UTC, date, datetime
 from math import gcd
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 Regime = Literal["SELL_VOL", "BUY_VOL", "ABSTAIN"]
 StructureKind = Literal["PUT_CREDIT", "CALL_CREDIT", "IRON_CONDOR", "CALL_DEBIT", "PUT_DEBIT"]
@@ -169,10 +176,12 @@ class Structure(BaseModel):
             raise ValueError("A vertical spread must not span more than two expiries.")
         return self
 
+    @computed_field
     @property
     def is_credit(self) -> bool:
         return self.net_credit > 0
 
+    @computed_field
     @property
     def limit_price(self) -> float:
         """Signed limit price for an mleg order.
@@ -182,6 +191,7 @@ class Structure(BaseModel):
         """
         return -round(self.net_credit, 2)
 
+    @computed_field
     @property
     def width(self) -> float:
         """Strike width of the risk, in dollars.
@@ -290,7 +300,8 @@ class RiskAuthority(BaseModel):
     max_concurrent_positions: int = 3
     next_promotion: str = ""  # human copy: what it takes to size up
 
-    @property
+    @computed_field  # serialised, because the dashboard and the MCP surface
+    @property  # both need it and neither should recompute it independently
     def available_dollars(self) -> float:
         return max(0.0, self.budget_dollars - self.used_dollars)
 

@@ -508,3 +508,33 @@ def test_strike_stepping_walks_listed_strikes_not_dollar_distance(real_spy_chain
     higher = strikes_away(contracts, anchor, 2, 1)
     assert higher is not None and higher.strike > anchor.strike
     assert strikes_away(contracts, anchor, 10_000, 1) is None
+
+
+def test_target_width_is_configurable_end_to_end(real_spy_chain, real_as_of):
+    """The config knob must actually reach the builders.
+
+    It did not: `target_width_pct` existed in Settings and was threaded through
+    selection.py, but desk.py never passed it, so every structure silently used
+    the module default and the setting did nothing. Caught by setting it and
+    seeing identical max losses come back.
+    """
+    narrow = build_credit_candidates(
+        real_spy_chain, dte_min=14, dte_max=60, width_pct=0.004, as_of=real_as_of
+    )
+    wide = build_credit_candidates(
+        real_spy_chain, dte_min=14, dte_max=60, width_pct=0.02, as_of=real_as_of
+    )
+    assert narrow and wide
+    assert max(s.width for s in wide) > max(s.width for s in narrow)
+    assert max(s.max_loss for s in wide) > max(s.max_loss for s in narrow)
+
+
+def test_the_desk_passes_its_configured_width(real_spy_chain, real_as_of):
+    """Guards the specific wiring gap, at the seam where it was missing."""
+    import inspect
+
+    from skew.desk import Desk
+
+    source = inspect.getsource(Desk._build_structures)
+    assert "width_pct" in source, "desk must forward the configured width to the builders"
+    assert "cfg.target_width_pct" in source

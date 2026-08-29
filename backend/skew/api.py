@@ -45,9 +45,40 @@ _CACHE: dict[str, Any] = {"vol_states": [], "candidates": [], "as_of": None}
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    """Start the desk alongside the API.
+
+    The trading loop needs a persistent process — that is why this deploys to a
+    container rather than to serverless — so it runs here rather than in a
+    separate service. The first cycle is kicked off immediately, in the
+    scheduler's own thread, so the dashboard has something to render within a
+    few seconds of boot instead of waiting for the first interval.
+    """
     init_db()
+    scheduler = None
+    if settings.run_scheduler:
+        from datetime import timedelta
+
+        from skew.loop import build_scheduler, run_cycle
+
+        scheduler = build_scheduler(settings)
+        scheduler.add_job(
+            lambda: run_cycle(dry_run=not settings.auto_execute, settings=settings),
+            "date",
+            run_date=datetime.now(UTC) + timedelta(seconds=2),
+            id="startup_cycle",
+        )
+        scheduler.start()
+        log.info(
+            "scheduler started — %ss cycle, auto_execute=%s",
+            settings.loop_interval_seconds,
+            settings.auto_execute,
+        )
+
     log.info("SKEW API up — paper-only, base URL %s", settings.alpaca_base_url)
     yield
+
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
 
 
 app = FastAPI(
@@ -129,6 +160,8 @@ def get_status() -> dict[str, Any]:
         "model_connected": settings.has_model_credentials,
         "universe": settings.universe_symbols,
         "last_cycle": report.ts.isoformat() if report else None,
+        "auto_execute": settings.auto_execute,
+        "scheduler_running": settings.run_scheduler,
         "version": VERSION,
     }
 

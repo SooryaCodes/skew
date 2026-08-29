@@ -99,6 +99,12 @@ export interface Structure {
   spot: number;
   qty: number;
   created_at: string;
+  /** Derived server-side so the client never recomputes them independently. */
+  is_credit: boolean;
+  /** Alpaca mleg convention: positive is a debit, negative is a credit. */
+  limit_price: number;
+  /** For an iron condor this is the wing width, not the full strike span. */
+  width: number;
 }
 
 export interface GateResult {
@@ -153,6 +159,8 @@ export interface RiskAuthority {
   open_positions: number;
   max_concurrent_positions: number;
   next_promotion: string;
+  /** budget − used, floored at zero. Computed server-side. */
+  available_dollars: number;
 }
 
 export interface Position {

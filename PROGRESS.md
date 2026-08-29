@@ -99,11 +99,33 @@ correct fail-safe — the desk does not trade when the selection step is down.
 
 ## Phase 05 — MCP server
 
-**Works:** _pending_
+**Works:** Seven read tools on FastMCP, all routed through the same Desk and the
+same gate chain as the loop. Verified live: `propose_structures` on AAPL returns
+three candidates with every gate evaluated, `stress_test` returns all 84 cells.
+`execute` and `close` are *registered* only when `MCP_ALLOW_EXECUTE` is true —
+absent from the tool list rather than refused at call time, so an accidental
+connection has nothing to try. Connection guide in `docs/MCP-SETUP.md`.
 
 ## Phase 06 — Dashboard
 
-**Works:** _pending_
+**Works:** Three columns mirroring the decision sequence — scan, decide, govern
+— with positions deliberately behind a tab. Live skew curve as the header spine,
+universe rail, vol readout, candidate cards with Recharts payoff diagrams and
+hand-rolled 7×4 stress grids, risk authority panel, audit stream. Verified in a
+browser against live data at 1400px and at the 768px quality floor with no
+horizontal overflow.
+
+The refusal choreography was verified in the DOM, not just by eye: refused cards
+carry `filter: saturate(0.4)` and `opacity: 0.55`, breaching cells render
+`rgb(217,83,79)` — exactly `--breach` — and that colour appears nowhere else.
+Failing gate rows are `--breach`, passing ones `--cheap`, and every gate is shown
+even after the first failure.
+
+**Bug found by the UI work:** `TARGET_WIDTH_PCT` was a dead setting. It existed
+in `Settings`, was threaded through `selection.py`, and `desk.py` never passed
+it — so every structure silently used the module default and the knob did
+nothing. Caught by setting it and seeing identical max losses come back. Now
+wired, with a test at the exact seam that was missing.
 
 ## Phase 07 — Hardening
 

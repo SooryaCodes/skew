@@ -221,6 +221,7 @@ class Desk:
             "qty": 1,
             "dte_min": cfg.target_dte_min,
             "dte_max": cfg.target_dte_max,
+            "width_pct": cfg.target_width_pct,
             "min_open_interest": cfg.min_open_interest,
             "max_spread_pct": cfg.max_spread_pct,
             "as_of": ref,

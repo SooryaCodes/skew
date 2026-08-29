@@ -21,7 +21,11 @@ from datetime import date
 from skew.data.chains import OptionChain
 from skew.models import Structure
 from skew.structures.base import StructureError, assemble, leg_from_contract
-from skew.structures.selection import choose_expiry, select_debit_vertical
+from skew.structures.selection import (
+    DEFAULT_WIDTH_PCT,
+    choose_expiry,
+    select_debit_vertical,
+)
 
 log = logging.getLogger(__name__)
 
@@ -73,7 +77,7 @@ def call_debit_spread(
     chain: OptionChain,
     expiry: date | None = None,
     long_delta: float = 0.50,
-    width_pct: float = 0.0075,
+    width_pct: float = DEFAULT_WIDTH_PCT,
     qty: int = 1,
     dte_min: int = 21,
     dte_max: int = 45,
@@ -102,7 +106,7 @@ def put_debit_spread(
     chain: OptionChain,
     expiry: date | None = None,
     long_delta: float = 0.50,
-    width_pct: float = 0.0075,
+    width_pct: float = DEFAULT_WIDTH_PCT,
     qty: int = 1,
     dte_min: int = 21,
     dte_max: int = 45,
@@ -133,6 +137,7 @@ def build_debit_candidates(
     dte_min: int = 21,
     dte_max: int = 45,
     long_delta: float = 0.50,
+    width_pct: float = DEFAULT_WIDTH_PCT,
     min_open_interest: int = 0,
     max_spread_pct: float = 1.0,
     as_of: date | None = None,
@@ -148,6 +153,7 @@ def build_debit_candidates(
         "dte_min": dte_min,
         "dte_max": dte_max,
         "long_delta": long_delta,
+        "width_pct": width_pct,
         "min_open_interest": min_open_interest,
         "max_spread_pct": max_spread_pct,
         "as_of": as_of,

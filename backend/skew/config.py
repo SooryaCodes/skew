@@ -76,6 +76,15 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
     rate_limit: str = "120/minute"
 
+    # ---- Scheduler ----
+    # The API process runs the trading loop, because the loop needs a persistent
+    # process and serverless will not do.
+    run_scheduler: bool = True
+    # Off by default: the loop scans, gates and logs every cycle but submits
+    # nothing until this is explicitly turned on. Paper trading is safe, but
+    # placing orders while developing the UI is still not what anyone wants.
+    auto_execute: bool = False
+
     # ---- MCP ----
     # Write tools on the MCP surface are OFF unless this is explicitly enabled.
     mcp_allow_execute: bool = False

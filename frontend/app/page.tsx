@@ -1,92 +1,152 @@
+"use client";
+
 /**
- * Phase 00 placeholder — confirms the palette, the three type faces and the
- * panel treatment render correctly before any real component is built.
- * Replaced by the desk in Phase 06.
+ * The desk.
+ *
+ * Three columns, mirroring the actual decision sequence: **scan, decide,
+ * govern.** Positions and P&L live on a second screen behind a tab — a
+ * deliberate, defensible choice. The product's claim is that risk governance
+ * matters more than returns, and the layout should say that before any words do.
  */
 
-const SWATCHES = [
-  { name: "--ground", value: "var(--ground)", note: "deep indigo-black, has a temperature" },
-  { name: "--surface", value: "var(--surface)", note: "raised panels" },
-  { name: "--line", value: "var(--line)", note: "hairlines, grid, dividers" },
-  { name: "--text", value: "var(--text)", note: "primary" },
-  { name: "--muted", value: "var(--muted)", note: "labels, axes, secondary" },
-  { name: "--rich", value: "var(--rich)", note: "vol is EXPENSIVE — sell premium" },
-  { name: "--cheap", value: "var(--cheap)", note: "vol is CHEAP — buy premium" },
-  { name: "--breach", value: "var(--breach)", note: "a gate FAILED — nothing else, ever" },
-] as const;
+import { useEffect, useMemo, useState } from "react";
 
-export default function Home() {
+import { AuditStream } from "@/components/AuditStream";
+import { CandidateCard } from "@/components/CandidateCard";
+import { Header } from "@/components/Header";
+import { RiskPanel } from "@/components/RiskPanel";
+import { UniverseRail } from "@/components/UniverseRail";
+import { VolReadout } from "@/components/VolReadout";
+import {
+  useAudit,
+  useAuditCounts,
+  useCandidates,
+  useRisk,
+  useStatus,
+  useUniverse,
+} from "@/lib/api";
+import { volPoints } from "@/lib/format";
+
+export default function DeskPage() {
+  const { data: status } = useStatus();
+  const { data: universe, isLoading: universeLoading, error: universeError } = useUniverse();
+  const { data: candidates } = useCandidates();
+  const { data: risk } = useRisk();
+  const { data: audit } = useAudit(40);
+  const { data: counts } = useAuditCounts();
+
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const states = useMemo(() => universe ?? [], [universe]);
+
+  // Focus the richest-volatility name by default — that is where the desk is
+  // most likely to have something to say.
+  useEffect(() => {
+    if (selected === null && states.length > 0) {
+      const richest = [...states].sort((a, b) => b.vrp - a.vrp)[0];
+      if (richest) setSelected(richest.symbol);
+    }
+  }, [states, selected]);
+
+  const focused = states.find((s) => s.symbol === selected);
+  const focusedCandidates = useMemo(
+    () => (candidates ?? []).filter((c) => c.structure.symbol === selected),
+    [candidates, selected],
+  );
+
+  const abstainCopy = useMemo(() => {
+    if (!states.length) return null;
+    const below = states.filter((s) => s.regime === "ABSTAIN").length;
+    if (below === states.length) {
+      return `No candidates — every one of the ${states.length} names is inside the VRP band or otherwise standing down.`;
+    }
+    return null;
+  }, [states]);
+
   return (
-    <main className="mx-auto max-w-4xl px-6 py-16">
-      <p className="mono text-[color:var(--muted)] text-xs uppercase tracking-widest">
-        Phase 00 — scaffold
-      </p>
-      <h1 className="font-display mt-3 text-[length:var(--fs-xl)] leading-none">SKEW</h1>
-      <p className="mt-4 max-w-xl text-[color:var(--muted)]">
-        An options desk that never predicts price direction. It measures the gap between
-        implied and realized volatility and takes defined-risk positions into it — with
-        every trade gated by a deterministic stress test before the model is allowed to act.
-      </p>
+    <div className="flex min-h-screen flex-col">
+      <Header focused={focused} status={status} tab="desk" />
 
-      <section className="mt-12">
-        <h2 className="font-display text-[length:var(--fs-md)]">Palette</h2>
-        <div className="panel mt-4 divide-y divide-[color:var(--line)]">
-          {SWATCHES.map((s) => (
-            <div key={s.name} className="flex items-center gap-4 px-4 py-3">
-              <span
-                className="h-6 w-10 shrink-0 border border-[color:var(--line)]"
-                style={{ background: s.value, borderRadius: "var(--radius)" }}
-              />
-              <span className="mono w-28 shrink-0 text-xs">{s.name}</span>
-              <span className="text-[color:var(--muted)] text-xs">{s.note}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      <div className="grid flex-1 grid-cols-1 lg:grid-cols-[13rem_minmax(0,1fr)_19rem]">
+        {/* scan */}
+        <aside className="border-b border-[color:var(--line)] lg:border-b-0 lg:border-r">
+          <UniverseRail
+            states={states}
+            selected={selected}
+            onSelect={setSelected}
+            loading={universeLoading}
+          />
+        </aside>
 
-      <section className="mt-12">
-        <h2 className="font-display text-[length:var(--fs-md)]">Type</h2>
-        <div className="panel mt-4 space-y-3 p-4">
-          <p className="font-display text-[length:var(--fs-lg)]">Archivo — display</p>
-          <p className="text-[length:var(--fs-base)]">
-            Instrument Sans — body. Gate reasons and model rationale render in this face.
-          </p>
-          <p className="mono text-[length:var(--fs-base)]">
-            IBM Plex Mono — data. 0123456789 −$1,240.00 +14.2σ
-          </p>
-          <p className="contract text-[length:var(--fs-sm)] text-[color:var(--muted)]">
-            spy250919p00580000
-          </p>
-        </div>
-      </section>
-
-      <section className="mt-12">
-        <h2 className="font-display text-[length:var(--fs-md)]">Two poles</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div className="panel p-4">
-            <p className="mono text-xs uppercase tracking-widest text-[color:var(--rich)]">
-              vol rich
+        {/* decide */}
+        <main className="min-w-0 p-4">
+          {universeError ? (
+            <p className="text-sm text-[color:var(--muted)]">
+              Cannot reach the desk API. Start the backend with{" "}
+              <span className="mono">uvicorn skew.api:app</span> and check{" "}
+              <span className="mono">NEXT_PUBLIC_API_BASE</span>.
             </p>
-            <p className="mono mt-2 text-[length:var(--fs-lg)] text-[color:var(--rich)]">+14.2</p>
-            <p className="mt-1 text-xs text-[color:var(--muted)]">
-              IV above realized. The market is overpaying for fear — sell premium.
+          ) : !focused ? (
+            <p className="text-sm text-[color:var(--muted)]">
+              {universeLoading
+                ? "Scanning — the first cycle takes a few seconds."
+                : "Select a symbol to see its volatility state."}
             </p>
+          ) : (
+            <>
+              <VolReadout state={focused} />
+
+              <section className="mt-6" aria-label="Candidates">
+                <div className="mb-3 flex items-baseline justify-between">
+                  <h2 className="mono text-[10px] uppercase tracking-widest text-[color:var(--muted)]">
+                    candidates
+                  </h2>
+                  {focusedCandidates.length > 0 && (
+                    <span className="mono text-[10px] text-[color:var(--muted)]">
+                      {focusedCandidates.filter((c) => c.passed_all).length} of{" "}
+                      {focusedCandidates.length} survived the gate chain
+                    </span>
+                  )}
+                </div>
+
+                {focusedCandidates.length === 0 ? (
+                  // Empty states are instructions, not "No data".
+                  <p className="text-sm text-[color:var(--muted)]">
+                    {abstainCopy ??
+                      `No candidates for ${focused.symbol} — ${focused.note}`}
+                  </p>
+                ) : (
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {focusedCandidates.map((candidate) => (
+                      <CandidateCard key={candidate.structure.id} candidate={candidate} />
+                    ))}
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+        </main>
+
+        {/* govern */}
+        <aside className="flex max-h-screen flex-col border-t border-[color:var(--line)] lg:border-l lg:border-t-0">
+          <RiskPanel risk={risk} />
+          <div className="min-h-0 flex-1 border-t border-[color:var(--line)]">
+            <AuditStream decisions={audit ?? []} counts={counts} />
           </div>
-          <div className="panel p-4">
-            <p className="mono text-xs uppercase tracking-widest text-[color:var(--cheap)]">
-              vol cheap
-            </p>
-            <p className="mono mt-2 text-[length:var(--fs-lg)] text-[color:var(--cheap)]">−3.1</p>
-            <p className="mt-1 text-xs text-[color:var(--muted)]">
-              Movement is underpriced relative to what actually happened — buy premium.
-            </p>
-          </div>
-        </div>
-      </section>
+        </aside>
+      </div>
 
-      <p className="mono mt-16 text-xs text-[color:var(--muted)]">
-        paper trading only · no live code path exists
-      </p>
-    </main>
+      <footer className="border-t border-[color:var(--line)] px-4 py-2">
+        <p className="mono text-[10px] text-[color:var(--muted)]">
+          {states.length > 0 && (
+            <>
+              {states.length} names scanned · widest VRP{" "}
+              {volPoints(Math.max(...states.map((s) => s.vrp)))} ·{" "}
+            </>
+          )}
+          paper trading only · no live code path exists · direction is never an input
+        </p>
+      </footer>
+    </div>
   );
 }
