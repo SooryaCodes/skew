@@ -97,11 +97,16 @@ def earnings_gate(candidate: Candidate, ctx: GateContext) -> GateResult:
     if hit is not None:
         days = (hit - ctx.as_of).days
         when = f"in {days} days" if days > 0 else f"{abs(days)} days ago"
+        confidence = ctx.earnings.confidence_for(symbol, hit)
+        # An estimated date blocks exactly like a confirmed one — a probable
+        # event window is still an event window — but the copy says which it is
+        # rather than claiming more certainty than the data has.
+        qualifier = "reports" if confidence == "confirmed" else "is estimated to report"
         return GateResult(
             gate=GATE,
             passed=False,
             reason=(
-                f"{symbol} reports on {hit:%d %b} ({when}), inside the "
+                f"{symbol} {qualifier} on {hit:%d %b} ({when}), inside the "
                 f"{ctx.earnings_blackout_days}-day blackout or before this structure expires "
                 f"on {expiry:%d %b}. Implied vol is elevated for a known event and will "
                 f"crush on the print — that premium is not the variance risk premium."
@@ -109,19 +114,26 @@ def earnings_gate(candidate: Candidate, ctx: GateContext) -> GateResult:
             detail={
                 "earnings_date": hit.isoformat(),
                 "days_away": days,
+                "confidence": confidence,
+                "source": ctx.earnings.source_for(symbol, hit),
                 "blackout_days": ctx.earnings_blackout_days,
                 "expiry": expiry.isoformat(),
             },
         )
 
     next_date = ctx.earnings.next_earnings(symbol, as_of=ctx.as_of)
-    tail = f"Next report {next_date:%d %b}, after expiry." if next_date else "No report scheduled."
+    if next_date:
+        confidence = ctx.earnings.confidence_for(symbol, next_date)
+        tail = f"Next report {next_date:%d %b} ({confidence}), after expiry."
+    else:
+        tail = "No report scheduled."
     return GateResult(
         gate=GATE,
         passed=True,
         reason=f"No earnings for {symbol} before this structure expires on {expiry:%d %b}. {tail}",
         detail={
             "next_earnings": next_date.isoformat() if next_date else None,
+            "confidence": ctx.earnings.confidence_for(symbol, next_date) if next_date else None,
             "expiry": expiry.isoformat(),
         },
     )

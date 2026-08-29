@@ -8,15 +8,44 @@
     "this desk exists to avoid, so an unknown date abstains loudly rather than",
     "waving the trade through. ETFs are exempt (see KNOWN_ETFS in data/calendar.py).",
     "",
-    "Fill in the next confirmed report date per name before the demo. Dates are the",
-    "report date itself; the gate applies EARNINGS_BLACKOUT_DAYS either side and",
-    "also blocks any report falling between today and the structure's expiry."
+    "An entry is either a bare ISO date (treated as confirmed) or an object with",
+    "date / confidence / source. 'estimated' dates are forecasts from a reporting",
+    "pattern, not company announcements — they block exactly the same way, and the",
+    "gate says which kind it used so the reason string stays honest.",
+    "",
+    "The gate applies EARNINGS_BLACKOUT_DAYS either side of the date, and also",
+    "blocks any report falling between today and the structure's expiry."
   ],
+  "_verify_before_demo": "Re-check every 'estimated' entry against the company IR page.",
   "symbols": {
-    "AAPL": [],
-    "MSFT": [],
-    "NVDA": [],
-    "AMD": [],
-    "TSLA": []
+    "AAPL": [
+      {
+        "date": "2026-10-29",
+        "confidence": "estimated",
+        "source": "forecast from historical fiscal-Q4 reporting pattern; not company-confirmed"
+      }
+    ],
+    "MSFT": [
+      {
+        "date": "2026-10-27",
+        "confidence": "confirmed",
+        "source": "reported as confirmed, after close"
+      }
+    ],
+    "TSLA": [
+      {
+        "date": "2026-10-28",
+        "confidence": "confirmed",
+        "source": "reported as confirmed, after close"
+      }
+    ],
+    "NVDA": [
+      {
+        "date": "2026-11-17",
+        "confidence": "estimated",
+        "source": "sources disagree (17 Nov vs 25 Nov); the earlier date is taken because it blocks the wider window"
+      }
+    ],
+    "AMD": []
   }
 }

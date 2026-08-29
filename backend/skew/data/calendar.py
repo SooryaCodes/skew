@@ -189,20 +189,38 @@ def is_monthly_expiry(expiry: date) -> bool:
 class EarningsCalendar:
     """Operator-maintained earnings dates.
 
-    File shape (``backend/data/earnings.json``)::
+    File shape (``backend/data/earnings.json``). An entry is either a bare ISO
+    date, treated as confirmed, or an object carrying its provenance::
 
         {
-          "_comment": "...",
-          "symbols": { "AAPL": ["2025-10-30"], "NVDA": ["2025-11-19"] }
+          "symbols": {
+            "MSFT": ["2026-10-27"],
+            "AAPL": [{"date": "2026-10-29", "confidence": "estimated",
+                      "source": "forecast from reporting pattern"}]
+          }
         }
 
-    ``status_for`` returns one of ``"etf"``, ``"known"`` or ``"unknown"`` so the
-    gate can write an honest reason string for each case.
+    The confirmed/estimated distinction is kept rather than flattened because a
+    forecast date and an announced one are different facts. Both block
+    identically — a probable event window is still an event window — but the
+    gate names which kind it used, so the reason string in the UI never claims
+    more certainty than the data has.
+
+    ``status_for`` returns ``"etf"``, ``"known"`` or ``"unknown"``.
     """
 
     def __init__(self, path: Path | None = None, data: dict[str, list[date]] | None = None) -> None:
         self.path = path or EARNINGS_FILE
+        self._confidence: dict[tuple[str, date], str] = {}
+        self._sources: dict[tuple[str, date], str] = {}
         self._dates: dict[str, list[date]] = data if data is not None else self._load()
+
+    def confidence_for(self, symbol: str, when: date) -> str:
+        """``"confirmed"`` or ``"estimated"``. Unknown entries default to confirmed."""
+        return self._confidence.get((symbol.upper(), when), "confirmed")
+
+    def source_for(self, symbol: str, when: date) -> str:
+        return self._sources.get((symbol.upper(), when), "")
 
     def _load(self) -> dict[str, list[date]]:
         if not self.path.exists():
@@ -220,13 +238,27 @@ class EarningsCalendar:
 
         out: dict[str, list[date]] = {}
         for symbol, entries in (raw.get("symbols") or {}).items():
+            key = symbol.upper()
             parsed: list[date] = []
             for entry in entries or []:
+                if isinstance(entry, dict):
+                    raw_date = entry.get("date")
+                    confidence = str(entry.get("confidence", "confirmed")).lower()
+                    source = str(entry.get("source", ""))
+                else:
+                    raw_date, confidence, source = entry, "confirmed", ""
                 try:
-                    parsed.append(date.fromisoformat(str(entry)[:10]))
-                except ValueError:
+                    when = date.fromisoformat(str(raw_date)[:10])
+                except (ValueError, TypeError):
                     log.warning("Ignoring unparseable earnings date %r for %s", entry, symbol)
-            out[symbol.upper()] = sorted(parsed)
+                    continue
+                parsed.append(when)
+                self._confidence[(key, when)] = (
+                    confidence if confidence in ("confirmed", "estimated") else "confirmed"
+                )
+                if source:
+                    self._sources[(key, when)] = source
+            out[key] = sorted(parsed)
         return out
 
     def status_for(self, symbol: str) -> str:
