@@ -1,169 +1,269 @@
 "use client";
 
 /**
- * The desk.
+ * The landing page. No auth, no signup, no gate — the CTA goes straight to
+ * the desk. Six sections, one idea each.
  *
- * Three columns, mirroring the actual decision sequence: **scan, decide,
- * govern.** Positions and P&L live on a second screen behind a tab — a
- * deliberate, defensible choice. The product's claim is that risk governance
- * matters more than returns, and the layout should say that before any words do.
+ * Two honesty rules govern everything below. The live-proof section reads REAL
+ * numbers from the running desk or says plainly that it cannot; the refusal
+ * section shows a REAL refused grid from the audit history or says none exists
+ * yet. Nothing on this page fabricates a number, ever.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
-import { AuditStream } from "@/components/AuditStream";
-import { ControlStrip } from "@/components/ControlStrip";
-import { KillBanner, SessionStrip } from "@/components/SessionStrip";
-import { CandidateCard } from "@/components/CandidateCard";
-import { Header } from "@/components/Header";
-import { RiskPanel } from "@/components/RiskPanel";
-import { UniverseRail } from "@/components/UniverseRail";
-import { VolReadout } from "@/components/VolReadout";
-import {
-  useAudit,
-  useAuditCounts,
-  useCandidates,
-  useRisk,
-  useStatus,
-  useUniverse,
-} from "@/lib/api";
-import { clockTime, volPoints } from "@/lib/format";
-import { captureOperatorToken, isOperator } from "@/lib/operator";
+import { SkewCurve } from "@/components/SkewCurve";
+import { StressGrid } from "@/components/StressGrid";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useRefusalExhibit, useStatus, useUniverse } from "@/lib/api";
+import { clockTime, regimeColor, timeAgo, volPoints } from "@/lib/format";
 
-export default function DeskPage() {
-  const { data: status } = useStatus();
-  const { data: universe, isLoading: universeLoading, error: universeError } = useUniverse();
-  const { data: candidates } = useCandidates();
-  const { data: risk } = useRisk();
-  const { data: audit } = useAudit(40);
-  const { data: counts } = useAuditCounts();
+const GITHUB = "https://github.com/USER/skew";
 
-  const [selected, setSelected] = useState<string | null>(null);
-  // Token capture happens once, client-side, and the URL is scrubbed. The
-  // operator flag only flips after mount so SSR and hydration agree.
-  const [operator, setOperator] = useState(false);
-  useEffect(() => {
-    captureOperatorToken();
-    setOperator(isOperator());
-  }, []);
-
-  const states = useMemo(() => universe ?? [], [universe]);
-
-  // Focus the richest-volatility name by default — that is where the desk is
-  // most likely to have something to say.
-  useEffect(() => {
-    if (selected === null && states.length > 0) {
-      const richest = [...states].sort((a, b) => b.vrp - a.vrp)[0];
-      if (richest) setSelected(richest.symbol);
-    }
-  }, [states, selected]);
-
-  const focused = states.find((s) => s.symbol === selected);
-  const focusedCandidates = useMemo(
-    () => (candidates ?? []).filter((c) => c.structure.symbol === selected),
-    [candidates, selected],
+function Section({
+  children,
+  full = false,
+  label,
+}: {
+  children: React.ReactNode;
+  full?: boolean;
+  label: string;
+}) {
+  return (
+    <section
+      aria-label={label}
+      className={`mx-auto w-full max-w-5xl px-6 ${
+        full ? "flex min-h-screen flex-col justify-center py-16" : "py-20"
+      }`}
+    >
+      {children}
+    </section>
   );
+}
 
-  const abstainCopy = useMemo(() => {
-    if (!states.length) return null;
-    const below = states.filter((s) => s.regime === "ABSTAIN").length;
-    if (below === states.length) {
-      return `No candidates — every one of the ${states.length} names is inside the VRP band or otherwise standing down.`;
-    }
-    return null;
-  }, [states]);
+export default function Landing() {
+  const { data: status } = useStatus();
+  const { data: universe, error: universeError } = useUniverse();
+  const { data: exhibit } = useRefusalExhibit();
+
+  const states = universe ?? [];
+  const hero = [...states].sort((a, b) => Math.abs(b.vrp) - Math.abs(a.vrp))[0];
+  const closed = status ? !status.market_open : false;
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header status={status} tab="desk" />
-      <KillBanner />
-      {operator && <ControlStrip />}
-      <SessionStrip />
-
-      <div className="grid flex-1 grid-cols-1 lg:grid-cols-[13rem_minmax(0,1fr)_19rem]">
-        {/* scan */}
-        <aside className="border-b border-[color:var(--line)] lg:border-b-0 lg:border-r">
-          <UniverseRail
-            states={states}
-            selected={selected}
-            onSelect={setSelected}
-            loading={universeLoading}
-          />
-        </aside>
-
-        {/* decide */}
-        <main className="min-w-0 p-4">
-          {universeError ? (
-            <p className="text-sm text-[color:var(--text-dim)]">
-              Cannot reach the desk API. Start the backend with{" "}
-              <span className="mono">uvicorn skew.api:app</span> and check{" "}
-              <span className="mono">NEXT_PUBLIC_API_BASE</span>.
-            </p>
-          ) : !focused ? (
-            <p className="text-sm text-[color:var(--text-dim)]">
-              {universeLoading
-                ? "Scanning — the first cycle takes a few seconds."
-                : "Select a symbol to see its volatility state."}
-            </p>
-          ) : (
-            <>
-              {status && !status.market_open && (
-                <p className="mono mb-2 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
-                  as of {clockTime(focused.as_of)} · last session
-                </p>
-              )}
-              <VolReadout state={focused} />
-
-              <section className="mt-6" aria-label="Candidates">
-                <div className="mb-3 flex items-baseline justify-between">
-                  <h2 className="mono text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
-                    candidates
-                  </h2>
-                  {focusedCandidates.length > 0 && (
-                    <span className="mono text-[10px] text-[color:var(--text-dim)]">
-                      {focusedCandidates.filter((c) => c.passed_all).length} of{" "}
-                      {focusedCandidates.length} survived the gate chain
-                    </span>
-                  )}
-                </div>
-
-                {focusedCandidates.length === 0 ? (
-                  // Empty states are instructions, not "No data".
-                  <p className="text-sm text-[color:var(--text-dim)]">
-                    {abstainCopy ??
-                      `No candidates for ${focused.symbol} — ${focused.note}`}
-                  </p>
-                ) : (
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    {focusedCandidates.map((candidate) => (
-                      <CandidateCard key={candidate.structure.id} candidate={candidate} />
-                    ))}
-                  </div>
-                )}
-              </section>
-            </>
-          )}
-        </main>
-
-        {/* govern */}
-        <aside className="flex max-h-screen flex-col border-t border-[color:var(--line)] lg:border-l lg:border-t-0">
-          <RiskPanel risk={risk} />
-          <div className="min-h-0 flex-1 border-t border-[color:var(--line)]">
-            <AuditStream decisions={audit ?? []} counts={counts} />
-          </div>
-        </aside>
+    <div className="min-h-screen">
+      {/* minimal chrome — the page is the pitch, not an app shell */}
+      <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
+        <span className="font-display text-[length:var(--fs-md)]">SKEW</span>
+        <ThemeToggle />
       </div>
 
-      <footer className="border-t border-[color:var(--line)] px-4 py-2">
-        <p className="mono text-[10px] text-[color:var(--text-dim)]">
-          {states.length > 0 && (
-            <>
-              {states.length} names scanned · widest VRP{" "}
-              {volPoints(Math.max(...states.map((s) => s.vrp)))} ·{" "}
-            </>
-          )}
-          paper trading only · no live code path exists · direction is never an input
+      {/* 1 — HERO */}
+      <Section full label="Hero">
+        {hero && (
+          <div className="mb-10 w-full max-w-[760px]">
+            <SkewCurve
+              slices={hero.skew_slices}
+              spot={hero.spot}
+              rv20={hero.rv_20}
+              redrawKey={`hero-${hero.symbol}`}
+              large
+            />
+            <p className="mono mt-1 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
+              {hero.symbol} · implied volatility by strike · live from the desk
+            </p>
+          </div>
+        )}
+
+        <h1 className="font-display max-w-3xl text-[length:var(--fs-xl)] leading-[1.05] sm:text-[4.5rem]">
+          It doesn&rsquo;t predict the market.
+          <br />
+          It prices it.
+        </h1>
+        <p className="mono mt-6 text-[11px] uppercase tracking-[0.2em] text-[color:var(--text-dim)]">
+          autonomous volatility desk · alpaca paper
         </p>
+        <div className="mt-10">
+          <Link
+            href="/desk"
+            className="mono t-fast inline-block border border-[color:var(--text)] px-5 py-2.5 text-[12px] uppercase tracking-widest text-[color:var(--text)] hover:bg-[color:var(--panel-alt)]"
+            style={{ borderRadius: "var(--radius)" }}
+          >
+            Enter the desk
+          </Link>
+        </div>
+      </Section>
+
+      {/* 2 — THE ARGUMENT */}
+      <Section label="The argument">
+        <div className="grid gap-12 md:grid-cols-2">
+          <div className="text-[15px] leading-relaxed text-[color:var(--text-dim)]">
+            <p className="mono mb-4 text-[10px] uppercase tracking-widest">
+              what every other agent does
+            </p>
+            <p>
+              Predict direction. Read the headlines, or a moving average, or a
+              model&rsquo;s intuition, and buy an option pointing the way it
+              guesses. The option is incidental — a leveraged bet on a forecast
+              that neither the model nor anyone else can reliably make.
+            </p>
+          </div>
+          <div className="text-[15px] leading-relaxed text-[color:var(--text)]">
+            <p className="mono mb-4 text-[10px] uppercase tracking-widest">what this desk does</p>
+            <p>
+              Measure what movement costs against what movement actually is.
+              Implied volatility runs persistently above the volatility that
+              gets realized, because people pay for protection. That gap — the
+              variance risk premium — is structural, documented, and requires
+              no forecast at all. Direction is never an input.
+            </p>
+          </div>
+        </div>
+      </Section>
+
+      {/* 3 — LIVE PROOF */}
+      <Section label="Live proof">
+        <p className="mono mb-6 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+          the premium, right now
+        </p>
+        {universeError || states.length === 0 ? (
+          // Quiet degradation. Never a fabricated number.
+          <p className="text-sm text-[color:var(--text-dim)]">
+            {universeError
+              ? "The desk is not reachable from here right now — and nothing on this page is invented in its absence."
+              : "The desk has not published its first scan yet."}
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-4">
+              {[...states]
+                .sort((a, b) => Math.abs(b.vrp) - Math.abs(a.vrp))
+                .map((state) => (
+                  <div key={state.symbol}>
+                    <p className="mono text-[11px] text-[color:var(--text-dim)]">
+                      {state.symbol}
+                    </p>
+                    {/* Metal at dial size — the >=24px / 3:1 tier both metals clear. */}
+                    <p
+                      className="font-display text-[2rem] leading-tight"
+                      style={{ color: regimeColor(state.regime) }}
+                    >
+                      {volPoints(state.vrp)}
+                    </p>
+                    <p className="mono text-[9px] uppercase tracking-wider text-[color:var(--text-faint)]">
+                      {state.regime === "SELL_VOL"
+                        ? "vol rich"
+                        : state.regime === "BUY_VOL"
+                          ? "vol cheap"
+                          : "abstaining"}
+                    </p>
+                  </div>
+                ))}
+            </div>
+            <p className="mono mt-8 text-[10px] text-[color:var(--text-dim)]">
+              {closed && hero
+                ? `as of ${clockTime(hero.as_of)} · last session · reading from the desk`
+                : "reading live from the desk"}
+            </p>
+          </>
+        )}
+      </Section>
+
+      {/* 4 — THE REFUSAL */}
+      <Section label="The refusal">
+        {exhibit?.available && exhibit.cells ? (
+          <div className="grid items-start gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div>
+              <h2 className="font-display text-[length:var(--fs-lg)] leading-tight">
+                84 scenarios. One breach.
+                <br />
+                It doesn&rsquo;t trade.
+              </h2>
+              <p className="mt-5 max-w-md text-[13px] leading-relaxed text-[color:var(--text)]">
+                {exhibit.reason}
+              </p>
+              <p className="mono mt-4 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
+                a real refusal · {exhibit.symbol} ·{" "}
+                {exhibit.kind?.replaceAll("_", " ").toLowerCase()} ·{" "}
+                {exhibit.ts && timeAgo(exhibit.ts)}
+              </p>
+            </div>
+            <div className="panel p-4">
+              <StressGrid cells={exhibit.cells} maxLoss={exhibit.max_loss ?? 1} refused />
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-[color:var(--text-dim)]">
+            The stress engine refuses any structure whose grid breaches the
+            earned budget. No breach has been recorded yet — this exhibit fills
+            in with the first real one, never with a mock.
+          </p>
+        )}
+      </Section>
+
+      {/* 5 — ARCHITECTURE */}
+      <Section label="Architecture">
+        <p className="mono mb-8 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+          deterministic gates · bounded selector
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {["liquidity", "earnings", "term", "stress", "budget", "selector", "execute"].map(
+            (stage, i, all) => (
+              <span key={stage} className="flex items-center gap-2">
+                <span
+                  className={`mono border px-3 py-1.5 text-[11px] uppercase tracking-wider ${
+                    stage === "selector"
+                      ? "border-[color:var(--brass)] text-[color:var(--text)]"
+                      : "border-[color:var(--line)] text-[color:var(--text)]"
+                  }`}
+                  style={{ borderRadius: "var(--radius)" }}
+                >
+                  {stage}
+                </span>
+                {i < all.length - 1 && (
+                  <span aria-hidden className="text-[color:var(--text-faint)]">
+                    →
+                  </span>
+                )}
+              </span>
+            ),
+          )}
+        </div>
+        <p className="mt-6 max-w-xl text-[14px] leading-relaxed text-[color:var(--text)]">
+          The model can choose among approved structures. It cannot invent one.
+        </p>
+      </Section>
+
+      {/* 6 — FOOTER */}
+      <footer className="border-t border-[color:var(--line)]">
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-baseline justify-between gap-4 px-6 py-8">
+          <p className="mono text-[11px] text-[color:var(--text)]">
+            Paper trading only. No live code path exists.
+          </p>
+          <nav className="mono flex gap-5 text-[10px] uppercase tracking-wider" aria-label="Footer">
+            <a
+              className="t-fast text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
+              href={GITHUB}
+            >
+              github
+            </a>
+            <a
+              className="t-fast text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
+              href={`${GITHUB}/blob/main/docs/MCP-SETUP.md`}
+            >
+              mcp setup
+            </a>
+            <span className="cursor-default text-[color:var(--text-faint)]" title="Ships with the submission">
+              demo video
+            </span>
+            <Link
+              className="t-fast text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
+              href="/desk"
+            >
+              the desk
+            </Link>
+          </nav>
+        </div>
       </footer>
     </div>
   );

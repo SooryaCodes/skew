@@ -245,10 +245,16 @@ export interface CycleStatus {
 export interface SessionSummary {
   session_date: string;
   market_open: boolean;
-  scanned: number;
-  candidates_built: number;
-  survivors: number;
+  /** The most recent single pass. Deliberately separate from the session
+   * aggregates — mixing the two windows read as "0 survived · 1 filled". */
+  cycle: {
+    ts: string | null;
+    scanned: number;
+    candidates_built: number;
+    survivors: number;
+  };
   counts: Record<string, number>;
+  counts_since: string;
   as_of: string | null;
   last_fill: {
     ts: string;
@@ -272,4 +278,16 @@ export interface VrpHistory {
   observations: number;
   series: VrpHistoryRow[];
   note: string;
+}
+
+export interface RefusalExhibit {
+  available: boolean;
+  ts?: string;
+  symbol?: string | null;
+  kind?: string | null;
+  structure_id?: string | null;
+  max_loss?: number | null;
+  reason?: string;
+  cells?: StressCell[];
+  note?: string;
 }

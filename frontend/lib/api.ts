@@ -15,6 +15,7 @@ import useSWR, { type SWRResponse } from "swr";
 import type {
   Candidate,
   CycleStatus,
+  RefusalExhibit,
   Decision,
   Position,
   RiskAuthority,
@@ -74,3 +75,5 @@ export const useVrpHistory = (symbol: string | null) =>
 // Fast poll: this is what animates the RUN CYCLE NOW control while it thinks.
 export const useCycleStatus = () => usePoll<CycleStatus>("/api/cycle/status", 1500);
 export const useSession = () => usePoll<SessionSummary>("/api/session", 15000);
+export const useRefusalExhibit = () =>
+  usePoll<RefusalExhibit>("/api/refusal-exhibit", 60000);

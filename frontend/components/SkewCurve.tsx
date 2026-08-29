@@ -31,6 +31,8 @@ interface Props {
   /** Annualised 20d realized vol — sizes the ±2σ wing markers. */
   rv20: number;
   redrawKey?: string;
+  /** The landing hero draws it large; the desk instrument stays capped at 420. */
+  large?: boolean;
 }
 
 function smoothPath(coords: Array<[number, number]>): string {
@@ -51,7 +53,7 @@ function smoothPath(coords: Array<[number, number]>): string {
   return d;
 }
 
-export function SkewCurve({ slices, spot, rv20, redrawKey }: Props) {
+export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Props) {
   const pathRef = useRef<SVGPathElement | null>(null);
   const [dash, setDash] = useState(900);
 
@@ -119,7 +121,7 @@ export function SkewCurve({ slices, spot, rv20, redrawKey }: Props) {
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
-      className="h-auto w-full max-w-[420px]"
+      className={`h-auto w-full ${large ? "max-w-[760px]" : "max-w-[420px]"}`}
       role="img"
       aria-label={`Implied volatility across strikes, ${(geo.minIv * 100).toFixed(1)} to ${(
         geo.maxIv * 100

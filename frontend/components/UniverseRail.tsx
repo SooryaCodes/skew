@@ -3,9 +3,10 @@
 /**
  * The universe rail — scan, the first column of the decision sequence.
  *
- * One row per symbol: ticker, VRP, regime. Coloured by `--brass` / `--steel` so
- * the temperature of the whole book reads at a glance before any number is
- * parsed. Selecting a symbol focuses the centre column.
+ * Sorted by |VRP|, so the widest gaps sit at the top regardless of sign: a
+ * −13.6 is exactly as interesting as a +13.6, and both belong above a +1.4.
+ * The regime lives in the border bar's metal; words and numerals stay ink,
+ * because steel and brass as 9–13px text fail 4.5:1 in one theme or the other.
  */
 
 import { regimeColor, regimeLabel, volPoints } from "@/lib/format";
@@ -35,7 +36,7 @@ export function UniverseRail({ states, selected, onSelect, loading }: Props) {
     );
   }
 
-  const sorted = [...states].sort((a, b) => b.vrp - a.vrp);
+  const sorted = [...states].sort((a, b) => Math.abs(b.vrp) - Math.abs(a.vrp));
 
   return (
     <nav className="p-3" aria-label="Universe">
@@ -46,8 +47,6 @@ export function UniverseRail({ states, selected, onSelect, loading }: Props) {
         {sorted.map((state) => {
           const active = state.symbol === selected;
           const color = regimeColor(state.regime);
-          // Regime lives in the border bar; words and numerals stay ink, because
-          // steel and brass as 9-13px text fail 4.5:1 in one theme or the other.
           return (
             <li key={state.symbol}>
               <button
@@ -75,8 +74,8 @@ export function UniverseRail({ states, selected, onSelect, loading }: Props) {
         })}
       </ul>
       <p className="mono mt-3 px-2 text-[9px] leading-relaxed text-[color:var(--text-dim)]">
-        VRP = implied − realized, in vol points. Positive means the market is
-        overpaying for movement.
+        sorted by |VRP| — the widest gap between implied and realized sits on
+        top, whichever way it points.
       </p>
     </nav>
   );

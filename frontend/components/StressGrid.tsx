@@ -162,6 +162,8 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
               const cell = view.at(pi, ii);
               if (!cell) return <span key={`${px}-${iv}`} className="h-7" />;
               const isWorst = cell === view.worst;
+              const contour = view.contour(pi, ii);
+              const hasContour = Object.keys(contour).length > 0;
               return (
                 <button
                   key={`${px}-${iv}`}
@@ -171,14 +173,12 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
                   aria-label={`${px} sigma, IV times ${iv}, profit and loss ${money(cell.pnl, 0)}${
                     cell.breached ? ", breaches the budget" : ""
                   }${isWorst ? ", worst cell" : ""}`}
-                  className="mono h-7 text-[10px] tabular-nums"
+                  className={`mono h-7 text-[10px] tabular-nums${
+                    hasContour ? " contour-in" : ""
+                  }${isWorst ? " cell-worst" : ""}`}
                   style={{
                     ...cellStyle(cell, view.maxProfit, maxLoss),
-                    ...view.contour(pi, ii),
-                    // The ring on the worst cell — ink, so it reads against
-                    // both the brass-dim field and the oxide region.
-                    outline: isWorst ? "1.5px solid var(--text)" : undefined,
-                    outlineOffset: isWorst ? "-1.5px" : undefined,
+                    ...contour,
                   }}
                 >
                   {Math.abs(cell.pnl) >= 1000

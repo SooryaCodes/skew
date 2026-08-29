@@ -215,16 +215,42 @@ body {
     border-color var(--dur-fast) ease;
 }
 
-/* The refusal: the stress grid's breach region tints and its contour draws
-   (inline, in StressGrid — colours transition in place over 260ms), then the
-   card desaturates, then the audit entry slides in. Still one choreographed
-   moment; still the only drama. */
+/* THE REFUSAL — the only animation in the app with any drama, and it is a
+   sequence, not a chord:
+
+     0–300ms   the breach contour draws
+     ~300ms    the worst cell gets its ring
+     400–600ms the candidate card desaturates to 45%
+     500–700ms the audit entry slides in
+
+   Everything else in the interface is a 120ms opacity transition. Nothing
+   bounces. Nothing pulses. */
+
+@keyframes contour-in {
+  from {
+    border-color: transparent;
+  }
+}
+
+.contour-in {
+  animation: contour-in 300ms ease backwards;
+}
+
+@keyframes ring-in {
+  from {
+    outline-color: transparent;
+  }
+}
+
+.cell-worst {
+  outline: 1.5px solid var(--text);
+  outline-offset: -1.5px;
+  animation: ring-in 150ms ease 300ms backwards;
+}
+
 .card-refused {
-  transition:
-    filter 300ms ease 200ms,
-    opacity 300ms ease 200ms;
-  filter: saturate(0.4);
-  opacity: 0.55;
+  transition: filter 200ms ease 400ms;
+  filter: saturate(0.45);
 }
 
 @keyframes audit-slide-in {
@@ -263,8 +289,9 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  /* Reduced motion skips the desaturation and the contour DRAW, but keeps the
+     colour change: the contour and ring appear instantly at full colour. */
   .card-refused {
     filter: none;
-    opacity: 1;
   }
 }

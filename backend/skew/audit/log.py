@@ -108,6 +108,11 @@ def record_refusal(candidate: Candidate, risk_tier: int, extra: dict[str, Any] |
         "kind": candidate.structure.kind,
         "failed": [g.gate for g in candidate.failed_gates],
     }
+    # A refusal with a genuine breach keeps its whole grid. That is the moment
+    # the product exists for, and it must be exhibitable later — the landing
+    # page shows a real refused grid, never a mocked one.
+    if any(cell.breached for cell in candidate.stress_grid):
+        detail["stress_grid"] = [cell.model_dump() for cell in candidate.stress_grid]
     if extra:
         detail.update(extra)
 

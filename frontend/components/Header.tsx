@@ -1,7 +1,13 @@
 "use client";
 
 /**
- * The header. The skew curve is its spine, not a widget inside it.
+ * The header, reduced to what earns its place:
+ * wordmark · desk / positions · health dot · last cycle · theme toggle.
+ *
+ * Six competing status tokens taught nothing; the armed state, paper-only
+ * guarantee, selector health, broker link and market state collapse into one
+ * health dot whose tooltip lists the full picture. Verdigris means every
+ * subsystem answers; oxide means one does not, and the tooltip names it.
  */
 
 import Link from "next/link";
@@ -16,33 +22,37 @@ interface Props {
   tab: "desk" | "positions";
 }
 
-function Dot({ on, label }: { on: boolean; label: string }) {
-  return (
-    <span className="mono inline-flex items-center gap-1 text-[10px] text-[color:var(--text-dim)]">
-      <span
-        className="inline-block h-1.5 w-1.5 rounded-full"
-        style={{ background: on ? "var(--steel)" : "var(--line)" }}
-        aria-hidden
-      />
-      {label}
-    </span>
-  );
+function healthReport(status: SystemStatus | undefined): { ok: boolean; lines: string[] } {
+  if (!status) return { ok: false, lines: ["status unavailable — backend unreachable"] };
+  const lines = [
+    status.broker_connected ? "broker connected" : "BROKER UNREACHABLE",
+    status.market_open ? "market open" : "market closed",
+    status.auto_execute
+      ? status.armed
+        ? "armed — selector answering"
+        : `NOT ARMED — ${status.selector_error ?? "selector down"}`
+      : "standing down (auto-execute off)",
+    status.kill_switch ? "KILL SWITCH ENGAGED" : "kill switch off",
+    "paper only — no live code path exists",
+  ];
+  const ok =
+    status.broker_connected && (!status.auto_execute || status.armed) && !status.kill_switch;
+  return { ok, lines };
 }
 
 export function Header({ status, tab }: Props) {
+  const health = healthReport(status);
+
   return (
-    // The full-bleed curve is gone: stretched across a header, twenty points
-    // of vertical range flatten into a squiggle. The skew now lives as a
-    // properly-scaled instrument beside the dials, where it shows something.
-    <header className="relative border-b border-[color:var(--line)]">
-      <div className="relative flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+    <header className="border-b border-[color:var(--line)]">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <Link href="/" className="font-display text-[length:var(--fs-md)] leading-none">
           SKEW
         </Link>
 
         <nav className="flex gap-3" aria-label="Views">
           <Link
-            href="/"
+            href="/desk"
             className="mono t-fast text-[11px] uppercase tracking-wider"
             style={{ color: tab === "desk" ? "var(--text)" : "var(--text-dim)" }}
           >
@@ -57,49 +67,30 @@ export function Header({ status, tab }: Props) {
           </Link>
         </nav>
 
-        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1">
-          <Dot on={status?.broker_connected ?? false} label="broker" />
-          <Dot on={status?.market_open ?? false} label={status?.market_open ? "open" : "closed"} />
-          {status?.kill_switch && (
-            <span className="flex items-center gap-1.5">
-              <span
-                className="inline-block h-[7px] w-[7px]"
-                style={{ background: "var(--brass)", borderRadius: "1px" }}
-                aria-hidden
-              />
-              <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text)]">
-                kill switch engaged
-              </span>
-            </span>
-          )}
-          {/* "armed" comes from the server, which gates it on a startup
-              preflight call to the selector — the desk never claims it can
-              trade on configuration alone. */}
-          {status?.auto_execute && !status.armed && (
-            <span className="flex items-center gap-1.5" title={status.selector_error ?? undefined}>
-              <span
-                className="inline-block h-[7px] w-[7px]"
-                style={{ background: "var(--brass)", borderRadius: "1px" }}
-                aria-hidden
-              />
-              <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text)]">
-                selector down — not armed
-              </span>
-            </span>
-          )}
-          {status?.armed && (
+        <div className="ml-auto flex items-center gap-4">
+          {/* The one connection indicator. Hover for the full report. */}
+          <span
+            className="flex cursor-default items-center gap-1.5"
+            title={health.lines.join("\n")}
+            role="status"
+            aria-label={health.lines.join("; ")}
+          >
+            <span
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ background: health.ok ? "var(--verdigris)" : "var(--oxide)" }}
+              aria-hidden
+            />
             <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
-              armed
+              {health.ok ? "all clear" : "attention"}
             </span>
-          )}
-          <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
-            paper only
           </span>
+
           {status?.last_cycle && (
             <span className="mono text-[10px] text-[color:var(--text-dim)]">
               cycle {timeAgo(status.last_cycle)}
             </span>
           )}
+
           <ThemeToggle />
         </div>
       </div>

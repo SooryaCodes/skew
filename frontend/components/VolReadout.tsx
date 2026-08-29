@@ -1,36 +1,18 @@
 "use client";
 
 /**
- * The volatility readout for the focused symbol.
+ * The hero dials for the focused symbol — IV, RV, VRP, TERM in Instrument
+ * Serif at dial size, each with a small mono caption. High-contrast serif
+ * numerals against dense monospace read as values on an instrument's face
+ * rather than stats in an app; it is the one typographic risk this design
+ * takes. Everything else stays mono and tabular.
  *
- * The four hero metrics — IV, RV, VRP, TERM — are set in Instrument Serif at
- * dial size. High-contrast serif numerals against dense monospace is the one
- * typographic risk this design takes: they read as values on an instrument's
- * face rather than stats in an app. Everything else stays mono and tabular.
- *
- * The `note` from the backend renders verbatim — it is the sentence that
- * explains the regime, written with the exact threshold that was hit.
+ * The `note` renders verbatim — the sentence that explains the regime, written
+ * in the backend with the exact threshold that was hit.
  */
 
 import { num, regimeColor, regimeLabel, vol, volPoints } from "@/lib/format";
 import type { VolState } from "@/lib/types";
-
-import { SkewCurve } from "./SkewCurve";
-import { TermStructure } from "./TermStructure";
-import { VolCone } from "./VolCone";
-import { VRPHistory } from "./VRPHistory";
-
-
-function Instrument({ caption, children }: { caption: string; children: React.ReactNode }) {
-  return (
-    <div className="panel p-3">
-      <p className="mono mb-2 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
-        {caption}
-      </p>
-      {children}
-    </div>
-  );
-}
 
 function Dial({
   label,
@@ -51,9 +33,7 @@ function Dial({
       <p className="hero-num mt-1" style={{ color }}>
         {value}
       </p>
-      {hint && (
-        <p className="mono mt-1 text-[9px] text-[color:var(--text-dim)]">{hint}</p>
-      )}
+      {hint && <p className="mono mt-1 text-[9px] text-[color:var(--text-dim)]">{hint}</p>}
     </div>
   );
 }
@@ -86,43 +66,15 @@ export function VolReadout({ state }: { state: VolState }) {
         </span>
       </div>
 
-      {/* The dials. VRP carries the regime's metal; the rest stay ink. */}
       <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
-        <Dial label="implied vol" value={vol(state.iv_atm)} hint="atm · annualised" />
+        <Dial label="iv atm" value={vol(state.iv_atm)} hint="annualised" />
         <Dial
-          label="realized vol"
+          label="rv 20d"
           value={vol(state.rv_20)}
-          hint={`20d · parkinson ${vol(state.rv_parkinson)}`}
+          hint={`park ${vol(state.rv_parkinson)}`}
         />
-        <Dial label="vrp" value={volPoints(state.vrp)} color={color} hint="implied − realized" />
+        <Dial label="vrp" value={volPoints(state.vrp)} color={color} hint="iv − rv" />
         <Dial label="term" value={volPoints(state.term_slope)} hint={termShape} />
-      </div>
-
-      {/* The instruments: the skew itself, the curve over time, the cone, and
-          the premium's history. Each reads one clause of the argument the
-          dials summarise. */}
-      <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
-        <Instrument caption={`skew · front ${state.skew_slices[0]?.dte ?? "—"}d`}>
-          <SkewCurve
-            slices={state.skew_slices}
-            spot={state.spot}
-            rv20={state.rv_20}
-            redrawKey={`${state.symbol}-${state.as_of}`}
-          />
-        </Instrument>
-        <Instrument caption="term structure">
-          <TermStructure points={state.term_curve} slope={state.term_slope} />
-        </Instrument>
-        <Instrument caption="realized-vol cone · 252d">
-          <VolCone
-            cone={state.vol_cone}
-            ivAtm={state.iv_atm}
-            ivDte={state.skew_slices[0]?.dte ?? 30}
-          />
-        </Instrument>
-        <Instrument caption="vrp history">
-          <VRPHistory symbol={state.symbol} />
-        </Instrument>
       </div>
 
       {/* Rendered verbatim. It names the exact threshold that was hit. */}

@@ -4,14 +4,14 @@
  * The closed-market state and the session summary.
  *
  * Judging happens after the deadline, likely on a weekend. Without this, the
- * best work in the project is invisible: an inert screen of abstentions. So
- * when the market is closed the desk says exactly what it is showing — the
- * full last session, honestly timestamped — and the summary strip gives the
- * shape of a real working day. The most recent fill, if one exists, sits
- * prominently: it is the proof the whole submission rests on.
+ * best work in the project is invisible: an inert screen of abstentions. When
+ * the market is closed the desk says exactly what it is showing — the full
+ * last session, honestly timestamped.
  *
- * Nothing here fabricates a live-looking number. Every stale figure carries
- * its "as of".
+ * The strip keeps its two windows separate and labelled: LAST CYCLE is one
+ * pass of the loop; SESSION aggregates every decision since the session began.
+ * Mixed together they once read "0 survived · 1 filled" — a contradiction a
+ * judge would rightly pounce on.
  */
 
 import { clockTime, timeAgo } from "@/lib/format";
@@ -42,6 +42,14 @@ export function KillBanner() {
   );
 }
 
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="mono text-[10px] text-[color:var(--text-dim)]">
+      <span className="text-[color:var(--text)]">{value}</span> {label}
+    </span>
+  );
+}
+
 export function SessionStrip() {
   const { data: status } = useStatus();
   const { data: session } = useSession();
@@ -65,14 +73,21 @@ export function SessionStrip() {
         </div>
       )}
 
-      {/* The shape of the working day. */}
+      {/* Two windows, two labels, no mixing. */}
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-b border-[color:var(--line)] px-4 py-1.5">
         <span className="mono text-[9px] uppercase tracking-widest text-[color:var(--text-dim)]">
+          last cycle
+        </span>
+        <Stat label="scanned" value={session.cycle.scanned} />
+        <Stat label="candidates" value={session.cycle.candidates_built} />
+        <Stat label="survived" value={session.cycle.survivors} />
+
+        <span
+          className="mono border-l border-[color:var(--line)] pl-5 text-[9px] uppercase tracking-widest text-[color:var(--text-dim)]"
+          title={`decisions since ${new Date(session.counts_since).toLocaleString()}`}
+        >
           session
         </span>
-        <Stat label="scanned" value={session.scanned} />
-        <Stat label="candidates" value={session.candidates_built} />
-        <Stat label="survived" value={session.survivors} />
         <Stat label="refused" value={counts.REFUSED ?? 0} />
         <Stat label="abstained" value={counts.ABSTAINED ?? 0} />
         <Stat label="filled" value={counts.EXECUTED ?? 0} />
@@ -95,13 +110,5 @@ export function SessionStrip() {
         )}
       </div>
     </section>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <span className="mono text-[10px] text-[color:var(--text-dim)]">
-      <span className="text-[color:var(--text)]">{value}</span> {label}
-    </span>
   );
 }

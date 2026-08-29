@@ -469,6 +469,39 @@ def post_universe(
     return {"universe": symbols, "effective": "next cycle"}
 
 
+@api.get("/refusal-exhibit", summary="The most recent refusal with a genuine breach")
+def get_refusal_exhibit() -> dict[str, Any]:
+    """A real refused candidate whose stress grid actually breached.
+
+    This feeds the landing page's centrepiece. It is drawn from the audit
+    history — an actual decision the desk made on real market data — and if no
+    such refusal has been recorded yet, it says so rather than inventing one.
+    """
+    for decision in audit.recent(limit=200, action="REFUSED"):
+        cells = decision.detail.get("stress_grid")
+        if not cells:
+            continue
+        gates = decision.detail.get("gates") or []
+        stress_reason = next(
+            (g.get("reason") for g in gates if g.get("gate") == "stress" and not g.get("passed")),
+            decision.reason,
+        )
+        return {
+            "available": True,
+            "ts": decision.ts.isoformat(),
+            "symbol": decision.symbol,
+            "kind": decision.detail.get("kind"),
+            "structure_id": decision.structure_id,
+            "max_loss": decision.detail.get("max_loss"),
+            "reason": stress_reason,
+            "cells": cells,
+        }
+    return {
+        "available": False,
+        "note": "No refusal with a stress breach has been recorded yet.",
+    }
+
+
 @api.get("/session", summary="The shape of the most recent session")
 def get_session() -> dict[str, Any]:
     """A working day at a glance: what was scanned, built, refused, executed —
@@ -495,10 +528,17 @@ def get_session() -> dict[str, Any]:
     return {
         "session_date": session_day.isoformat(),
         "market_open": market_open,
-        "scanned": len(report.scanned) if report else 0,
-        "candidates_built": len(report.candidates) if report else 0,
-        "survivors": (sum(1 for c in report.candidates if c.passed_all) if report else 0),
+        # Two windows, deliberately separate. "cycle" is the most recent single
+        # pass; "counts" aggregates every decision since the session began.
+        # Mixing them produced a self-contradictory "0 survived · 1 filled".
+        "cycle": {
+            "ts": report.ts.isoformat() if report else None,
+            "scanned": len(report.scanned) if report else 0,
+            "candidates_built": len(report.candidates) if report else 0,
+            "survivors": (sum(1 for c in report.candidates if c.passed_all) if report else 0),
+        },
         "counts": counts,
+        "counts_since": session_start.astimezone(UTC).isoformat(),
         "as_of": report.ts.isoformat() if report else None,
         "last_fill": (
             {
