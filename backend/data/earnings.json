@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "Operator-maintained earnings calendar. Alpaca serves no earnings dates —",
+    "its corporate-actions endpoint covers dividends and splits only.",
+    "",
+    "The earnings gate BLOCKS a single-name symbol that has no entry here. That is",
+    "deliberate: selling premium into an unknown event window is the exact mistake",
+    "this desk exists to avoid, so an unknown date abstains loudly rather than",
+    "waving the trade through. ETFs are exempt (see KNOWN_ETFS in data/calendar.py).",
+    "",
+    "Fill in the next confirmed report date per name before the demo. Dates are the",
+    "report date itself; the gate applies EARNINGS_BLACKOUT_DAYS either side and",
+    "also blocks any report falling between today and the structure's expiry."
+  ],
+  "symbols": {
+    "AAPL": [],
+    "MSFT": [],
+    "NVDA": [],
+    "AMD": [],
+    "TSLA": []
+  }
+}
