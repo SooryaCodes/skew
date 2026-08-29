@@ -318,11 +318,24 @@ class Decision(BaseModel):
 
 
 class RiskAuthority(BaseModel):
-    """The earned risk tier. See docs/01-ARCHITECTURE.md §6."""
+    """The earned risk tier. See docs/01-ARCHITECTURE.md §6.
+
+    Two separate risk dimensions, deliberately not one number:
+
+    * ``budget_dollars`` — the PER-TRADE cap. What any single position may risk.
+    * ``portfolio_cap_dollars`` — the PORTFOLIO cap. What all open positions may
+      risk together. ``used_dollars`` counts against this, never against the
+      per-trade cap.
+
+    Conflating them locked the desk out after one fill: with $341 committed,
+    "available" read $159 and every candidate failed forever.
+    """
 
     tier: int
     max_loss_pct: float
     budget_dollars: float
+    portfolio_pct: float = 0.015
+    portfolio_cap_dollars: float = 0.0
     used_dollars: float
     closed_trades: int
     breaches: int
@@ -336,7 +349,12 @@ class RiskAuthority(BaseModel):
     @computed_field  # serialised, because the dashboard and the MCP surface
     @property  # both need it and neither should recompute it independently
     def available_dollars(self) -> float:
-        return max(0.0, self.budget_dollars - self.used_dollars)
+        """PORTFOLIO headroom: what a new position may add to committed risk.
+
+        Not the per-trade cap. A candidate must clear both this and
+        ``budget_dollars`` on its own max loss.
+        """
+        return max(0.0, self.portfolio_cap_dollars - self.used_dollars)
 
 
 class Position(BaseModel):

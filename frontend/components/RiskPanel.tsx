@@ -62,7 +62,8 @@ export function RiskPanel({ risk }: { risk: RiskAuthority | undefined }) {
     );
   }
 
-  const used = risk.budget_dollars > 0 ? risk.used_dollars / risk.budget_dollars : 0;
+  const deployed =
+    risk.portfolio_cap_dollars > 0 ? risk.used_dollars / risk.portfolio_cap_dollars : 0;
 
   return (
     <section className="p-3" aria-label="Risk authority">
@@ -79,9 +80,14 @@ export function RiskPanel({ risk }: { risk: RiskAuthority | undefined }) {
       </div>
 
       <div className="mt-3 border-t border-[color:var(--line)] pt-2">
-        <Row label="budget" value={dollars(risk.budget_dollars)} />
-        <Row label="used" value={dollars(risk.used_dollars)} hint={`(${pct(used)})`} />
-        <Row label="available" value={dollars(risk.available_dollars)} />
+        {/* Two separate risk dimensions. Merging them once locked the desk out. */}
+        <Row label="per trade" value={dollars(risk.budget_dollars)} />
+        <Row
+          label="portfolio"
+          value={`${dollars(risk.used_dollars)} / ${dollars(risk.portfolio_cap_dollars)}`}
+          hint={`(${pct(deployed)})`}
+        />
+        <Row label="headroom" value={dollars(risk.available_dollars)} />
         <Row label="drawdown" value={`${risk.drawdown_pct.toFixed(2)}%`} />
       </div>
 

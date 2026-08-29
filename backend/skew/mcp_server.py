@@ -314,18 +314,20 @@ def risk_status() -> dict[str, Any]:
     clean trades.
 
     Returns:
-        Current tier, dollar budget per trade, how much is committed, drawdown
-        from the high-water mark, and `next_promotion` — plain-English copy
-        saying exactly what it would take to size up.
+        Current tier, the PER-TRADE cap (what any single position may risk),
+        the PORTFOLIO cap (what all open positions may risk together, with
+        committed and headroom), drawdown from the high-water mark, and
+        `next_promotion` — plain-English copy saying what it takes to size up.
     """
     desk = _desk()
     risk = desk.risk_authority()
     return {
         "tier": risk.tier,
         "max_loss_pct": risk.max_loss_pct,
-        "budget_dollars": risk.budget_dollars,
-        "used_dollars": risk.used_dollars,
-        "available_dollars": risk.available_dollars,
+        "per_trade_cap_dollars": risk.budget_dollars,
+        "portfolio_cap_dollars": risk.portfolio_cap_dollars,
+        "portfolio_committed_dollars": risk.used_dollars,
+        "portfolio_headroom_dollars": risk.available_dollars,
         "equity": risk.equity,
         "closed_trades": risk.closed_trades,
         "breaches": risk.breaches,

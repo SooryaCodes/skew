@@ -1,12 +1,17 @@
-"""Budget gate — the structure's max loss must fit inside the earned tier.
+"""Budget gate — three separate limits, each named when it refuses.
 
-The last gate in the chain, and the simplest. Where the stress gate asks "could
-this position hurt more than the budget along the way", this one asks the
-straightforward question: is the known, terminal maximum loss inside what this
-desk has currently earned the right to risk?
+1. **Per-trade cap** — the structure's own max loss must fit the tier's
+   per-trade budget (tier 0: 0.5% of equity).
+2. **Portfolio cap** — committed risk plus this structure's max loss must fit
+   the tier's deployed budget (tier 0: 1.5% of equity).
+3. **Position count** — the concurrent-position cap.
 
-It also enforces the concurrent-position cap, because three positions each
-inside budget individually can still add up to a portfolio nobody authorised.
+These used to be one number, and the conflation locked the desk out: with $341
+committed against a $500 "budget", every candidate over $159 was refused
+forever — sixty-four consecutive identical refusals. Per-trade risk asks "is
+this position too big?"; portfolio risk asks "are we carrying too much in
+total?". Different questions, different caps, and the refusal copy says which
+one failed.
 """
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ def budget_gate(candidate: Candidate, ctx: GateContext) -> GateResult:
     risk = ctx.risk
     max_loss = structure.max_loss
 
+    # 3 — capacity first: it is the cheapest to explain.
     if ctx.open_positions >= ctx.max_concurrent_positions:
         return GateResult(
             gate=GATE,
@@ -32,59 +38,71 @@ def budget_gate(candidate: Candidate, ctx: GateContext) -> GateResult:
                 f"conviction, is the binding constraint here."
             ),
             detail={
+                "failed_check": "capacity",
                 "open_positions": ctx.open_positions,
                 "max_concurrent": ctx.max_concurrent_positions,
             },
         )
 
+    # 1 — per-trade: is this single position too big for the tier?
     if max_loss > risk.budget_dollars:
         return GateResult(
             gate=GATE,
             passed=False,
             reason=(
-                f"Max loss ${max_loss:,.0f} exceeds the tier {risk.tier} budget of "
-                f"${risk.budget_dollars:,.0f} "
+                f"Per-trade cap — max loss ${max_loss:,.0f} exceeds the tier {risk.tier} "
+                f"limit of ${risk.budget_dollars:,.0f} per position "
                 f"({risk.max_loss_pct:.1%} of ${risk.equity:,.0f} equity). "
                 f"{risk.next_promotion}"
             ),
             detail={
+                "failed_check": "per_trade",
                 "max_loss": max_loss,
-                "budget": risk.budget_dollars,
+                "per_trade_cap": risk.budget_dollars,
                 "tier": risk.tier,
-                "max_loss_pct": risk.max_loss_pct,
             },
         )
 
-    if max_loss > risk.available_dollars:
+    # 2 — portfolio: would total deployed risk exceed what the tier permits?
+    proposed_total = risk.used_dollars + max_loss
+    if proposed_total > risk.portfolio_cap_dollars:
         return GateResult(
             gate=GATE,
             passed=False,
             reason=(
-                f"Max loss ${max_loss:,.0f} fits the tier {risk.tier} budget of "
-                f"${risk.budget_dollars:,.0f}, but ${risk.used_dollars:,.0f} is already "
-                f"committed to open positions, leaving ${risk.available_dollars:,.0f}."
+                f"Portfolio cap — ${risk.used_dollars:,.0f} is already committed to open "
+                f"positions, and adding this ${max_loss:,.0f} would deploy "
+                f"${proposed_total:,.0f} against the tier {risk.tier} portfolio limit of "
+                f"${risk.portfolio_cap_dollars:,.0f} ({risk.portfolio_pct:.1%} of equity). "
+                f"The position fits the per-trade cap; the book does not have room for it."
             ),
             detail={
+                "failed_check": "portfolio",
                 "max_loss": max_loss,
-                "budget": risk.budget_dollars,
-                "used": risk.used_dollars,
-                "available": risk.available_dollars,
+                "committed": risk.used_dollars,
+                "proposed_total": round(proposed_total, 2),
+                "portfolio_cap": risk.portfolio_cap_dollars,
+                "tier": risk.tier,
             },
         )
 
-    utilisation = max_loss / risk.budget_dollars if risk.budget_dollars else 0.0
+    per_trade_use = max_loss / risk.budget_dollars if risk.budget_dollars else 0.0
     return GateResult(
         gate=GATE,
         passed=True,
         reason=(
-            f"Max loss ${max_loss:,.0f} is {utilisation:.0%} of the tier {risk.tier} budget "
-            f"(${risk.budget_dollars:,.0f}, {risk.max_loss_pct:.1%} of equity). "
+            f"Max loss ${max_loss:,.0f} is {per_trade_use:.0%} of the ${risk.budget_dollars:,.0f} "
+            f"per-trade cap, and total deployed risk becomes ${proposed_total:,.0f} of the "
+            f"${risk.portfolio_cap_dollars:,.0f} portfolio cap. "
             f"Position {ctx.open_positions + 1} of {ctx.max_concurrent_positions}."
         ),
         detail={
             "max_loss": max_loss,
-            "budget": risk.budget_dollars,
-            "utilisation": round(utilisation, 4),
+            "per_trade_cap": risk.budget_dollars,
+            "per_trade_utilisation": round(per_trade_use, 4),
+            "committed": risk.used_dollars,
+            "proposed_total": round(proposed_total, 2),
+            "portfolio_cap": risk.portfolio_cap_dollars,
             "tier": risk.tier,
         },
     )

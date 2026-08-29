@@ -131,9 +131,10 @@ VOLATILITY STATE
 {format_vol_state(vol)}
 
 RISK AUTHORITY
-Tier {risk.tier} — max loss ${risk.budget_dollars:,.0f} per trade \
+Tier {risk.tier} — per-trade cap ${risk.budget_dollars:,.0f} \
 ({risk.max_loss_pct:.1%} of ${risk.equity:,.0f} equity)
-${risk.available_dollars:,.0f} of that budget is still uncommitted.
+Portfolio: ${risk.used_dollars:,.0f} of ${risk.portfolio_cap_dollars:,.0f} deployed; \
+${risk.available_dollars:,.0f} of headroom remains.
 {risk.open_positions} of {risk.max_concurrent_positions} concurrent positions are open.
 
 CANDIDATES — all have passed every gate

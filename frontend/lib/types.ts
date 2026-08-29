@@ -171,7 +171,11 @@ export interface Decision {
 export interface RiskAuthority {
   tier: number;
   max_loss_pct: number;
+  /** PER-TRADE cap: what any single position may risk. */
   budget_dollars: number;
+  portfolio_pct: number;
+  /** PORTFOLIO cap: what all open positions may risk together. */
+  portfolio_cap_dollars: number;
   used_dollars: number;
   closed_trades: number;
   breaches: number;
@@ -180,7 +184,7 @@ export interface RiskAuthority {
   open_positions: number;
   max_concurrent_positions: number;
   next_promotion: string;
-  /** budget − used, floored at zero. Computed server-side. */
+  /** PORTFOLIO headroom: portfolio cap − committed, floored at zero. */
   available_dollars: number;
 }
 

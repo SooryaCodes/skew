@@ -90,11 +90,15 @@ def make_vol_state(symbol="SPY", regime="SELL_VOL") -> VolState:
     )
 
 
-def make_risk(tier=1, budget=1000.0, equity=100_000.0, used=0.0) -> RiskAuthority:
+def make_risk(tier=1, budget=1000.0, equity=100_000.0, used=0.0, portfolio=None) -> RiskAuthority:
+    # Portfolio cap defaults to 3x the per-trade cap, mirroring the real tiers.
+    portfolio_cap = portfolio if portfolio is not None else budget * 3
     return RiskAuthority(
         tier=tier,
         max_loss_pct=budget / equity,
         budget_dollars=budget,
+        portfolio_pct=portfolio_cap / equity,
+        portfolio_cap_dollars=portfolio_cap,
         used_dollars=used,
         closed_trades=3,
         breaches=0,
@@ -354,7 +358,7 @@ def test_stress_reason_reads_as_human_copy():
     r = stress_gate(make_candidate(), make_ctx(risk=make_risk(budget=100.0)))
     assert r.reason.startswith("Worst case −$")
     assert "σ" in r.reason
-    assert "exceeds tier 1 budget $100" in r.reason
+    assert "exceeds the tier 1 per-trade budget of $100" in r.reason
     assert r.detail["failed_check"] == "absolute"
 
 
@@ -418,6 +422,7 @@ def test_budget_passes_when_max_loss_fits_the_tier():
     r = budget_gate(make_candidate(), make_ctx(risk=make_risk(tier=1, budget=1000.0)))
     assert r.passed
     assert "42%" in r.reason  # 420 / 1000
+    assert "portfolio cap" in r.reason
 
 
 def test_budget_respects_the_current_tier():
@@ -429,12 +434,39 @@ def test_budget_respects_the_current_tier():
     assert budget_gate(candidate, make_ctx(risk=make_risk(tier=1, budget=1000.0))).passed
 
 
-def test_budget_fails_when_capital_is_already_committed():
-    risk = make_risk(tier=1, budget=1000.0, used=800.0)
+def test_one_open_position_does_not_lock_the_desk_out():
+    """The lockout bug, pinned as the spec's acceptance case.
+
+    One $341 position open at tier 0 (per-trade $500, portfolio $1,500): a
+    $412 candidate must PASS. Under the old conflated model "available" read
+    $159 and everything was refused forever.
+    """
+    risk = make_risk(tier=0, budget=500.0, used=341.0, portfolio=1500.0)
+    candidate = make_candidate()
+    candidate.structure = candidate.structure.model_copy(update={"max_loss": 412.0})
+    r = budget_gate(candidate, make_ctx(risk=risk))
+    assert r.passed, r.reason
+    assert r.detail["proposed_total"] == pytest.approx(753.0)
+
+
+def test_budget_fails_on_the_portfolio_cap_and_names_it():
+    """$800 committed + $420 proposed = $1,220 > a $1,000 portfolio cap —
+    refused, even though $420 fits the per-trade cap comfortably."""
+    risk = make_risk(tier=1, budget=1000.0, used=800.0, portfolio=1000.0)
     r = budget_gate(make_candidate(), make_ctx(risk=risk))
     assert not r.passed
-    assert "already committed" in r.reason
-    assert r.detail["available"] == pytest.approx(200.0)
+    assert r.detail["failed_check"] == "portfolio"
+    assert "Portfolio cap" in r.reason
+    assert "per-trade cap" in r.reason  # copy says the OTHER check was fine
+    assert r.detail["proposed_total"] == pytest.approx(1220.0)
+
+
+def test_budget_per_trade_failure_names_itself():
+    risk = make_risk(tier=0, budget=300.0)
+    r = budget_gate(make_candidate(), make_ctx(risk=risk))
+    assert not r.passed
+    assert r.detail["failed_check"] == "per_trade"
+    assert "Per-trade cap" in r.reason
 
 
 def test_budget_fails_at_the_concurrent_position_cap():
@@ -449,6 +481,13 @@ def test_budget_failure_tells_the_operator_what_would_change_it():
     r = budget_gate(make_candidate(), make_ctx(risk=risk))
     assert not r.passed
     assert "Tier 2" in r.reason or "Tier 1" in r.reason
+
+
+def test_capacity_failure_names_itself():
+    ctx = make_ctx(open_positions=3, max_concurrent_positions=3)
+    r = budget_gate(make_candidate(), ctx)
+    assert not r.passed
+    assert r.detail["failed_check"] == "capacity"
 
 
 # ====================================================================

@@ -141,8 +141,8 @@ def stress_gate(candidate: Candidate, ctx: GateContext) -> GateResult:
             gate=GATE,
             passed=False,
             reason=(
-                f"Worst case −${abs(worst.pnl):,.0f} at {describe_cell(worst)}, exceeds tier "
-                f"{ctx.risk.tier} budget ${budget:,.0f}. "
+                f"Worst case −${abs(worst.pnl):,.0f} at {describe_cell(worst)}, exceeds the "
+                f"tier {ctx.risk.tier} per-trade budget of ${budget:,.0f}. "
                 f"{len(breaches)} of {GRID_SIZE} scenarios breach."
             ),
             detail={**base_detail, "breached_count": len(breaches), "failed_check": "absolute"},
@@ -195,7 +195,7 @@ def stress_gate(candidate: Candidate, ctx: GateContext) -> GateResult:
         passed=True,
         reason=(
             f"Survives all {GRID_SIZE} scenarios. Worst case −${abs(worst.pnl):,.0f} at "
-            f"{describe_cell(worst)}, inside the tier {ctx.risk.tier} budget of "
+            f"{describe_cell(worst)}, inside the tier {ctx.risk.tier} per-trade budget of "
             f"${budget:,.0f}, and {routine_text}."
         ),
         detail={

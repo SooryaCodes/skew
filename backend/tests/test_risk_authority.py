@@ -174,16 +174,32 @@ def test_next_promotion_copy_tells_the_operator_what_it_takes():
     assert "Top tier" in get_authority(EQUITY).next_promotion
 
 
-def test_authority_reports_available_budget_after_commitments():
+def test_authority_reports_both_risk_dimensions():
+    """Per-trade and portfolio are separate numbers. Merging them locked the
+    desk out after one fill."""
     a = get_authority(EQUITY, used_dollars=300.0, open_positions=1)
-    assert a.budget_dollars == pytest.approx(500.0)
+    assert a.budget_dollars == pytest.approx(500.0)  # per-trade, tier 0 = 0.5%
+    assert a.portfolio_cap_dollars == pytest.approx(1_500.0)  # tier 0 = 1.5%
     assert a.used_dollars == pytest.approx(300.0)
-    assert a.available_dollars == pytest.approx(200.0)
+    # Headroom is portfolio headroom, NOT per-trade minus committed.
+    assert a.available_dollars == pytest.approx(1_200.0)
     assert a.open_positions == 1
 
 
+def test_portfolio_caps_scale_with_the_tier():
+    from skew.risk.authority import TIERS
+
+    assert TIERS[0].portfolio_pct == pytest.approx(0.015)
+    assert TIERS[1].portfolio_pct == pytest.approx(0.030)
+    assert TIERS[2].portfolio_pct == pytest.approx(0.050)
+    for tier in TIERS.values():
+        assert tier.portfolio_pct > tier.max_loss_pct, (
+            "a portfolio cap at or under the per-trade cap recreates the lockout"
+        )
+
+
 def test_available_never_goes_negative():
-    a = get_authority(EQUITY, used_dollars=900.0)
+    a = get_authority(EQUITY, used_dollars=9_900.0)
     assert a.available_dollars == 0.0
 
 

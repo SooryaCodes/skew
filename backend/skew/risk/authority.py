@@ -38,16 +38,20 @@ log = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class Tier:
     level: int
+    # Per-trade: what any single position may risk.
     max_loss_pct: float
+    # Portfolio: what all open positions may risk together. A separate number —
+    # merging the two locked the desk out after its first fill.
+    portfolio_pct: float
     trades_required: int
     max_drawdown_pct: float
     description: str
 
 
 TIERS: dict[int, Tier] = {
-    0: Tier(0, 0.005, 0, 100.0, "starting authority — 0.5% of equity per trade"),
-    1: Tier(1, 0.010, 3, 100.0, "3 closed trades with no gate breach"),
-    2: Tier(2, 0.020, 6, 3.0, "6 closed trades and drawdown under 3%"),
+    0: Tier(0, 0.005, 0.015, 0, 100.0, "starting authority — 0.5% per trade, 1.5% deployed"),
+    1: Tier(1, 0.010, 0.030, 3, 100.0, "3 closed trades with no gate breach"),
+    2: Tier(2, 0.020, 0.050, 6, 3.0, "6 closed trades and drawdown under 3%"),
 }
 MAX_TIER = max(TIERS)
 
@@ -178,7 +182,10 @@ def _next_promotion_copy(tier: int, closed: int, breaches: int, drawdown: float)
         parts.append(f"drawdown back under {nxt.max_drawdown_pct:.0f}% (currently {drawdown:.1f}%)")
     if not parts:
         parts.append("conditions met — promotes on the next evaluation")
-    return f"Tier {nxt.level} ({nxt.max_loss_pct:.1%} per trade) needs " + " and ".join(parts) + "."
+    return (
+        f"Tier {nxt.level} ({nxt.max_loss_pct:.1%} per trade, {nxt.portfolio_pct:.1%} "
+        f"deployed) needs " + " and ".join(parts) + "."
+    )
 
 
 def get_authority(
@@ -199,6 +206,8 @@ def get_authority(
         tier=tier_level,
         max_loss_pct=tier.max_loss_pct,
         budget_dollars=round(equity * tier.max_loss_pct, 2),
+        portfolio_pct=tier.portfolio_pct,
+        portfolio_cap_dollars=round(equity * tier.portfolio_pct, 2),
         used_dollars=round(used_dollars, 2),
         closed_trades=closed,
         breaches=breaches,
