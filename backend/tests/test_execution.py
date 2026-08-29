@@ -422,3 +422,35 @@ def test_closing_a_position_removes_it_from_the_open_set(credit_spread):
     record_open(credit_spread, "cid-1")
     record_close(credit_spread.id, realized_pnl=40.0, reason="profit target")
     assert open_positions() == []
+
+
+def test_a_live_cycle_downgrades_itself_when_the_market_is_closed(monkeypatch):
+    """Defence in depth against submitting into a closed market.
+
+    The scheduler already skips closed markets, but a live cycle can also come
+    from the CLI or from a redeploy. Queuing an order nobody is watching is the
+    failure this guards.
+    """
+    from skew import loop
+
+    class ClosedDesk:
+        broker = None
+        settings = Settings()
+
+        def start_cycle(self):
+            pass
+
+        def market_open(self):
+            return False
+
+        def equity(self):
+            return 100_000.0
+
+        def evaluate_symbol(self, symbol):
+            from skew.desk import SymbolResult
+
+            return SymbolResult(symbol=symbol, error="stubbed")
+
+    monkeypatch.setattr(loop, "_monitor", lambda *a, **k: [])
+    report = loop.run_cycle(dry_run=False, settings=Settings(universe="SPY"), desk=ClosedDesk())
+    assert any("market closed" in e for e in report.errors)

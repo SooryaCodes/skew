@@ -61,8 +61,12 @@ async def lifespan(_app: FastAPI):
         from skew.loop import build_scheduler, run_cycle
 
         scheduler = build_scheduler(settings)
+        # The startup cycle is ALWAYS dry. Its job is to populate the dashboard
+        # within a few seconds of boot, not to trade — and it does not check
+        # market hours, so letting it submit would mean a deploy at 3am placing
+        # orders. The scheduled ticks do the trading, and they check.
         scheduler.add_job(
-            lambda: run_cycle(dry_run=not settings.auto_execute, settings=settings),
+            lambda: run_cycle(dry_run=True, settings=settings),
             "date",
             run_date=datetime.now(UTC) + timedelta(seconds=2),
             id="startup_cycle",
@@ -162,6 +166,10 @@ def get_status() -> dict[str, Any]:
         "last_cycle": report.ts.isoformat() if report else None,
         "auto_execute": settings.auto_execute,
         "scheduler_running": settings.run_scheduler,
+        # An armed desk whose selection step is unreachable looks exactly like a
+        # calm market from outside. Say so plainly rather than making an
+        # operator read logs to find out nothing can trade.
+        "selector_error": loop.get_selector().last_error,
         "version": VERSION,
     }
 

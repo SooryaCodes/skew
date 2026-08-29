@@ -188,5 +188,9 @@ export interface SystemStatus {
   model_connected: boolean;
   universe: string[];
   last_cycle: string | null;
+  auto_execute: boolean;
+  scheduler_running: boolean;
+  /** Non-null when the bounded selector is unreachable — the desk cannot trade. */
+  selector_error: string | null;
   version: string;
 }

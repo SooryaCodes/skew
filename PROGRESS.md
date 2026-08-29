@@ -155,3 +155,25 @@ Deployment: Dockerfile for the backend (the loop needs a persistent process, so
 container not serverless), `railway.toml`, and `vercel.json` with security
 headers. `.env.example` rewritten and asserted to cover every setting in
 `Settings` with no orphans in either direction.
+
+## Phase 08 — Submission readiness
+
+**Armed.** `AUTO_EXECUTE=true`. From Monday's open the loop scans every five
+minutes during the regular session and submits when a candidate clears all five
+gates and the bounded selector picks one.
+
+Two safety fixes went in with the arming, both caught by thinking about what
+"armed" actually means:
+
+- The startup cycle is now **always** dry. It exists to populate the dashboard
+  within seconds of boot and it does not check market hours, so with
+  auto-execute on, a redeploy at 3am would have queued orders.
+- A live cycle triggered from the CLI or a redeploy now downgrades itself to dry
+  when the market is closed, rather than queuing an order nobody is watching.
+
+**Still blocked on one credential.** The Anthropic key is identity-linked and
+needs `ANTHROPIC_WORKSPACE_ID`. Until it is set the selector abstains every
+cycle — correct fail-safe behaviour, but an armed desk that silently cannot
+trade looks exactly like a calm market from outside. So the failure is now
+surfaced on `/api/status` as `selector_error` and in the dashboard header as
+**"armed · selector unreachable"**, rather than living only in the logs.

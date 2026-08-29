@@ -49,6 +49,15 @@ log = logging.getLogger(__name__)
 # Module-level so the API can read the last cycle without re-running one.
 _LAST_CYCLE: CycleReport | None = None
 _DESK: Desk | None = None
+_SELECTOR: BoundedSelector | None = None
+
+
+def get_selector(settings: Settings | None = None) -> BoundedSelector:
+    """Process-wide selector, so its last error survives for /api/status."""
+    global _SELECTOR
+    if _SELECTOR is None:
+        _SELECTOR = BoundedSelector(settings or default_settings)
+    return _SELECTOR
 
 
 def get_desk(settings: Settings | None = None) -> Desk:
@@ -79,11 +88,19 @@ def run_cycle(
 
     cfg = settings or default_settings
     desk = desk or get_desk(cfg)
-    selector = selector or BoundedSelector(cfg)
+    selector = selector or get_selector(cfg)
     report = CycleReport(ts=datetime.now(UTC))
 
     init_db()
     desk.start_cycle()
+
+    # Defence in depth. The scheduler already skips closed markets, but a live
+    # cycle can also be triggered by the CLI and by a redeploy, and submitting
+    # into a closed market queues an order nobody is watching.
+    if not dry_run and not desk.market_open():
+        log.warning("market is closed — running this cycle dry rather than submitting")
+        dry_run = True
+        report.errors.append("market closed: cycle downgraded to dry run")
 
     # Monitoring first, and unconditionally. Freeing capacity before looking for
     # new positions is also what lets a full book take a better trade.

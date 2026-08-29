@@ -84,6 +84,22 @@ export function Header({ focused, status, tab }: Props) {
               kill switch engaged
             </span>
           )}
+          {/* An armed desk whose selection step is down looks exactly like a
+              calm market from outside. Say so where it cannot be missed. */}
+          {status?.auto_execute && status?.selector_error && (
+            <span
+              className="mono text-[10px] uppercase tracking-wider"
+              style={{ color: "var(--rich)" }}
+              title={status.selector_error}
+            >
+              armed · selector unreachable
+            </span>
+          )}
+          {status?.auto_execute && !status?.selector_error && (
+            <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--muted)]">
+              armed
+            </span>
+          )}
           <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--muted)]">
             paper only
           </span>

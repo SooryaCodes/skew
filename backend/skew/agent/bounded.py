@@ -147,6 +147,11 @@ class BoundedSelector:
         self.settings = settings or default_settings
         self._client = client
         self.last_usage: dict[str, int] = {}
+        # Surfaced on /api/status. An armed desk whose selection step is quietly
+        # unreachable looks identical to a calm market from the outside, and
+        # that is exactly the failure an operator must not have to read logs to
+        # discover.
+        self.last_error: str | None = None
 
     @property
     def available(self) -> bool:
@@ -187,6 +192,7 @@ class BoundedSelector:
             return _abstain("No candidate survived the gate chain. Nothing to select.")
 
         if not self.available:
+            self.last_error = "no ANTHROPIC_API_KEY configured"
             return _abstain(
                 "Bounded selector unavailable — no ANTHROPIC_API_KEY configured. "
                 "Abstaining rather than trading without the selection step."
@@ -205,11 +211,13 @@ class BoundedSelector:
             )
         except Exception as exc:  # noqa: BLE001 — any API failure is an abstention
             log.warning("bounded selector call failed: %s: %s", type(exc).__name__, exc)
+            self.last_error = f"{type(exc).__name__}: {str(exc)[:200]}"
             return _abstain(
                 f"Bounded selector could not be reached ({type(exc).__name__}). "
                 f"Abstaining — the desk does not trade when the selection step is down."
             )
 
+        self.last_error = None
         usage = getattr(response, "usage", None)
         self.last_usage = {
             "input_tokens": getattr(usage, "input_tokens", 0),
