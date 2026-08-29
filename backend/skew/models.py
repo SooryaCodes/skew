@@ -184,6 +184,21 @@ class Structure(BaseModel):
 
     @property
     def width(self) -> float:
+        """Strike width of the risk, in dollars.
+
+        For an iron condor this is the **wing** width, not the distance from the
+        lowest strike to the highest. Only one wing can finish in the money, so
+        the span across the whole structure is not what is at risk and showing
+        it would badly overstate the position.
+        """
+        if self.kind == "IRON_CONDOR":
+            widths = []
+            for right in ("PUT", "CALL"):
+                side = sorted({leg.strike for leg in self.legs if leg.right == right})
+                if len(side) >= 2:
+                    widths.append(max(side) - min(side))
+            return max(widths) if widths else 0.0
+
         strikes = sorted({leg.strike for leg in self.legs})
         if len(strikes) < 2:
             return 0.0

@@ -36,6 +36,7 @@ ignore = [
 # Scripts and tests are allowed to print and to use asserts freely.
 "tests/*" = ["T20"]
 "skew/cli.py" = ["T20"]
+"skew/reporting.py" = ["T20"]  # terminal renderer; printing is the job
 "scripts/*" = ["T20"]
 
 [tool.pytest.ini_options]
