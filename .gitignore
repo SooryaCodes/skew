@@ -24,8 +24,11 @@ venv/
 dist/
 build/
 
-# Data / runtime
+# Data / runtime — including SQLite's WAL/SHM sidecars, which *.db does not match
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 *.sqlite3
 data/cache/
 data/snapshots/
