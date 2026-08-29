@@ -19,6 +19,7 @@ import type {
   RiskAuthority,
   SystemStatus,
   VolState,
+  VrpHistory,
 } from "./types";
 
 export const API_BASE =
@@ -66,3 +67,5 @@ export const usePositions = () => usePoll<Position[]>("/api/positions", 10000);
 export const useAudit = (limit = 40) => usePoll<Decision[]>(`/api/audit?limit=${limit}`);
 export const useAuditCounts = () =>
   usePoll<Record<string, number>>("/api/audit/counts", 15000);
+export const useVrpHistory = (symbol: string | null) =>
+  usePoll<VrpHistory>(symbol ? `/api/vrp-history/${symbol}` : null, 60000);

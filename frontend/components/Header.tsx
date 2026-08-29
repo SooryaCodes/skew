@@ -6,14 +6,12 @@
 
 import Link from "next/link";
 
-import { regimeColor, timeAgo } from "@/lib/format";
-import type { SystemStatus, VolState } from "@/lib/types";
+import { timeAgo } from "@/lib/format";
+import type { SystemStatus } from "@/lib/types";
 
-import { SkewCurve } from "./SkewCurve";
 import { ThemeToggle } from "./ThemeToggle";
 
 interface Props {
-  focused: VolState | undefined;
   status: SystemStatus | undefined;
   tab: "desk" | "positions";
 }
@@ -31,24 +29,13 @@ function Dot({ on, label }: { on: boolean; label: string }) {
   );
 }
 
-export function Header({ focused, status, tab }: Props) {
-  const accent = focused ? regimeColor(focused.regime) : "var(--text-dim)";
-
+export function Header({ status, tab }: Props) {
   return (
-    // min-height so the 72px curve has room to be the spine rather than a
-    // clipped sliver; overflow-hidden so it never bleeds into the columns below.
-    <header className="relative min-h-[6rem] overflow-hidden border-b border-[color:var(--line)]">
-      {/* Ambient, always moving. The thesis before a word is read. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 opacity-80">
-        <SkewCurve
-          points={focused?.skew_curve ?? []}
-          spot={focused?.spot ?? 0}
-          accent={accent}
-          redrawKey={`${focused?.symbol ?? "none"}-${focused?.as_of ?? ""}`}
-        />
-      </div>
-
-      <div className="relative flex flex-wrap items-center gap-x-6 gap-y-2 px-4 pt-3 pb-8">
+    // The full-bleed curve is gone: stretched across a header, twenty points
+    // of vertical range flatten into a squiggle. The skew now lives as a
+    // properly-scaled instrument beside the dials, where it shows something.
+    <header className="relative border-b border-[color:var(--line)]">
+      <div className="relative flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <Link href="/" className="font-display text-[length:var(--fs-md)] leading-none">
           SKEW
         </Link>
@@ -69,10 +56,6 @@ export function Header({ focused, status, tab }: Props) {
             positions
           </Link>
         </nav>
-
-        <p className="mono hidden text-[10px] text-[color:var(--text-dim)] lg:block">
-          implied volatility across strikes
-        </p>
 
         <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1">
           <Dot on={status?.broker_connected ?? false} label="broker" />

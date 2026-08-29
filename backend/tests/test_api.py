@@ -220,3 +220,19 @@ def test_no_endpoint_leaks_a_credential(client):
 def test_openapi_schema_documents_the_paper_only_claim(client):
     schema = client.get("/openapi.json").json()
     assert "paper trading only" in schema["info"]["description"].lower()
+
+
+def test_vrp_history_labels_its_window_honestly(client):
+    from skew.data.store import record_iv
+
+    record_iv("SPY", atm_iv=0.15)
+    body = client.get("/api/vrp-history/SPY").json()
+    assert body["symbol"] == "SPY"
+    assert body["observations"] == 1
+    assert "window_days" in body
+    assert "exactly as long as it says it is" in body["note"]
+    assert isinstance(body["series"], list)
+    # Broker is unavailable in unit tests, so the realized side may be None —
+    # the endpoint must degrade rather than 500.
+    for row in body["series"]:
+        assert set(row) == {"date", "iv", "rv"}

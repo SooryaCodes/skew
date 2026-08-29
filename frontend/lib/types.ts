@@ -37,6 +37,24 @@ export interface TermPoint {
   iv_atm: number;
 }
 
+/** The IV-vs-strike curve for one expiry. Front slice drawn, later ones ghosts. */
+export interface SkewSlice {
+  expiry: string;
+  dte: number;
+  points: SkewPoint[];
+}
+
+/** Realized-vol percentile band at one horizon, from the symbol's own history. */
+export interface ConePoint {
+  horizon: number;
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  current: number;
+}
+
 export interface VolState {
   symbol: string;
   spot: number;
@@ -56,7 +74,10 @@ export interface VolState {
   iv_rank_window_days: number;
   iv_rank: number | null;
   skew_curve: SkewPoint[];
+  /** Front expiry first, then up to two later expiries as ghosts. */
+  skew_slices: SkewSlice[];
   term_curve: TermPoint[];
+  vol_cone: ConePoint[];
   note: string;
 }
 
@@ -195,4 +216,19 @@ export interface SystemStatus {
   /** The server's verdict: configured to trade AND the selector passed preflight. */
   armed: boolean;
   version: string;
+}
+
+export interface VrpHistoryRow {
+  date: string;
+  iv: number;
+  rv: number | null;
+}
+
+export interface VrpHistory {
+  symbol: string;
+  /** Exactly how much IV history exists. Never implies more than it holds. */
+  window_days: number;
+  observations: number;
+  series: VrpHistoryRow[];
+  note: string;
 }

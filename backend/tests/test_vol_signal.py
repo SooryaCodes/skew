@@ -340,3 +340,43 @@ def test_build_vol_state_refuses_on_too_few_bars(real_spy_chain, real_as_of):
     short = BarSeries(symbol="SPY", bars=real_spy_chain and [])
     with pytest.raises(ValueError, match="Cannot compute realized volatility"):
         build_vol_state(real_spy_chain, short, as_of=real_as_of)
+
+
+# ------------------------------------------------------------------ chart data
+
+
+def test_skew_slices_carry_the_front_curve_plus_ghosts(real_spy_chain, real_spy_bars, real_as_of):
+    """The front slice is the drawn curve; later expiries ride behind as ghosts."""
+    state = build_vol_state(real_spy_chain, real_spy_bars, as_of=real_as_of)
+    assert state.skew_slices, "at least the front slice must exist"
+    front = state.skew_slices[0]
+    assert [p.strike for p in front.points] == [p.strike for p in state.skew_curve]
+    dtes = [s.dte for s in state.skew_slices]
+    assert dtes == sorted(dtes), "ghosts must be later expiries, in order"
+    assert len(state.skew_slices) <= 3
+    for s in state.skew_slices:
+        assert len(s.points) >= 5
+
+
+def test_vol_cone_bands_are_ordered_and_honest(real_spy_bars):
+    from skew.vol.vrp import CONE_HORIZONS, build_vol_cone
+
+    cone = build_vol_cone(real_spy_bars.closes)
+    assert cone, "252 days of bars must support at least the short horizons"
+    for point in cone:
+        assert point.horizon in CONE_HORIZONS
+        assert point.p10 <= point.p25 <= point.p50 <= point.p75 <= point.p90
+        assert point.p10 > 0.0 and point.p90 < 2.0
+        assert point.current > 0
+
+
+def test_vol_cone_refuses_horizons_without_enough_history():
+    import numpy as np
+
+    from skew.vol.vrp import build_vol_cone
+
+    rng = np.random.default_rng(7)
+    closes = 100 * np.exp(np.cumsum(rng.normal(0, 0.01, 45)))
+    cone = build_vol_cone(closes)
+    horizons = {c.horizon for c in cone}
+    assert 90 not in horizons, "a 90d band from 45 closes would be an invention"

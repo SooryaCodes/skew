@@ -293,6 +293,50 @@ def get_iv_history(symbol: str) -> dict[str, Any]:
     }
 
 
+@api.get("/vrp-history/{symbol}", summary="IV vs RV, day by day, since first run")
+def get_vrp_history(symbol: str) -> dict[str, Any]:
+    """The variance risk premium over time: daily closing ATM IV against the
+    20-day realized vol on the same date.
+
+    The IV side comes from the snapshot poller and exists only since first run —
+    Alpaca serves no historical IV — so the window is labelled with exactly how
+    much history it holds and never implies more. The RV side is computed from
+    bar history and aligned by date.
+    """
+    key = symbol.upper()
+    iv_days = daily_closing_iv(key)
+
+    rv_by_date: dict[str, float] = {}
+    try:
+        from skew.vol.realized import rolling_close_to_close
+
+        bars = loop.get_desk().bars.get_bars(key)
+        series = rolling_close_to_close(bars.closes, window=20)
+        # rolling series index i corresponds to the (window + i)-th close.
+        dates = [b.date.isoformat() for b in bars.bars]
+        offset = len(dates) - len(series)
+        for i, value in enumerate(series):
+            rv_by_date[dates[offset + i]] = float(value)
+    except Exception as exc:  # noqa: BLE001 — IV side still renders without RV
+        log.warning("vrp-history: realized side unavailable for %s: %s", key, exc)
+
+    def rv_on_or_before(day: str) -> float | None:
+        # Weekend IV samples pair with the last trading day's realized vol.
+        candidates = [d for d in rv_by_date if d <= day]
+        return rv_by_date[max(candidates)] if candidates else None
+
+    return {
+        "symbol": key,
+        "window_days": history_window_days(key),
+        "observations": observation_count(key),
+        "series": [{"date": d, "iv": iv, "rv": rv_on_or_before(d)} for d, iv in iv_days],
+        "note": (
+            "IV history is built forward from first run — Alpaca serves none. "
+            "This window is exactly as long as it says it is."
+        ),
+    }
+
+
 @api.post("/kill", summary="Kill switch — halts new entries. Requires auth.")
 @limiter.limit("10/minute")
 def post_kill(

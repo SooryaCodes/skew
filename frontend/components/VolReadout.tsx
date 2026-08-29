@@ -15,6 +15,23 @@
 import { num, regimeColor, regimeLabel, vol, volPoints } from "@/lib/format";
 import type { VolState } from "@/lib/types";
 
+import { SkewCurve } from "./SkewCurve";
+import { TermStructure } from "./TermStructure";
+import { VolCone } from "./VolCone";
+import { VRPHistory } from "./VRPHistory";
+
+
+function Instrument({ caption, children }: { caption: string; children: React.ReactNode }) {
+  return (
+    <div className="panel p-3">
+      <p className="mono mb-2 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+        {caption}
+      </p>
+      {children}
+    </div>
+  );
+}
+
 function Dial({
   label,
   value,
@@ -79,6 +96,33 @@ export function VolReadout({ state }: { state: VolState }) {
         />
         <Dial label="vrp" value={volPoints(state.vrp)} color={color} hint="implied − realized" />
         <Dial label="term" value={volPoints(state.term_slope)} hint={termShape} />
+      </div>
+
+      {/* The instruments: the skew itself, the curve over time, the cone, and
+          the premium's history. Each reads one clause of the argument the
+          dials summarise. */}
+      <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+        <Instrument caption={`skew · front ${state.skew_slices[0]?.dte ?? "—"}d`}>
+          <SkewCurve
+            slices={state.skew_slices}
+            spot={state.spot}
+            rv20={state.rv_20}
+            redrawKey={`${state.symbol}-${state.as_of}`}
+          />
+        </Instrument>
+        <Instrument caption="term structure">
+          <TermStructure points={state.term_curve} slope={state.term_slope} />
+        </Instrument>
+        <Instrument caption="realized-vol cone · 252d">
+          <VolCone
+            cone={state.vol_cone}
+            ivAtm={state.iv_atm}
+            ivDte={state.skew_slices[0]?.dte ?? 30}
+          />
+        </Instrument>
+        <Instrument caption="vrp history">
+          <VRPHistory symbol={state.symbol} />
+        </Instrument>
       </div>
 
       {/* Rendered verbatim. It names the exact threshold that was hit. */}

@@ -215,26 +215,10 @@ body {
     border-color var(--dur-fast) ease;
 }
 
-/* The refusal: breaching cell to --oxide over 200ms, card desaturates over
-   300ms, audit entry slides in. 700ms, choreographed. The only drama. */
-/* A breached cell reads oxide without putting a numeral on solid oxide, which
-   fails 4.5:1 in dark. Tinted field plus a solid oxide outline: unmistakably
-   the failure colour, and the number inside stays legible ink. */
-@keyframes breach-in {
-  from {
-    background-color: var(--panel-alt);
-  }
-  to {
-    background-color: color-mix(in srgb, var(--oxide) 32%, var(--panel-alt));
-  }
-}
-
-.cell-breach {
-  animation: breach-in 200ms ease forwards;
-  outline: 1.5px solid var(--oxide);
-  outline-offset: -1.5px;
-}
-
+/* The refusal: the stress grid's breach region tints and its contour draws
+   (inline, in StressGrid — colours transition in place over 260ms), then the
+   card desaturates, then the audit entry slides in. Still one choreographed
+   moment; still the only drama. */
 .card-refused {
   transition:
     filter 300ms ease 200ms,

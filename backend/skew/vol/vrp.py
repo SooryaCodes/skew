@@ -26,14 +26,20 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING
 
+import numpy as np
 from pydantic import BaseModel
 
 from skew.config import Settings
 from skew.config import settings as default_settings
-from skew.models import Regime, VolState
+from skew.models import ConePoint, Regime, SkewSlice, VolState
 from skew.vol.implied import atm_implied_vol, skew_slice
 from skew.vol.rank import RankedValue, iv_rank_from_history, rv_percentile
-from skew.vol.realized import InsufficientBars, close_to_close_vol, parkinson_vol
+from skew.vol.realized import (
+    InsufficientBars,
+    close_to_close_vol,
+    parkinson_vol,
+    rolling_close_to_close,
+)
 from skew.vol.term import TermStructure, term_structure_slope
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -156,6 +162,51 @@ def classify_regime(
     )
 
 
+CONE_HORIZONS = (10, 20, 30, 60, 90)
+
+
+def build_skew_slices(chain, front_expiry, as_of, ghosts: int = 2) -> list[SkewSlice]:
+    """The front slice plus up to ``ghosts`` later expiries with usable curves."""
+    ref = as_of or chain.as_of.date()
+    slices: list[SkewSlice] = []
+    expiries = [front_expiry] + [e for e in chain.expiries if e > front_expiry]
+    for expiry in expiries:
+        if len(slices) > ghosts:
+            break
+        points = skew_slice(chain, expiry=expiry, as_of=ref)
+        if len(points) >= 5:
+            slices.append(SkewSlice(expiry=expiry, dte=(expiry - ref).days, points=points))
+    return slices
+
+
+def build_vol_cone(closes: np.ndarray, lookback: int = 252) -> list[ConePoint]:
+    """Percentile bands of realized vol per horizon, from the symbol's own bars.
+
+    Each horizon's rolling series is ranked over its trailing ``lookback``
+    observations. Horizons without at least 30 observations are omitted rather
+    than padded — a band drawn from a handful of points would be an invention.
+    """
+    cone: list[ConePoint] = []
+    for horizon in CONE_HORIZONS:
+        series = rolling_close_to_close(np.asarray(closes, dtype=float), window=horizon)
+        if series.size < 30:
+            continue
+        window = series[-lookback:]
+        p10, p25, p50, p75, p90 = (float(np.percentile(window, q)) for q in (10, 25, 50, 75, 90))
+        cone.append(
+            ConePoint(
+                horizon=horizon,
+                p10=p10,
+                p25=p25,
+                p50=p50,
+                p75=p75,
+                p90=p90,
+                current=float(series[-1]),
+            )
+        )
+    return cone
+
+
 def build_vol_state(
     chain: OptionChain,
     bars: BarSeries,
@@ -208,6 +259,8 @@ def build_vol_state(
         iv_rank_window_days=iv_history_window_days,
         iv_rank=iv_rank.percentile if iv_rank.computable else None,
         skew_curve=skew_slice(chain, target_dte=target_dte, as_of=ref),
+        skew_slices=build_skew_slices(chain, atm.expiry, ref),
         term_curve=term.points if term else [],
+        vol_cone=build_vol_cone(bars.closes),
         note=call.reason,
     )

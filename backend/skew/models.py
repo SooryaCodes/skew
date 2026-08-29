@@ -60,7 +60,10 @@ class VolState(BaseModel):
     iv_rank_window_days: int = 0  # honest label: how much IV history we actually have
     iv_rank: float | None = None  # None until store.py has accumulated enough
     skew_curve: list[SkewPoint] = Field(default_factory=list)
+    # Front expiry first, then up to two later expiries as ghosts.
+    skew_slices: list[SkewSlice] = Field(default_factory=list)
     term_curve: list[TermPoint] = Field(default_factory=list)
+    vol_cone: list[ConePoint] = Field(default_factory=list)
     note: str = ""  # human-readable explanation when regime is ABSTAIN
 
 
@@ -80,6 +83,36 @@ class TermPoint(BaseModel):
     expiry: date
     dte: int
     iv_atm: float
+
+
+class SkewSlice(BaseModel):
+    """The IV-vs-strike curve for one expiry.
+
+    The front slice is the drawn curve; the next two expiries ride behind it as
+    ghosts, so the chart shows the surface having depth rather than implying the
+    skew is a single line.
+    """
+
+    expiry: date
+    dte: int
+    points: list[SkewPoint] = Field(default_factory=list)
+
+
+class ConePoint(BaseModel):
+    """Realized-vol percentile band at one horizon, from the symbol's own history.
+
+    The cone is what a vol trader actually looks at: where does movement at each
+    horizon sit inside this underlying's own 252-day distribution. Current
+    implied vol plotted against it turns "RV percentile 25" into an argument.
+    """
+
+    horizon: int  # trading-day window
+    p10: float
+    p25: float
+    p50: float
+    p75: float
+    p90: float
+    current: float  # trailing realized vol at this horizon, now
 
 
 class Leg(BaseModel):

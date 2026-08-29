@@ -1,18 +1,17 @@
 "use client";
 
 /**
- * The stress grid — the secondary signature element, and the money shot.
+ * The stress grid — the centrepiece.
  *
- * 7 columns of price shock by 4 rows of IV shock, each cell a small square
- * shaded by outcome. Almost always calm. When one cell breaches it goes
- * `--oxide`, and the candidate card desaturates around it.
+ * P&L maps to a CONTINUOUS ramp, not four buckets: verdigris through neutral
+ * into brass-dim as losses deepen, oxide only inside the breach region. The
+ * breach boundary is DRAWN — a 1.5px --oxide contour between passing and
+ * failing cells — because a visible frontier is far stronger than shaded
+ * squares: the eye reads a line on a map where it would skim a heat blob.
  *
- * Hand-rolled CSS grid rather than a chart library. It is 28 squares — a chart
- * library would be more friction than help, per docs/02-TECH-STACK.md.
- *
- * `--oxide` red appears here and only here in the whole interface, and only on
- * a genuinely breaching cell. That is the rule that makes the refusal land: the
- * eye goes straight to it because nothing else on the screen is that colour.
+ * The worst cell gets a ring and a callout naming its coordinates. Switching
+ * NOW / MID-LIFE / EXPIRY cross-fades each cell's colour in place — same grid,
+ * new weather — rather than jumping.
  */
 
 import { useMemo, useState } from "react";
@@ -32,24 +31,34 @@ interface Props {
   refused?: boolean;
 }
 
-/** Cell background: calm cells barely register, so a breach is unmissable. */
-function cellStyle(cell: StressCell, worstPnl: number, maxLoss: number): React.CSSProperties {
+/** The continuous ramp. Intensity from the cell's own share of the extremes. */
+function cellStyle(cell: StressCell, maxProfit: number, maxLoss: number): React.CSSProperties {
+  const base: React.CSSProperties = {
+    borderRadius: "var(--radius)",
+    // The cross-fade: colours transition in place when the time point flips.
+    transition: "background-color 260ms ease, border-color 260ms ease, color 260ms ease",
+  };
   if (cell.breached) {
-    // Field + outline come from .cell-breach; ink stays --text so the numeral
-    // clears 4.5:1 in both themes. Solid oxide under a numeral does not.
-    return { color: "var(--text)" };
-  }
-  if (cell.pnl >= 0) {
-    const strength = Math.min(1, cell.pnl / Math.max(1, Math.abs(worstPnl) * 0.25));
+    const t = Math.min(1, Math.abs(cell.pnl) / Math.max(1, maxLoss));
     return {
-      background: `color-mix(in srgb, var(--steel) ${8 + strength * 16}%, var(--panel-alt))`,
+      ...base,
+      background: `color-mix(in srgb, var(--oxide) ${18 + t * 22}%, var(--panel))`,
       color: "var(--text)",
     };
   }
-  const severity = Math.min(1, Math.abs(cell.pnl) / Math.max(1, maxLoss));
+  if (cell.pnl >= 0) {
+    const t = Math.min(1, cell.pnl / Math.max(1, maxProfit));
+    return {
+      ...base,
+      background: `color-mix(in srgb, var(--verdigris) ${4 + t * 26}%, var(--panel))`,
+      color: "var(--text-dim)",
+    };
+  }
+  const t = Math.min(1, Math.abs(cell.pnl) / Math.max(1, maxLoss));
   return {
-    background: `color-mix(in srgb, var(--brass) ${6 + severity * 30}%, var(--panel-alt))`,
-    color: severity > 0.6 ? "var(--text)" : "var(--text-dim)",
+    ...base,
+    background: `color-mix(in srgb, var(--brass-dim) ${4 + t * 46}%, var(--panel))`,
+    color: t > 0.55 ? "var(--text)" : "var(--text-dim)",
   };
 }
 
@@ -66,7 +75,30 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
       (acc, c) => (acc === null || c.pnl < acc.pnl ? c : acc),
       null,
     );
-    return { priceShocks, ivShocks, lookup, worst, count: slice.length };
+    const maxProfit = Math.max(1, ...slice.map((c) => c.pnl));
+
+    // The contour: a cell's side gets the oxide line where its neighbour's
+    // breached state differs. Drawn on the breached side only, so the frontier
+    // is a single crisp line hugging the failing region.
+    const at = (pi: number, ii: number) =>
+      lookup.get(`${priceShocks[pi]}|${ivShocks[ii]}`) ?? null;
+    const contour = (pi: number, ii: number) => {
+      const cell = at(pi, ii);
+      if (!cell?.breached) return {};
+      const edge = "1.5px solid var(--oxide)";
+      const style: React.CSSProperties = {};
+      const left = pi > 0 ? at(pi - 1, ii) : null;
+      const right = pi < priceShocks.length - 1 ? at(pi + 1, ii) : null;
+      const up = ii > 0 ? at(pi, ii - 1) : null;
+      const down = ii < ivShocks.length - 1 ? at(pi, ii + 1) : null;
+      if (left && !left.breached) style.borderLeft = edge;
+      if (right && !right.breached) style.borderRight = edge;
+      if (up && !up.breached) style.borderTop = edge;
+      if (down && !down.breached) style.borderBottom = edge;
+      return style;
+    };
+
+    return { priceShocks, ivShocks, lookup, worst, maxProfit, contour, at };
   }, [cells, timePoint]);
 
   if (cells.length === 0) {
@@ -121,16 +153,14 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
           </span>
         ))}
 
-        {view.ivShocks.map((iv) => (
+        {view.ivShocks.map((iv, ii) => (
           <div key={`row-${iv}`} className="contents">
             <span className="mono self-center pr-1 text-right text-[10px] text-[color:var(--text-dim)]">
               ×{iv.toFixed(1)}
             </span>
-            {view.priceShocks.map((px) => {
-              const cell = view.lookup.get(`${px}|${iv}`);
-              if (!cell) {
-                return <span key={`${px}-${iv}`} className="h-7" />;
-              }
+            {view.priceShocks.map((px, pi) => {
+              const cell = view.at(pi, ii);
+              if (!cell) return <span key={`${px}-${iv}`} className="h-7" />;
               const isWorst = cell === view.worst;
               return (
                 <button
@@ -139,15 +169,16 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
                   onMouseEnter={() => setHovered(cell)}
                   onFocus={() => setHovered(cell)}
                   aria-label={`${px} sigma, IV times ${iv}, profit and loss ${money(cell.pnl, 0)}${
-                    cell.breached ? ", breached" : ""
-                  }`}
-                  className={`mono h-7 text-[10px] tabular-nums ${
-                    cell.breached ? "cell-breach" : "t-fast"
-                  }`}
+                    cell.breached ? ", breaches the budget" : ""
+                  }${isWorst ? ", worst cell" : ""}`}
+                  className="mono h-7 text-[10px] tabular-nums"
                   style={{
-                    ...cellStyle(cell, view.worst?.pnl ?? -1, maxLoss),
-                    borderRadius: "var(--radius)",
-                    outline: isWorst && !cell.breached ? "1px solid var(--line)" : undefined,
+                    ...cellStyle(cell, view.maxProfit, maxLoss),
+                    ...view.contour(pi, ii),
+                    // The ring on the worst cell — ink, so it reads against
+                    // both the brass-dim field and the oxide region.
+                    outline: isWorst ? "1.5px solid var(--text)" : undefined,
+                    outlineOffset: isWorst ? "-1.5px" : undefined,
                   }}
                 >
                   {Math.abs(cell.pnl) >= 1000
@@ -160,31 +191,22 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
         ))}
       </div>
 
+      {/* the callout: worst cell by default, hovered cell when exploring */}
       {detail && (
-        <p className="mt-2 text-[11px] text-[color:var(--text-dim)]">
-          <span className="mono">
-            {detail.price_shock > 0 ? `+${detail.price_shock}` : detail.price_shock}σ
-          </span>
-          {" with IV "}
-          <span className="mono">
-            {detail.iv_shock === 1
-              ? "unchanged"
-              : `${detail.iv_shock > 1 ? "+" : "−"}${Math.abs(
-                  (detail.iv_shock - 1) * 100,
-                ).toFixed(0)}%`}
-          </span>
+        <p className="mono mt-2 text-[10px] text-[color:var(--text-dim)]">
+          {detail === view.worst && !hovered ? "◯ worst " : ""}
+          {detail.price_shock > 0 ? `+${detail.price_shock}` : detail.price_shock}σ, iv{" "}
+          {detail.iv_shock === 1
+            ? "unchanged"
+            : `${detail.iv_shock > 1 ? "+" : "−"}${Math.abs((detail.iv_shock - 1) * 100).toFixed(0)}%`}
           {" → "}
-          <span className="mono" style={{ color: detail.breached ? "var(--oxide)" : undefined }}>
-            {money(detail.pnl, 0)}
-          </span>
-          {detail === view.worst && !hovered && (
-            <span className="text-[color:var(--text-dim)]">
+          <span style={{ color: "var(--text)" }}>{money(detail.pnl, 0)}</span>
+          {detail.breached && (
+            <span>
               {" "}
-              · worst cell at this time point
+              · past the budget line
+              {refused ? " — this is why the gate refused" : ""}
             </span>
-          )}
-          {refused && detail.breached && (
-            <span style={{ color: "var(--oxide)" }}> · breaches the tier budget</span>
           )}
         </p>
       )}

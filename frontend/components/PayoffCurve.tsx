@@ -3,13 +3,13 @@
 /**
  * Payoff at expiry across underlying price.
  *
- * Computed from intrinsic values on the client — the same arithmetic the
- * backend's `expiry_pnl` does, and it agrees with it because both are just
- * `Σ signed_ratio × intrinsic × 100` minus the entry price. Doing it here
- * rather than shipping a curve keeps the API small and lets the chart resample
- * smoothly at any width.
- *
- * Recharts, per docs/02-TECH-STACK.md. Sufficient and fast to write.
+ * Profit region shaded --verdigris, loss region --oxide (both at 12% — the
+ * oxide-only-for-failed-gates rule is relaxed here by explicit design
+ * direction, and only as a 12% field, never as text). Current spot is a
+ * labelled marker — without it the chart is abstract — with the ±1σ move over
+ * the structure's life shaded across the x axis so "how far is the breakeven"
+ * has a ruler next to it. Max profit and max loss sit as asymptote labels at
+ * the right edge.
  */
 
 import { useMemo } from "react";
@@ -17,6 +17,7 @@ import {
   Area,
   ComposedChart,
   Line,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -44,22 +45,30 @@ function payoffAt(structure: Structure, spot: number): number {
   return value - entry;
 }
 
-export function PayoffCurve({ structure }: { structure: Structure }) {
+interface Props {
+  structure: Structure;
+  /** Annualised 20d realized vol of the underlying — sizes the ±1σ band. */
+  rv20?: number;
+}
+
+export function PayoffCurve({ structure, rv20 }: Props) {
+  const sigma = rv20 ? structure.spot * rv20 * Math.sqrt(Math.max(structure.dte, 1) / 365) : 0;
+
   const data = useMemo(() => {
     const strikes = structure.legs.map((l) => l.strike);
-    const lo = Math.min(...strikes, structure.spot);
-    const hi = Math.max(...strikes, structure.spot);
-    const pad = Math.max((hi - lo) * 1.6, structure.spot * 0.035);
-
+    const lo = Math.min(...strikes, structure.spot - sigma);
+    const hi = Math.max(...strikes, structure.spot + sigma);
+    const pad = Math.max((hi - lo) * 0.35, structure.spot * 0.01);
     const from = Math.max(0.01, lo - pad);
     const to = hi + pad;
-    const steps = 90;
+    const steps = 120;
 
     return Array.from({ length: steps + 1 }, (_, i) => {
       const price = from + ((to - from) * i) / steps;
-      return { price, pnl: payoffAt(structure, price) };
+      const pnl = payoffAt(structure, price);
+      return { price, pnl, pos: Math.max(0, pnl), neg: Math.min(0, pnl) };
     });
-  }, [structure]);
+  }, [structure, sigma]);
 
   const domain = useMemo(() => {
     const values = data.map((d) => d.pnl);
@@ -70,16 +79,9 @@ export function PayoffCurve({ structure }: { structure: Structure }) {
   }, [data]);
 
   return (
-    <div className="h-28 w-full" aria-label="Payoff at expiry">
+    <div className="relative h-32 w-full" aria-label="Payoff at expiry">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
-          <defs>
-            <linearGradient id="payoff-up" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--steel)" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="var(--steel)" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-
+        <ComposedChart data={data} margin={{ top: 4, right: 46, bottom: 0, left: 4 }}>
           <XAxis
             dataKey="price"
             type="number"
@@ -93,22 +95,66 @@ export function PayoffCurve({ structure }: { structure: Structure }) {
           />
           <YAxis hide domain={domain} />
 
+          {/* ±1σ over the structure's life — the ruler behind the picture */}
+          {sigma > 0 && (
+            <ReferenceArea
+              x1={structure.spot - sigma}
+              x2={structure.spot + sigma}
+              fill="var(--steel-dim)"
+              fillOpacity={0.14}
+              strokeOpacity={0}
+            />
+          )}
+
           <ReferenceLine y={0} stroke="var(--line)" strokeWidth={1} />
+
+          {/* current spot — labelled, or the chart is abstract */}
           <ReferenceLine
             x={structure.spot}
             stroke="var(--text-dim)"
             strokeWidth={1}
             strokeDasharray="2 3"
+            label={{
+              value: `spot ${num(structure.spot, 0)}`,
+              position: "insideTopLeft",
+              fill: "var(--text-dim)",
+              fontSize: 9,
+              fontFamily: "var(--font-mono)",
+            }}
           />
+
+          {/* breakevens as hairlines carrying their values */}
           {structure.breakevens.map((b) => (
-            <ReferenceLine key={b} x={b} stroke="var(--line)" strokeDasharray="1 3" />
+            <ReferenceLine
+              key={b}
+              x={b}
+              stroke="var(--line)"
+              strokeDasharray="1 3"
+              label={{
+                value: num(b, 2),
+                position: "insideBottomLeft",
+                fill: "var(--text-dim)",
+                fontSize: 9,
+                fontFamily: "var(--font-mono)",
+              }}
+            />
           ))}
 
+          {/* profit verdigris, loss oxide — 12% fields */}
           <Area
             type="monotone"
-            dataKey="pnl"
+            dataKey="pos"
             stroke="none"
-            fill="url(#payoff-up)"
+            fill="var(--verdigris)"
+            fillOpacity={0.12}
+            isAnimationActive={false}
+          />
+          <Area
+            type="monotone"
+            dataKey="neg"
+            stroke="none"
+            fill="var(--oxide)"
+            fillOpacity={0.12}
             isAnimationActive={false}
           />
           <Line
@@ -133,6 +179,14 @@ export function PayoffCurve({ structure }: { structure: Structure }) {
           />
         </ComposedChart>
       </ResponsiveContainer>
+
+      {/* asymptote labels at the right edge */}
+      <span className="mono pointer-events-none absolute right-0 top-1 text-[9px] text-[color:var(--text-dim)]">
+        max {money(structure.max_profit, 0)}
+      </span>
+      <span className="mono pointer-events-none absolute bottom-4 right-0 text-[9px] text-[color:var(--text-dim)]">
+        {money(-structure.max_loss, 0)}
+      </span>
     </div>
   );
 }

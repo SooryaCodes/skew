@@ -65,7 +65,7 @@ export default function DeskPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header focused={focused} status={status} tab="desk" />
+      <Header status={status} tab="desk" />
 
       <div className="grid flex-1 grid-cols-1 lg:grid-cols-[13rem_minmax(0,1fr)_19rem]">
         {/* scan */}

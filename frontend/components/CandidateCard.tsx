@@ -138,7 +138,7 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
       </p>
 
       <div className="mt-3 border-t border-[color:var(--line)] pt-3">
-        <PayoffCurve structure={s} />
+        <PayoffCurve structure={s} rv20={candidate.vol_state?.rv_20} />
       </div>
 
       <div className="mt-3 border-t border-[color:var(--line)] pt-3">

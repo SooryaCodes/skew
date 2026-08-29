@@ -11,22 +11,20 @@
 
 import { Header } from "@/components/Header";
 import { contractLabel, dollars, money, structureLabel } from "@/lib/format";
-import { usePositions, useRisk, useStatus, useUniverse } from "@/lib/api";
+import { usePositions, useRisk, useStatus } from "@/lib/api";
 
 export default function PositionsPage() {
   const { data: status } = useStatus();
-  const { data: universe } = useUniverse();
   const { data: positions, isLoading } = usePositions();
   const { data: risk } = useRisk();
 
   const rows = positions ?? [];
   const totalPnl = rows.reduce((acc, p) => acc + p.unrealized_pnl, 0);
   const totalRisk = rows.reduce((acc, p) => acc + p.max_loss, 0);
-  const focused = (universe ?? [])[0];
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header focused={focused} status={status} tab="positions" />
+      <Header status={status} tab="positions" />
 
       <main className="flex-1 p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-4">
