@@ -1,0 +1,380 @@
+"""The core cycle.
+
+    for symbol in universe:
+        vol state  ->  regime  ->  candidates  ->  gate chain
+        log every gate result, pass or fail
+        if nothing survived: abstain and continue
+        bounded model selects one, or abstains
+        pre-flight recheck, then one atomic mleg order
+    monitor open positions
+
+Three properties worth stating, because they are what makes this a desk rather
+than a script:
+
+* **Every branch writes to the audit log.** Refusals and abstentions are
+  recorded as prominently as fills. A cycle that traded nothing still produces a
+  complete account of what it looked at and why it declined.
+* **Nothing here can raise past one symbol.** A bad chain on NVDA must not stop
+  the desk looking at SPY, so every symbol is evaluated inside its own guard and
+  a failure becomes a logged abstention.
+* **The kill switch halts entries only.** Monitoring keeps running, because
+  looking away from open positions is not a safety feature.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import UTC, datetime
+
+from apscheduler.schedulers.background import BackgroundScheduler
+
+from skew.agent.bounded import BoundedSelector, pick_candidate
+from skew.audit import log as audit
+from skew.config import Settings
+from skew.config import settings as default_settings
+from skew.data.chains import ChainClient
+from skew.data.store import IVPoller
+from skew.db import init_db
+from skew.desk import Desk
+from skew.exec import monitor
+from skew.exec.exit import close_structure
+from skew.exec.submit import SubmissionRefused, submit_structure
+from skew.gates.base import GateContext
+from skew.models import CycleReport
+from skew.risk import authority
+from skew.vol.term import term_structure_slope
+
+log = logging.getLogger(__name__)
+
+# Module-level so the API can read the last cycle without re-running one.
+_LAST_CYCLE: CycleReport | None = None
+_DESK: Desk | None = None
+
+
+def get_desk(settings: Settings | None = None) -> Desk:
+    """Process-wide Desk, so chain and bar caches survive between cycles."""
+    global _DESK
+    if _DESK is None:
+        _DESK = Desk(settings=settings)
+    return _DESK
+
+
+def last_cycle() -> CycleReport | None:
+    return _LAST_CYCLE
+
+
+def run_cycle(
+    dry_run: bool = True,
+    settings: Settings | None = None,
+    desk: Desk | None = None,
+    selector: BoundedSelector | None = None,
+) -> CycleReport:
+    """One full pass over the universe.
+
+    ``dry_run`` does everything except submit — the gates run, the model is
+    asked, the decision is logged — so a cycle can be exercised end to end
+    without touching the account.
+    """
+    global _LAST_CYCLE
+
+    cfg = settings or default_settings
+    desk = desk or get_desk(cfg)
+    selector = selector or BoundedSelector(cfg)
+    report = CycleReport(ts=datetime.now(UTC))
+
+    init_db()
+    desk.start_cycle()
+
+    # Monitoring first, and unconditionally. Freeing capacity before looking for
+    # new positions is also what lets a full book take a better trade.
+    try:
+        report.decisions.extend(_monitor(desk, dry_run=dry_run, settings=cfg))
+    except Exception as exc:
+        log.exception("position monitoring failed")
+        report.errors.append(f"monitor: {exc}")
+
+    for symbol in cfg.universe_symbols:
+        report.scanned.append(symbol)
+        try:
+            report.decisions.extend(
+                _evaluate_and_act(desk, selector, symbol, report, dry_run=dry_run, settings=cfg)
+            )
+        except Exception as exc:
+            log.exception("cycle failed on %s", symbol)
+            report.errors.append(f"{symbol}: {exc}")
+
+    _LAST_CYCLE = report
+    return report
+
+
+def _evaluate_and_act(
+    desk: Desk,
+    selector: BoundedSelector,
+    symbol: str,
+    report: CycleReport,
+    dry_run: bool,
+    settings: Settings,
+):
+    """Everything the desk does about one symbol in one cycle."""
+    decisions = []
+    result = desk.evaluate_symbol(symbol)
+    tier = result.risk.tier
+
+    if result.vol_state is not None:
+        report.vol_states.append(result.vol_state)
+
+    # No volatility state, or a regime that says stand down.
+    if result.vol_state is None or not result.candidates:
+        decisions.append(
+            audit.record_abstention(
+                symbol=symbol,
+                reason=result.error or "No candidate could be constructed.",
+                risk_tier=tier,
+                detail={
+                    "regime": result.vol_state.regime if result.vol_state else None,
+                    "vrp": result.vol_state.vrp if result.vol_state else None,
+                },
+            )
+        )
+        return decisions
+
+    report.candidates.extend(result.candidates)
+
+    # Refusals are logged as prominently as executions — that is the product.
+    for candidate in result.candidates:
+        if not candidate.passed_all:
+            decisions.append(audit.record_refusal(candidate, tier))
+
+    survivors = result.survivors
+    if not survivors:
+        decisions.append(
+            audit.record_abstention(
+                symbol=symbol,
+                reason=(
+                    f"All {len(result.candidates)} candidates refused by the gate chain. "
+                    f"No position taken."
+                ),
+                risk_tier=tier,
+                detail={"refused": len(result.candidates)},
+            )
+        )
+        return decisions
+
+    # The model sees only pre-validated candidates, and may pick one or abstain.
+    selection = selector.select(result.vol_state, survivors, result.risk)
+    chosen = pick_candidate(survivors, selection)
+
+    if chosen is None:
+        decisions.append(
+            audit.record_abstention(
+                symbol=symbol,
+                reason=(
+                    f"Bounded selector abstained across {len(survivors)} approved candidate(s)."
+                ),
+                risk_tier=tier,
+                model_rationale=selection.rationale,
+                detail={
+                    "malformed": selection.malformed,
+                    "offered": [c.id for c in survivors],
+                },
+            )
+        )
+        return decisions
+
+    if dry_run:
+        decisions.append(
+            audit.record_abstention(
+                symbol=symbol,
+                reason=(
+                    f"DRY RUN — would have submitted {chosen.structure.describe()} for "
+                    f"${abs(chosen.structure.net_credit):,.2f}, max loss "
+                    f"${chosen.structure.max_loss:,.2f}. No order sent."
+                ),
+                risk_tier=tier,
+                model_rationale=selection.rationale,
+                detail={"dry_run": True, "structure_id": chosen.id},
+            )
+        )
+        return decisions
+
+    if settings.kill_switch:
+        decisions.append(
+            audit.record_abstention(
+                symbol=symbol,
+                reason="Kill switch engaged — entries halted. Open positions still monitored.",
+                risk_tier=tier,
+                model_rationale=selection.rationale,
+                detail={"kill_switch": True},
+            )
+        )
+        return decisions
+
+    context = _gate_context(desk, result, settings)
+    try:
+        order = submit_structure(desk.broker, chosen, context, settings=settings)
+    except SubmissionRefused as exc:
+        # Includes the pre-flight recheck failing because the market moved.
+        decisions.append(
+            audit.record_refusal(
+                chosen,
+                tier,
+                extra={"submission_refused": str(exc), "stage": "pre-flight"},
+            )
+        )
+        return decisions
+
+    monitor.record_open(chosen.structure, order["client_order_id"])
+    decisions.append(
+        audit.record_execution(
+            chosen,
+            tier,
+            order_id=order["client_order_id"],
+            model_rationale=selection.rationale,
+            detail={"broker_order_id": order.get("broker_order_id"), "status": order.get("status")},
+        )
+    )
+    return decisions
+
+
+def _gate_context(desk: Desk, result, settings: Settings) -> GateContext:
+    """Rebuild the gate context for the pre-flight recheck, on fresh quotes."""
+    cfg = settings
+    chain = desk.chains.get_chain(
+        result.symbol, dte_min=cfg.target_dte_min, dte_max=cfg.target_dte_max + 60, use_cache=False
+    )
+    return GateContext(
+        vol_state=result.vol_state,
+        risk=result.risk,
+        realized_vol=result.vol_state.rv_20,
+        term=term_structure_slope(chain),
+        earnings=desk.earnings,
+        as_of=datetime.now(UTC).date(),
+        min_open_interest=cfg.min_open_interest,
+        max_spread_pct=cfg.max_spread_pct,
+        min_volume=cfg.min_volume,
+        earnings_blackout_days=cfg.earnings_blackout_days,
+        earnings_unknown_blocks=cfg.earnings_unknown_blocks,
+        risk_free_rate=cfg.risk_free_rate,
+        routine_sigma=cfg.routine_sigma,
+        routine_max_loss_pct=cfg.routine_max_loss_pct,
+        max_breakeven_sigma=cfg.max_breakeven_sigma,
+        open_positions=result.risk.open_positions,
+        max_concurrent_positions=cfg.max_concurrent_positions,
+    )
+
+
+def _monitor(desk: Desk, dry_run: bool, settings: Settings):
+    """Check open positions and close the ones that have hit a rule."""
+    decisions = []
+    actions = monitor.monitor_positions(desk.broker, settings=settings)
+    tier = authority.evaluate_tier(desk.equity())
+
+    for action in actions:
+        if dry_run:
+            decisions.append(
+                audit.record_abstention(
+                    symbol=action["symbol"],
+                    reason=f"DRY RUN — would close on {action['rule']}: {action['reason']}",
+                    risk_tier=tier,
+                    detail={"dry_run": True, "structure_id": action["structure_id"]},
+                )
+            )
+            continue
+
+        try:
+            order = close_structure(
+                desk.broker,
+                action["structure"],
+                current_mids=action["mids"],
+                reason=action["reason"],
+                settings=settings,
+            )
+        except Exception as exc:
+            log.exception("failed to close %s", action["structure_id"])
+            decisions.append(
+                audit.record(
+                    action="REFUSED",
+                    reason=f"Could not close {action['symbol']}: {exc}",
+                    risk_tier=tier,
+                    symbol=action["symbol"],
+                    structure_id=action["structure_id"],
+                )
+            )
+            continue
+
+        monitor.record_close(action["structure_id"], action["unrealized_pnl"], action["reason"])
+        # A position closed on the loss limit is not a gate breach — the gates
+        # held and the structure stayed inside its defined risk. Only a genuine
+        # breach demotes.
+        authority.record_closed_trade(clean=action["rule"] != "breach")
+        decisions.append(
+            audit.record(
+                action="EXECUTED",
+                reason=f"Closed on {action['rule']}: {action['reason']}",
+                risk_tier=tier,
+                symbol=action["symbol"],
+                structure_id=action["structure_id"],
+                order_id=order["client_order_id"],
+                detail={"realized_pnl": action["unrealized_pnl"], "rule": action["rule"]},
+            )
+        )
+    return decisions
+
+
+# ------------------------------------------------------------------ scheduler
+
+
+def build_scheduler(settings: Settings | None = None) -> BackgroundScheduler:
+    """APScheduler with the trading cycle and the IV poller.
+
+    The two run on separate intervals deliberately. The trading loop only acts
+    during the regular session; the IV poller keeps sampling regardless, because
+    the history it is building is the only IV history that will ever exist —
+    Alpaca serves none.
+    """
+    cfg = settings or default_settings
+    scheduler = BackgroundScheduler(timezone="UTC")
+    desk = get_desk(cfg)
+
+    def trading_tick() -> None:
+        if not desk.market_open():
+            log.debug("market closed — skipping trading cycle")
+            return
+        try:
+            report = run_cycle(dry_run=False, settings=cfg, desk=desk)
+            log.info(
+                "cycle: %d scanned, %d candidates, %d decisions, %d errors",
+                len(report.scanned),
+                len(report.candidates),
+                len(report.decisions),
+                len(report.errors),
+            )
+        except Exception:
+            log.exception("trading cycle raised")
+
+    poller = IVPoller(ChainClient(desk.broker), cfg.universe_symbols)
+
+    def iv_tick() -> None:
+        try:
+            stored = poller.poll_once()
+            log.debug("IV poll stored %d symbols", len(stored))
+        except Exception:
+            log.exception("IV poll raised")
+
+    scheduler.add_job(
+        trading_tick,
+        "interval",
+        seconds=cfg.loop_interval_seconds,
+        id="trading_cycle",
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        iv_tick,
+        "interval",
+        seconds=cfg.iv_poll_interval_seconds,
+        id="iv_poller",
+        max_instances=1,
+        coalesce=True,
+    )
+    return scheduler

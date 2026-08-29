@@ -157,6 +157,30 @@ def worst_within(
     return min(pool, key=lambda c: c.pnl) if pool else None
 
 
+def best_within(
+    cells: list[StressCell],
+    max_abs_sigma: float,
+    include_expiry: bool = False,
+) -> StressCell | None:
+    """The best outcome inside a routine move — the mirror of :func:`worst_within`.
+
+    Used for long-premium structures, where the meaningful question is inverted.
+    A debit spread's maximum loss is simply the premium paid, and an adverse
+    move of any size takes most of it, so asking "does a routine move reach the
+    max loss" would refuse every debit spread ever built. The question that
+    actually separates a good long-premium structure from a bad one is whether
+    it can **profit on an ordinary move**, or whether it needs a tail event to
+    come good.
+    """
+    pool = [
+        c
+        for c in cells
+        if abs(c.price_shock) <= max_abs_sigma + 1e-9
+        and (include_expiry or c.time_point != "EXPIRY")
+    ]
+    return max(pool, key=lambda c: c.pnl) if pool else None
+
+
 def worst_case(cells: list[StressCell]) -> float:
     """The worst P&L across the grid. Zero when the grid is empty."""
     cell = worst_cell(cells)

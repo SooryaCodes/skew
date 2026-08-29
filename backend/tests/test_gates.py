@@ -518,3 +518,54 @@ def test_gate_result_defaults_are_safe():
     r = GateResult(gate="x", passed=False, reason="because")
     assert r.detail == {}
     assert r.skipped is False
+
+
+def test_the_routine_check_asks_the_opposite_question_of_a_debit_spread():
+    """A debit spread's max loss IS the premium paid.
+
+    An adverse move of any size takes 80–100% of it at every level of realized
+    volatility — that is the structure working as designed, not a defect. Applying
+    the short-premium test here would refuse every debit spread ever built and
+    make the whole BUY_VOL regime untradeable.
+    """
+    from skew.stress.scenarios import build_grid, worst_within
+
+    # An at-the-money debit spread — the shape the BUY_VOL regime actually builds.
+    atm_debit = assemble(
+        "SPY",
+        "CALL_DEBIT",
+        [_leg(590, "BUY", "CALL", 12.00), _leg(600, "SELL", "CALL", 7.00)],
+        spot=590.0,
+        as_of=AS_OF,
+    )
+    for rv in (0.15, 0.25, 0.50):
+        grid = build_grid(atm_debit, realized_vol=rv, budget=100_000.0)
+        routine = worst_within(grid, 1.0)
+        assert abs(routine.pnl) > 0.6 * atm_debit.max_loss, (
+            f"at rv={rv} a routine adverse move should take most of the premium; "
+            f"got {routine.pnl:.2f} of {atm_debit.max_loss:.2f}"
+        )
+
+    debit = make_candidate("CALL_DEBIT")
+
+    # And yet it must still pass, because the question asked of it is different.
+    r = stress_gate(debit, make_ctx(risk=make_risk(budget=10_000.0), realized_vol=0.25))
+    assert r.passed, r.reason
+    assert r.detail["short_premium"] is False
+    assert "breakeven sits" in r.reason
+
+
+def test_a_debit_spread_whose_breakeven_needs_a_tail_event_is_refused():
+    """The honest mirror for long premium: how far must price actually travel?
+
+    Measured on the breakeven rather than on the grid, because a long-vega
+    structure profits from an IV shock alone — which would mask a strike that
+    price realistically cannot reach.
+    """
+    debit = make_candidate("CALL_DEBIT")
+    # Barely any realized volatility, so the breakeven is many sigma away.
+    r = stress_gate(debit, make_ctx(risk=make_risk(budget=10_000.0), realized_vol=0.01))
+    assert not r.passed
+    assert r.detail["failed_check"] == "breakeven_too_far"
+    assert "lottery ticket" in r.reason
+    assert r.detail["breakeven_sigma"] > 1.25

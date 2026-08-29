@@ -196,6 +196,7 @@ class Desk:
             risk_free_rate=cfg.risk_free_rate,
             routine_sigma=cfg.routine_sigma,
             routine_max_loss_pct=cfg.routine_max_loss_pct,
+            max_breakeven_sigma=cfg.max_breakeven_sigma,
             open_positions=result.risk.open_positions,
             max_concurrent_positions=cfg.max_concurrent_positions,
         )

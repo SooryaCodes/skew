@@ -60,6 +60,8 @@ class GateContext:
     # more than this fraction of the budget. See skew/gates/stress.py.
     routine_sigma: float = 1.0
     routine_max_loss_pct: float = 0.60
+    # Long premium: how far the breakeven may sit, in sigma of a routine move.
+    max_breakeven_sigma: float = 1.25
     open_positions: int = 0
     max_concurrent_positions: int = 3
 

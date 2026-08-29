@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # ---- Anthropic (bounded selector model) ----
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"
+    # Identity-linked API keys must name the workspace they act in, or every
+    # request returns 400. Blank for a standard key.
+    anthropic_workspace_id: str = ""
 
     # ---- Runtime ----
     universe: str = "SPY,QQQ,IWM,AAPL,MSFT,NVDA,AMD,TSLA"
@@ -108,6 +111,9 @@ class Settings(BaseSettings):
     # different odds of reaching it. See skew/stress/scenarios.py.
     routine_sigma: float = 1.0
     routine_max_loss_pct: float = 0.60
+    # Long premium: the breakeven must sit within this many sigma of spot, or the
+    # structure needs a tail event rather than ordinary movement to come good.
+    max_breakeven_sigma: float = 1.25
     # Exit rules.
     profit_target_pct: float = 0.50
     loss_limit_multiple: float = 2.0
