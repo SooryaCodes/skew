@@ -16,20 +16,21 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { useSurface } from "@/lib/api";
+import type { Surface } from "@/lib/types";
 import { prefersReducedMotion } from "@/lib/useInView";
 
 const W = 1000;
 const H = 640;
 
 interface Props {
-  symbol?: string;
+  /** Live, last-known or recorded — the caller labels provenance; this only draws. */
+  surface?: Surface;
   /** 0 → full hero; 1 → flattened and shrunk into the next section's margin. */
   progress: number;
 }
 
-export function VolatilitySurface({ symbol = "SPY", progress }: Props) {
-  const { data } = useSurface(symbol);
+export function VolatilitySurface({ surface, progress }: Props) {
+  const data = surface;
   const [parallax, setParallax] = useState(0);
   const parallaxTarget = useRef(0);
   const reduced = useRef(false);
@@ -92,11 +93,9 @@ export function VolatilitySurface({ symbol = "SPY", progress }: Props) {
   }, [data]);
 
   if (!curves) {
-    return (
-      <p className="mono absolute bottom-6 right-6 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
-        surface unavailable — this hero only draws the live chain
-      </p>
-    );
+    // With the snapshot spine this only happens while the first snapshot is in
+    // flight — a beat of quiet, never a standing state.
+    return null;
   }
 
   const p = Math.min(1, Math.max(0, progress));

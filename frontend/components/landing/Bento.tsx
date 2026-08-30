@@ -41,9 +41,21 @@ interface Props {
   exhibit?: RefusalExhibit;
   status?: SystemStatus;
   closed: boolean;
+  /** "reading live from the desk" / "as of 14:43 · last known" / "recorded 30 Aug". */
+  provenance?: string | null;
+  isLive?: boolean;
 }
 
-export function Bento({ states, counts, latest, exhibit, status, closed }: Props) {
+export function Bento({
+  states,
+  counts,
+  latest,
+  exhibit,
+  status,
+  closed,
+  provenance,
+  isLive = false,
+}: Props) {
   const gridRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -81,10 +93,11 @@ export function Bento({ states, counts, latest, exhibit, status, closed }: Props
 
   const byGap = [...states].sort((a, b) => Math.abs(b.vrp) - Math.abs(a.vrp));
   const hero = byGap[0];
-  const traced = Object.values(counts ?? {}).reduce(
-    (a, b) => a + (typeof b === "number" ? b : 0),
-    0,
-  );
+  const traced =
+    counts?.TOTAL ??
+    Object.entries(counts ?? {})
+      .filter(([k]) => k !== "TOTAL")
+      .reduce((a, [, v]) => a + (typeof v === "number" ? v : 0), 0);
 
   return (
     <div ref={gridRef} className="grid grid-cols-2 gap-3 md:grid-cols-12">
@@ -93,8 +106,7 @@ export function Bento({ states, counts, latest, exhibit, status, closed }: Props
         <CellCaption>the premium, right now</CellCaption>
         {byGap.length === 0 ? (
           <p className="text-sm text-[color:var(--text-dim)]">
-            The desk is not reachable from here — nothing on this page is
-            invented in its absence.
+            Loading the recorded state — one beat, never a blank.
           </p>
         ) : (
           <>
@@ -116,9 +128,8 @@ export function Bento({ states, counts, latest, exhibit, status, closed }: Props
               ))}
             </div>
             <p className="mono mt-4 text-[9px] text-[color:var(--text-dim)]">
-              {closed && hero
-                ? `as of ${clockTime(hero.as_of)} · last session`
-                : "reading live from the desk"}
+              {provenance ??
+                (closed && hero ? `as of ${clockTime(hero.as_of)} · last session` : "")}
             </p>
           </>
         )}
@@ -164,7 +175,7 @@ export function Bento({ states, counts, latest, exhibit, status, closed }: Props
             ivDte={hero.skew_slices[0]?.dte ?? 30}
           />
         ) : (
-          <p className="text-xs text-[color:var(--text-dim)]">cone pending first scan</p>
+          <p className="text-xs text-[color:var(--text-dim)]">loading…</p>
         )}
       </div>
 
@@ -174,7 +185,7 @@ export function Bento({ states, counts, latest, exhibit, status, closed }: Props
         {hero && hero.term_curve.length >= 2 ? (
           <TermStructure points={hero.term_curve} slope={hero.term_slope} />
         ) : (
-          <p className="text-xs text-[color:var(--text-dim)]">term curve pending first scan</p>
+          <p className="text-xs text-[color:var(--text-dim)]">loading…</p>
         )}
       </div>
 
@@ -251,21 +262,25 @@ export function Bento({ states, counts, latest, exhibit, status, closed }: Props
         <ul className="mono space-y-1.5 text-[11px] leading-relaxed">
           <li>
             <span className="text-[color:var(--text-dim)]">market</span>{" "}
-            {status ? (status.market_open ? "open" : "closed") : "—"}
+            {status ? (status.market_open ? "open" : "closed") : "…"}
+            {!isLive && status ? " (when recorded)" : ""}
           </li>
           <li>
             <span className="text-[color:var(--text-dim)]">universe</span>{" "}
-            {status?.universe_size ?? "—"} names
+            {status?.universe_size ?? status?.universe?.length ?? 8} names
           </li>
           <li>
             <span className="text-[color:var(--text-dim)]">last cycle</span>{" "}
-            {status?.last_cycle ? timeAgo(status.last_cycle) : "—"}
+            {status?.last_cycle ? timeAgo(status.last_cycle) : "…"}
           </li>
           <li>
             <span className="text-[color:var(--text-dim)]">account</span>{" "}
             {status?.account_id_suffix ? `…${status.account_id_suffix} (paper)` : "paper"}
           </li>
         </ul>
+        {provenance && (
+          <p className="mono mt-3 text-[9px] text-[color:var(--text-dim)]">{provenance}</p>
+        )}
       </div>
     </div>
   );

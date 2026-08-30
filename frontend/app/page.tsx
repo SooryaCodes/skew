@@ -23,8 +23,8 @@ import { Reveal } from "@/components/Reveal";
 import { Texture } from "@/components/Texture";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { VolatilitySurface } from "@/components/VolatilitySurface";
-import { useAudit, useAuditCounts, useRefusalExhibit, useStatus, useUniverse } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
+import { fieldProvenance, useSnapshot } from "@/lib/snapshot";
 import { prefersReducedMotion } from "@/lib/useInView";
 
 const GITHUB = "https://github.com/USER/skew";
@@ -33,11 +33,18 @@ const GITHUB = "https://github.com/USER/skew";
 const RHYTHM = { minor: "96px", major: "144px", grand: "192px" };
 
 export default function Landing() {
-  const { data: status } = useStatus();
-  const { data: universe } = useUniverse();
-  const { data: exhibit } = useRefusalExhibit();
-  const { data: counts } = useAuditCounts();
-  const { data: audit } = useAudit(1);
+  // One spine, three states: live, last-known (server-cached), or a real
+  // recorded snapshot from the audit history. The page is never empty and
+  // never pretends history is the present — provenance renders alongside.
+  const { data: snapshot } = useSnapshot();
+  const status = snapshot?.data.status;
+  const universe = snapshot?.data.universe;
+  const exhibit = snapshot?.data.exhibit;
+  const counts = snapshot?.data.counts;
+  const latest = snapshot?.data.latest?.[0];
+  const surface = snapshot?.data.surface;
+  const provenance = snapshot ? fieldProvenance(snapshot, "universe") : null;
+  const isLive = snapshot?.state === "live" && snapshot.field_states?.status === "live";
 
   // Hero scroll progress: 0 at the top, 1 once a viewport has scrolled by.
   const [progress, setProgress] = useState(0);
@@ -63,7 +70,11 @@ export default function Landing() {
 
   const refused = counts?.REFUSED ?? 0;
   const executed = counts?.EXECUTED ?? 0;
-  const traced = Object.values(counts ?? {}).reduce((a, b) => a + b, 0);
+  const traced =
+    counts?.TOTAL ??
+    Object.entries(counts ?? {})
+      .filter(([k]) => k !== "TOTAL")
+      .reduce((a, [, v]) => a + (typeof v === "number" ? v : 0), 0);
 
   return (
     <div className="relative min-h-screen">
@@ -79,7 +90,7 @@ export default function Landing() {
       {/* 1 — HERO: type upper-left on a scrim, the surface sweeping beneath */}
       <section aria-label="Hero" className="relative z-10" style={{ height: "175vh" }}>
         <div className="sticky top-0 h-screen overflow-hidden">
-          <VolatilitySurface symbol="SPY" progress={progress} />
+          <VolatilitySurface surface={surface} progress={progress} />
           {/* The scrim — the ONE sanctioned gradient: --ground pooling behind
               the type so the headline sits on darkness while the curves stay
               visible at the edges. */}
@@ -121,20 +132,23 @@ export default function Landing() {
                 Enter the desk
               </Link>
             </div>
-            {/* live status chip — immediate proof it is running */}
+            {/* status chip — armed reads live; anything else reads calm, never broken */}
             {status && (
               <p className="mono mt-5 text-[10px] text-[color:var(--text-dim)]">
                 <span
                   className="mr-1.5 inline-block h-[7px] w-[7px] align-middle"
                   style={{
-                    background: status.broker_connected ? "var(--verdigris)" : "var(--line)",
+                    background:
+                      isLive && status.broker_connected ? "var(--verdigris)" : "var(--line)",
                     borderRadius: "1px",
                   }}
                   aria-hidden
                 />
-                {status.broker_connected ? "live" : "standby"} ·{" "}
-                {status.universe_size ?? status.universe.length} names scanned
-                {status.last_cycle ? ` · last cycle ${timeAgo(status.last_cycle)}` : ""}
+                {isLive && status.broker_connected
+                  ? `armed · ${status.universe_size ?? status.universe.length} names${
+                      status.last_cycle ? ` · last cycle ${timeAgo(status.last_cycle)}` : ""
+                    }`
+                  : "paper account · desk idle"}
               </p>
             )}
           </div>
@@ -163,10 +177,12 @@ export default function Landing() {
         <Bento
           states={states}
           counts={counts}
-          latest={audit?.[0]}
+          latest={latest}
           exhibit={exhibit}
           status={status}
           closed={closed}
+          provenance={provenance}
+          isLive={isLive}
         />
       </section>
 
