@@ -46,6 +46,9 @@ class SymbolResult:
 
     symbol: str
     vol_state: VolState | None = None
+    # How many contracts the chain fetch returned — recorded so a decision
+    # trace can show the scan step's real numbers, never recomputed ones.
+    chain_contracts: int = 0
     candidates: list[Candidate] = field(default_factory=list)
     risk: RiskAuthority = field(
         default_factory=lambda: RiskAuthority(
@@ -164,6 +167,7 @@ class Desk:
             chain = self.chains.get_chain(
                 symbol, dte_min=cfg.target_dte_min, dte_max=cfg.target_dte_max + 60
             )
+            result.chain_contracts = len(chain.contracts)
             series = self.bars.get_bars(symbol)
             vol_state = build_vol_state(
                 chain,

@@ -10,6 +10,7 @@
  * template and always renders in full. Fills never collapse at all.
  */
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { clockTime, timeAgo } from "@/lib/format";
@@ -91,10 +92,17 @@ function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boole
   const style = ACTION_STYLE[decision.action] ?? ACTION_STYLE.ABSTAINED;
   return (
     <li
-      className={`border-t border-[color:var(--line)] py-2 first:border-t-0 ${
+      className={`border-t border-[color:var(--line)] first:border-t-0 ${
         isNewest ? "audit-enter" : ""
       }`}
     >
+      {/* The whole entry links to its decision trace — conclusions here,
+          reasoning one click deeper. */}
+      <Link
+        href={`/trace/${decision.id}`}
+        className="t-fast block py-2 hover:bg-[color:var(--panel)]"
+        aria-label={`Open the decision trace for ${decision.symbol ?? "this decision"}`}
+      >
       <div className="flex items-center gap-2">
         <time
           className="mono shrink-0 text-[10px] text-[color:var(--text-dim)]"
@@ -120,6 +128,7 @@ function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boole
           {decision.model_rationale}
         </p>
       )}
+      </Link>
     </li>
   );
 }
@@ -151,17 +160,22 @@ function Run({ first, rest, isNewest }: { first: Decision; rest: Decision[]; isN
           <ul className="mt-1 border-l border-[color:var(--line)] pl-2">
             {rest.map((entry) => (
               <li key={entry.id} className="py-1">
-                <p className="mono text-[10px] text-[color:var(--text-dim)]">
-                  {clockTime(entry.ts)} · {entry.symbol ?? "—"}
-                </p>
-                <p className="text-[11px] leading-snug text-[color:var(--text)]">
-                  {entry.reason}
-                </p>
-                {entry.model_rationale && (
-                  <p className="mt-0.5 text-[10px] italic leading-snug text-[color:var(--text-dim)]">
-                    {entry.model_rationale}
+                <Link
+                  href={`/trace/${entry.id}`}
+                  className="t-fast block hover:bg-[color:var(--panel)]"
+                >
+                  <p className="mono text-[10px] text-[color:var(--text-dim)]">
+                    {clockTime(entry.ts)} · {entry.symbol ?? "—"}
                   </p>
-                )}
+                  <p className="text-[11px] leading-snug text-[color:var(--text)]">
+                    {entry.reason}
+                  </p>
+                  {entry.model_rationale && (
+                    <p className="mt-0.5 text-[10px] italic leading-snug text-[color:var(--text-dim)]">
+                      {entry.model_rationale}
+                    </p>
+                  )}
+                </Link>
               </li>
             ))}
           </ul>

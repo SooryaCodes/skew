@@ -91,7 +91,12 @@ def record(
     return decision
 
 
-def record_refusal(candidate: Candidate, risk_tier: int, extra: dict[str, Any] | None = None):
+def record_refusal(
+    candidate: Candidate,
+    risk_tier: int,
+    extra: dict[str, Any] | None = None,
+    trace: dict[str, Any] | None = None,
+):
     """Log a candidate the gate chain refused, with every gate result attached.
 
     The full chain is stored, not just the failing gate, so the log carries the
@@ -115,6 +120,8 @@ def record_refusal(candidate: Candidate, risk_tier: int, extra: dict[str, Any] |
         detail["stress_grid"] = [cell.model_dump() for cell in candidate.stress_grid]
     if extra:
         detail.update(extra)
+    if trace:
+        detail["trace"] = trace
 
     return record(
         action="REFUSED",
@@ -132,14 +139,18 @@ def record_abstention(
     risk_tier: int,
     model_rationale: str | None = None,
     detail: dict[str, Any] | None = None,
+    trace: dict[str, Any] | None = None,
 ):
+    body = dict(detail or {})
+    if trace:
+        body["trace"] = trace
     return record(
         action="ABSTAINED",
         reason=reason,
         risk_tier=risk_tier,
         symbol=symbol,
         model_rationale=model_rationale,
-        detail=detail,
+        detail=body,
     )
 
 
@@ -149,6 +160,7 @@ def record_execution(
     order_id: str,
     model_rationale: str | None = None,
     detail: dict[str, Any] | None = None,
+    trace: dict[str, Any] | None = None,
 ):
     structure = candidate.structure
     body: dict[str, Any] = {
@@ -162,6 +174,8 @@ def record_execution(
     }
     if detail:
         body.update(detail)
+    if trace:
+        body["trace"] = trace
 
     return record(
         action="EXECUTED",

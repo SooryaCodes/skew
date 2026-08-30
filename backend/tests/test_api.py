@@ -345,3 +345,36 @@ def test_status_names_the_last_session(client):
     from skew.data.calendar import is_trading_day
 
     assert is_trading_day(day)
+
+
+def test_decision_endpoint_serves_the_full_record(client):
+    from skew.audit import log as audit_log
+
+    d = audit_log.record_abstention(
+        symbol="SPY",
+        reason="VRP inside the band.",
+        risk_tier=0,
+        trace={"scan": {"symbol": "SPY", "spot": 769.0, "contracts": 4100}},
+    )
+    body = client.get(f"/api/decision/{d.id}").json()
+    assert body["id"] == d.id
+    assert body["detail"]["trace"]["scan"]["contracts"] == 4100
+    assert client.get("/api/decision/not-a-real-id").status_code == 404
+
+
+def test_refusals_carry_their_trace(client):
+    """The trace shows recorded data, never recomputed — so it must be stored
+    at decision time on every path."""
+    from skew.audit import log as audit_log
+    from skew.gates.base import run_gates
+    from tests.test_gates import make_candidate, make_ctx, make_risk
+
+    refused = run_gates(make_candidate(oi=1), make_ctx(risk=make_risk()))
+    d = audit_log.record_refusal(
+        refused,
+        risk_tier=0,
+        trace={"classify": {"regime": "SELL_VOL", "note": "rich"}},
+    )
+    body = client.get(f"/api/decision/{d.id}").json()
+    assert body["detail"]["trace"]["classify"]["regime"] == "SELL_VOL"
+    assert len(body["detail"]["gates"]) == 5

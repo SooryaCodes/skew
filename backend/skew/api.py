@@ -469,6 +469,89 @@ def post_universe(
     return {"universe": symbols, "effective": "next cycle"}
 
 
+# The full volatility surface is a landing-page visual: one wide chain fetch
+# (out to ~370 days) per symbol, cached hard because term structure moves
+# slowly and the page must never trigger a fetch storm.
+_SURFACE_CACHE: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+_SURFACE_TTL_SECONDS = 900
+
+
+@api.get("/surface/{symbol}", summary="The volatility surface — one skew curve per expiry")
+def get_surface(symbol: str) -> dict[str, Any]:
+    """Up to 30 real skew slices from 7 to ~365 days out, for the hero surface.
+
+    Real chain data, same source as the desk. Cached for fifteen minutes; when
+    the broker is unreachable the response says so rather than inventing a
+    surface.
+    """
+    import time as _time
+
+    from skew.vol.implied import skew_slice
+
+    key = symbol.upper()
+    hit = _SURFACE_CACHE.get(key)
+    if hit and (_time.monotonic() - hit[0]) < _SURFACE_TTL_SECONDS:
+        return {"symbol": key, "slices": hit[1], "cached": True}
+
+    desk = loop.get_desk()
+    try:
+        spot = desk.broker.fetch_spot(key)
+        today = datetime.now(UTC).date()
+        snapshots = desk.broker.fetch_option_chain(
+            key,
+            expiry_gte=today + timedelta(days=5),
+            expiry_lte=today + timedelta(days=370),
+            strike_gte=spot * 0.88,
+            strike_lte=spot * 1.12,
+        )
+        from skew.data.chains import build_chain
+
+        chain = build_chain(key, spot, snapshots)
+    except Exception as exc:  # noqa: BLE001 — the page degrades, never invents
+        log.warning("surface unavailable for %s: %s", key, exc)
+        return {"symbol": key, "slices": [], "error": "surface unavailable"}
+    if spot <= 0:
+        return {"symbol": key, "slices": [], "error": "surface unavailable"}
+
+    slices: list[dict[str, Any]] = []
+    for expiry in chain.expiries:
+        dte = (expiry - datetime.now(UTC).date()).days
+        if dte < 5 or dte > 370:
+            continue
+        points = skew_slice(chain, expiry=expiry, width_pct=0.10)
+        if len(points) < 6:
+            continue
+        slices.append(
+            {
+                "dte": dte,
+                "points": [
+                    {"strike": p.strike, "iv": p.iv, "moneyness": p.moneyness} for p in points
+                ],
+            }
+        )
+
+    # Cap at 30 curves, sampled evenly across the tenor range so the waterfall
+    # keeps both its dense near end and its long tail.
+    if len(slices) > 30:
+        step = len(slices) / 30
+        slices = [slices[int(i * step)] for i in range(30)]
+
+    _SURFACE_CACHE[key] = (_time.monotonic(), slices)
+    return {"symbol": key, "spot": chain.spot, "slices": slices, "cached": False}
+
+
+@api.get("/decision/{decision_id}", summary="One decision, in full, for the trace view")
+def get_decision(decision_id: str) -> Decision:
+    """The complete record behind one audit entry — including the trace block
+    (scan, measure, classify, build), every gate result, and the stress grid
+    when one breached. This is what /trace/<id> renders.
+    """
+    decision = audit.by_id(decision_id)
+    if decision is None:
+        raise HTTPException(status_code=404, detail=f"No decision {decision_id!r}.")
+    return decision
+
+
 @api.get("/refusal-exhibit", summary="The most recent refusal with a genuine breach")
 def get_refusal_exhibit() -> dict[str, Any]:
     """A real refused candidate whose stress grid actually breached.

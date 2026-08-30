@@ -179,6 +179,40 @@ def run_cycle(
         _CYCLE_LOCK.release()
 
 
+def _trace_for(result) -> dict:
+    """The recorded reasoning chain behind one symbol's decisions this cycle.
+
+    Every value here was observed during THIS evaluation — spot, contract
+    count, the measured vols, the classifier's sentence — so a decision trace
+    replays what actually happened rather than recomputing something similar.
+    """
+    v = result.vol_state
+    if v is None:
+        return {"scan": {"symbol": result.symbol, "error": result.error}}
+    return {
+        "scan": {
+            "symbol": v.symbol,
+            "spot": v.spot,
+            "contracts": result.chain_contracts,
+            "as_of": v.as_of.isoformat(),
+        },
+        "measure": {
+            "iv_atm": v.iv_atm,
+            "rv_20": v.rv_20,
+            "rv_parkinson": v.rv_parkinson,
+            "vrp": v.vrp,
+            "term_slope": v.term_slope,
+            "rv_percentile": v.rv_percentile,
+        },
+        "classify": {"regime": v.regime, "note": v.note},
+        "build": {
+            "count": len(result.candidates),
+            "kinds": [c.structure.kind for c in result.candidates],
+            "survivors": [c.id for c in result.survivors],
+        },
+    }
+
+
 def _evaluate_and_act(
     desk: Desk,
     selector: BoundedSelector,
@@ -190,6 +224,7 @@ def _evaluate_and_act(
     """Everything the desk does about one symbol in one cycle."""
     decisions = []
     result = desk.evaluate_symbol(symbol, on_stage=lambda stage: _progress(phase=stage))
+    trace = _trace_for(result)
     tier = result.risk.tier
 
     if result.vol_state is not None:
@@ -206,6 +241,7 @@ def _evaluate_and_act(
                     "regime": result.vol_state.regime if result.vol_state else None,
                     "vrp": result.vol_state.vrp if result.vol_state else None,
                 },
+                trace=trace,
             )
         )
         return decisions
@@ -215,7 +251,7 @@ def _evaluate_and_act(
     # Refusals are logged as prominently as executions — that is the product.
     for candidate in result.candidates:
         if not candidate.passed_all:
-            decisions.append(audit.record_refusal(candidate, tier))
+            decisions.append(audit.record_refusal(candidate, tier, trace=trace))
 
     survivors = result.survivors
     if not survivors:
@@ -228,6 +264,7 @@ def _evaluate_and_act(
                 ),
                 risk_tier=tier,
                 detail={"refused": len(result.candidates)},
+                trace=trace,
             )
         )
         return decisions
@@ -250,6 +287,7 @@ def _evaluate_and_act(
                     "malformed": selection.malformed,
                     "offered": [c.id for c in survivors],
                 },
+                trace=trace,
             )
         )
         return decisions
@@ -265,7 +303,12 @@ def _evaluate_and_act(
                 ),
                 risk_tier=tier,
                 model_rationale=selection.rationale,
-                detail={"dry_run": True, "structure_id": chosen.id},
+                detail={
+                    "dry_run": True,
+                    "structure_id": chosen.id,
+                    "offered": [c.id for c in survivors],
+                },
+                trace=trace,
             )
         )
         return decisions
@@ -278,6 +321,7 @@ def _evaluate_and_act(
                 risk_tier=tier,
                 model_rationale=selection.rationale,
                 detail={"kill_switch": True},
+                trace=trace,
             )
         )
         return decisions
@@ -292,6 +336,7 @@ def _evaluate_and_act(
                 chosen,
                 tier,
                 extra={"submission_refused": str(exc), "stage": "pre-flight"},
+                trace=trace,
             )
         )
         return decisions
@@ -303,7 +348,12 @@ def _evaluate_and_act(
             tier,
             order_id=order["client_order_id"],
             model_rationale=selection.rationale,
-            detail={"broker_order_id": order.get("broker_order_id"), "status": order.get("status")},
+            detail={
+                "broker_order_id": order.get("broker_order_id"),
+                "status": order.get("status"),
+                "offered": [c.id for c in survivors],
+            },
+            trace=trace,
         )
     )
     return decisions
