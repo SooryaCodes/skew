@@ -27,6 +27,29 @@ from skew.config import settings as default_settings
 log = logging.getLogger(__name__)
 
 
+def competition_account_gate(connected: str, competition_id: str) -> str | None:
+    """The competition-account check, pure so it is testable without a broker.
+
+    Returns None when the check passes — including when no competition id is
+    configured, which logs as unverified elsewhere but must not block a dev
+    environment.
+    """
+    if not competition_id:
+        return None
+    if not connected:
+        return (
+            "COMPETITION_ACCOUNT_ID is set but the connected account id could not "
+            "be read — cannot confirm this is the competition account."
+        )
+    if connected != competition_id:
+        return (
+            f"Connected account …{connected[-4:]} is not the competition account "
+            f"…{competition_id[-4:]}. Set the competition credentials or clear "
+            "COMPETITION_ACCOUNT_ID."
+        )
+    return None
+
+
 class BrokerUnavailable(RuntimeError):
     """Raised when credentials are absent. Never carries a credential value."""
 
@@ -106,14 +129,19 @@ class Broker:
     def verify_account(self) -> dict[str, Any]:
         """Startup check per docs/05-SECURITY.md.
 
-        Confirms the account is the dedicated hackathon account when an account
-        number is configured, and warns when equity is not roughly $100k. Warns
-        rather than refuses on equity: a paper balance drifting is normal, a
-        wrong *account* is not.
+        Logs which account is connected and its equity, warns when equity is
+        not roughly $100k, and — when COMPETITION_ACCOUNT_ID is set — verifies
+        the connected account IS the dedicated competition account. A mismatch
+        does not crash the boot; it is returned as ``competition_error`` so the
+        API can refuse to report ARMED while staying inspectable.
         """
         account = self.get_account()
         number = str(getattr(account, "account_number", "") or "")
         equity = float(getattr(account, "equity", 0.0) or 0.0)
+
+        # The loud startup line: which account, how much money. The id goes to
+        # the server log only — the API exposes just its last four characters.
+        log.info("CONNECTED ACCOUNT %s — equity $%,.2f", number or "<unknown>", equity)
 
         expected = self.settings.alpaca_account_number
         if expected and number != expected:
@@ -127,16 +155,26 @@ class Broker:
                 "hackathon account. Set it before the demo."
             )
 
+        competition_error = competition_account_gate(
+            number, self.settings.competition_account_id
+        )
+        if competition_error:
+            log.error("COMPETITION ACCOUNT MISMATCH — the desk will NOT report ARMED: %s",
+                      competition_error)
+
         target = self.settings.expected_equity
         if target > 0 and abs(equity - target) / target > 0.25:
             log.warning(
-                "Account equity %.2f is more than 25%% away from the expected %.2f. "
-                "Check this is the right paper account.",
+                "ACCOUNT EQUITY $%,.2f IS NOT ~$%,.0f — more than 25%% away from the "
+                "expected fresh-account balance. Check this is the right paper account.",
                 equity,
                 target,
             )
         return {
             "account_number_set": bool(expected),
+            "account_number": number,
+            "account_id_suffix": number[-4:] if number else None,
+            "competition_error": competition_error,
             "equity": equity,
             "buying_power": float(getattr(account, "buying_power", 0.0) or 0.0),
             "options_level": getattr(account, "options_trading_level", None),

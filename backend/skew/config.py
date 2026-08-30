@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     # Optional: the dedicated hackathon account number. When set, startup verifies
     # the connected account matches, so a stray key cannot trade the wrong account.
     alpaca_account_number: str = ""
+    # Hackathon rule: the submission runs on a brand-new paper account. When
+    # set, boot verifies the connected account IS that account, and the desk
+    # refuses to report ARMED on a mismatch — the guard against accidentally
+    # submitting with the dev account.
+    competition_account_id: str = ""
     expected_equity: float = 100_000.0
 
     # ---- Anthropic (bounded selector model) ----

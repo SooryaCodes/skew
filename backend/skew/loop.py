@@ -78,6 +78,11 @@ def _progress(**updates) -> None:
 _DESK: Desk | None = None
 _SELECTOR: BoundedSelector | None = None
 
+# Set once by the API lifespan after the boot-time account check. suffix is the
+# last four characters of the connected account id (all the API ever exposes);
+# error is a competition-account mismatch, and an armed desk requires it None.
+ACCOUNT: dict[str, str | float | None] = {"suffix": None, "error": None, "equity": None}
+
 
 def get_selector(settings: Settings | None = None) -> BoundedSelector:
     """Process-wide selector, so its last error survives for /api/status."""

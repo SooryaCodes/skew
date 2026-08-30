@@ -85,6 +85,26 @@ async def lifespan(_app: FastAPI):
     else:
         log.info("selector preflight ok — model %s reachable", settings.anthropic_model)
 
+    # Boot-time account check: log who we are connected as, warn on a drifted
+    # balance, and refuse to arm on the wrong account. Unreachable-broker boots
+    # (no credentials, network down) leave suffix None; if a competition id is
+    # configured, unverified counts as failed — never arm on an unknown account.
+    desk = loop.get_desk(settings)
+    if desk.broker.available:
+        try:
+            check = desk.broker.verify_account()
+            loop.ACCOUNT["suffix"] = check.get("account_id_suffix")
+            loop.ACCOUNT["equity"] = check.get("equity")
+            loop.ACCOUNT["error"] = check.get("competition_error")
+        except Exception as exc:  # boot must survive to report itself
+            log.exception("account verification failed at boot")
+            if settings.competition_account_id:
+                loop.ACCOUNT["error"] = f"account unverifiable at boot: {exc}"
+    elif settings.competition_account_id:
+        loop.ACCOUNT["error"] = (
+            "COMPETITION_ACCOUNT_ID is set but no broker credentials are configured."
+        )
+
     scheduler = None
     if settings.run_scheduler:
         from datetime import timedelta
@@ -235,7 +255,15 @@ def get_status() -> dict[str, Any]:
         # server's own verdict: configured to trade AND the selector answered
         # the startup preflight. The UI renders armed only from this field.
         "selector_error": loop.get_selector().last_error,
-        "armed": settings.auto_execute and loop.get_selector().last_error is None,
+        # Last four characters only — enough to confirm WHICH account from the
+        # deployed status page, never the full id.
+        "account_id_suffix": loop.ACCOUNT["suffix"],
+        "account_error": loop.ACCOUNT["error"],
+        "armed": (
+            settings.auto_execute
+            and loop.get_selector().last_error is None
+            and loop.ACCOUNT["error"] is None
+        ),
         "version": VERSION,
     }
 
