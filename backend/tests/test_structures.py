@@ -538,3 +538,77 @@ def test_the_desk_passes_its_configured_width(real_spy_chain, real_as_of):
     source = inspect.getsource(Desk._build_structures)
     assert "width_pct" in source, "desk must forward the configured width to the builders"
     assert "cfg.target_width_pct" in source
+
+
+# ---------------------------------------------------------------- budget sizing
+
+
+def _quote(strike, right, mid, delta, oi=5000):
+    return ContractQuote(
+        symbol=f"SPY{EXPIRY:%y%m%d}{right[0]}{round(strike * 1000):08d}",
+        underlying="SPY",
+        strike=strike,
+        expiry=EXPIRY,
+        right=right,
+        bid=mid - 0.02,
+        ask=mid + 0.02,
+        iv=0.20,
+        delta=delta,
+        open_interest=oi,
+    )
+
+
+def _put_ladder(step=5.0):
+    """A put chain around spot 600: strikes 550..595, deltas rising toward ATM."""
+    quotes = []
+    for i, strike in enumerate(range(550, 600, int(step))):
+        distance = (600 - strike) / 50  # 1.0 far, ~0.1 near
+        quotes.append(
+            _quote(float(strike), "PUT", mid=0.3 + i * 0.60, delta=-(0.05 + i * 0.03))
+        )
+    del distance
+    return quotes
+
+
+def test_budget_walk_picks_the_widest_fitting_width():
+    """With a $500 cap the long leg lands at the widest strike that still fits."""
+    from skew.structures.selection import _walk_to_budget, credit_vertical_loss
+
+    contracts = sorted(_put_ladder(), key=lambda c: c.strike)
+    short = contracts[-1]  # 595, the richest
+    # width 5 -> est loss (5 - credit)*100*1.1  well under 500 -> fits
+    # width 10, 15 ... grow until they breach.
+    fit = _walk_to_budget(contracts, short, -1, 500.0, credit_vertical_loss)
+    assert fit is not None
+    width = short.strike - fit.strike
+    est = credit_vertical_loss(short, fit) * 1.10
+    assert est <= 500.0
+    # The next-wider strike must NOT fit — otherwise the walk stopped early.
+    wider = [c for c in contracts if c.strike < fit.strike]
+    if wider:
+        next_leg = max(wider, key=lambda c: c.strike)
+        assert credit_vertical_loss(short, next_leg) * 1.10 > 500.0
+    assert width >= 5.0
+
+
+def test_budget_too_tight_raises_with_the_numbers():
+    """When even one strike interval exceeds the cap, the walk abstains loudly."""
+    from skew.structures.selection import BudgetTooTight, _walk_to_budget, credit_vertical_loss
+
+    contracts = sorted(_put_ladder(), key=lambda c: c.strike)
+    short = contracts[-1]
+    with pytest.raises(BudgetTooTight) as excinfo:
+        _walk_to_budget(contracts, short, -1, 50.0, credit_vertical_loss)
+    err = excinfo.value
+    assert err.budget == 50.0
+    assert err.narrowest_width == 5.0
+    assert "Narrowest available spread" in str(err)
+
+
+def test_assemble_asserts_the_per_trade_cap_at_construction(primer_put_credit):
+    """The 580/575 spread has a $420 max loss — a $400 cap must refuse it HERE."""
+    with pytest.raises(StructureError, match="per-trade cap"):
+        assemble("SPY", "PUT_CREDIT", primer_put_credit, spot=584.0, max_loss_cap=400.0)
+    # And a cap it fits under builds normally.
+    s = assemble("SPY", "PUT_CREDIT", primer_put_credit, spot=584.0, max_loss_cap=500.0)
+    assert s.max_loss == pytest.approx(420.0)

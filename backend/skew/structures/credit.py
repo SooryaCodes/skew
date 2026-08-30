@@ -27,6 +27,7 @@ from skew.models import Structure
 from skew.structures.base import StructureError, assemble, leg_from_contract
 from skew.structures.selection import (
     DEFAULT_WIDTH_PCT,
+    BudgetTooTight,
     choose_expiry,
     select_condor_wings,
     select_credit_vertical,
@@ -46,6 +47,7 @@ def put_credit_spread(
     min_open_interest: int = 0,
     max_spread_pct: float = 1.0,
     as_of: date | None = None,
+    budget: float | None = None,
 ) -> Structure | None:
     """Sell a put, buy a lower one. The bread and butter when vol is rich."""
     ref = as_of or chain.as_of.date()
@@ -54,7 +56,14 @@ def put_credit_spread(
         return None
 
     picked = select_credit_vertical(
-        chain, chosen, "PUT", short_delta, width_pct, min_open_interest, max_spread_pct
+        chain,
+        chosen,
+        "PUT",
+        short_delta,
+        width_pct,
+        min_open_interest,
+        max_spread_pct,
+        budget=budget,
     )
     if picked is None:
         return None
@@ -71,6 +80,7 @@ def put_credit_spread(
             spot=chain.spot,
             qty=qty,
             as_of=ref,
+            max_loss_cap=budget,
         )
     except StructureError as exc:
         log.debug("put credit spread on %s rejected at assembly: %s", chain.symbol, exc)
@@ -88,6 +98,7 @@ def call_credit_spread(
     min_open_interest: int = 0,
     max_spread_pct: float = 1.0,
     as_of: date | None = None,
+    budget: float | None = None,
 ) -> Structure | None:
     """Sell a call, buy a higher one. Mirror image of the put credit spread."""
     ref = as_of or chain.as_of.date()
@@ -96,7 +107,14 @@ def call_credit_spread(
         return None
 
     picked = select_credit_vertical(
-        chain, chosen, "CALL", short_delta, width_pct, min_open_interest, max_spread_pct
+        chain,
+        chosen,
+        "CALL",
+        short_delta,
+        width_pct,
+        min_open_interest,
+        max_spread_pct,
+        budget=budget,
     )
     if picked is None:
         return None
@@ -113,6 +131,7 @@ def call_credit_spread(
             spot=chain.spot,
             qty=qty,
             as_of=ref,
+            max_loss_cap=budget,
         )
     except StructureError as exc:
         log.debug("call credit spread on %s rejected at assembly: %s", chain.symbol, exc)
@@ -130,6 +149,7 @@ def iron_condor(
     min_open_interest: int = 0,
     max_spread_pct: float = 1.0,
     as_of: date | None = None,
+    budget: float | None = None,
 ) -> Structure | None:
     """A put credit spread and a call credit spread on the same expiry.
 
@@ -144,7 +164,13 @@ def iron_condor(
         return None
 
     wings = select_condor_wings(
-        chain, chosen, short_delta, width_pct, min_open_interest, max_spread_pct
+        chain,
+        chosen,
+        short_delta,
+        width_pct,
+        min_open_interest,
+        max_spread_pct,
+        budget=budget,
     )
     if wings is None:
         return None
@@ -163,6 +189,7 @@ def iron_condor(
             spot=chain.spot,
             qty=qty,
             as_of=ref,
+            max_loss_cap=budget,
         )
     except StructureError as exc:
         log.debug("iron condor on %s rejected at assembly: %s", chain.symbol, exc)
@@ -179,12 +206,18 @@ def build_credit_candidates(
     min_open_interest: int = 0,
     max_spread_pct: float = 1.0,
     as_of: date | None = None,
+    budget: float | None = None,
 ) -> list[Structure]:
     """Two or three fully-specified premium-selling candidates.
 
     Deliberately a short list. The model downstream picks among pre-validated
     options; handing it thirty near-identical spreads would be handing it a
     search problem instead of a choice.
+
+    Sized to the budget: each builder places its long leg at the widest strike
+    that keeps max loss inside the per-trade cap. When even the narrowest listed
+    interval cannot fit and nothing at all could be built, the BudgetTooTight is
+    re-raised so the desk abstains with the numbers instead of logging silence.
     """
     kwargs = {
         "qty": qty,
@@ -194,10 +227,22 @@ def build_credit_candidates(
         "min_open_interest": min_open_interest,
         "max_spread_pct": max_spread_pct,
         "as_of": as_of,
+        "budget": budget,
     }
-    built = [
-        put_credit_spread(chain, short_delta=short_delta, **kwargs),
-        iron_condor(chain, short_delta=max(0.15, short_delta - 0.05), **kwargs),
-        call_credit_spread(chain, short_delta=short_delta, **kwargs),
-    ]
-    return [s for s in built if s is not None]
+    built: list[Structure] = []
+    tight: BudgetTooTight | None = None
+    for build in (
+        lambda: put_credit_spread(chain, short_delta=short_delta, **kwargs),
+        lambda: iron_condor(chain, short_delta=max(0.15, short_delta - 0.05), **kwargs),
+        lambda: call_credit_spread(chain, short_delta=short_delta, **kwargs),
+    ):
+        try:
+            structure = build()
+        except BudgetTooTight as exc:
+            tight = tight or exc
+            continue
+        if structure is not None:
+            built.append(structure)
+    if not built and tight is not None:
+        raise tight
+    return built

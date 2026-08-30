@@ -17,6 +17,7 @@ structure that cannot be closed.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -32,6 +33,33 @@ log = logging.getLogger(__name__)
 # very different underlyings.
 DEFAULT_WIDTH_PCT = 0.0075
 MIN_WIDTH_DOLLARS = 1.0
+
+# A slightly worse fill than the quoted mid must not push the realized max loss
+# past the cap, so the width search prices every candidate with this margin.
+BUDGET_FILL_MARGIN = 1.10
+
+
+class BudgetTooTight(Exception):
+    """Even the narrowest listed strike interval exceeds the per-trade budget.
+
+    Deliberately NOT a StructureError: assembly-level catches must not swallow
+    it. It carries the numbers so the desk can abstain with a reason a human can
+    check — "narrowest available spread is 5 points, max loss $487, exceeds
+    remaining headroom $159" — instead of building a candidate it already knows
+    will be refused.
+    """
+
+    def __init__(self, symbol: str, narrowest_width: float, est_max_loss: float, budget: float):
+        self.symbol = symbol
+        self.narrowest_width = narrowest_width
+        self.est_max_loss = est_max_loss
+        self.budget = budget
+        super().__init__(
+            f"Narrowest available spread on {symbol} is {narrowest_width:g} points — "
+            f"estimated max loss ${est_max_loss:,.0f} exceeds the remaining per-trade "
+            f"headroom ${budget:,.0f}. Abstaining rather than building an oversized "
+            "structure."
+        )
 
 
 def usable_contracts(
@@ -145,6 +173,62 @@ def _walk_to_width(
     return best
 
 
+def _walk_to_budget(
+    contracts: list[ContractQuote],
+    anchor: ContractQuote,
+    direction: int,
+    budget: float,
+    est_loss: Callable[[ContractQuote, ContractQuote], float],
+    max_steps: int = 25,
+) -> ContractQuote | None:
+    """The WIDEST strike whose estimated max loss (with fill margin) fits ``budget``.
+
+    Works backwards from the risk budget instead of forwards from a width
+    target: walks outward from ``anchor`` through the strikes that actually
+    exist, keeps the widest one that still fits, and raises
+    :class:`BudgetTooTight` when even the first interval does not — the caller
+    abstains rather than building a candidate its own gate must refuse.
+    """
+    narrowest: tuple[float, float] | None = None  # (width, est) of the first interval
+    best: ContractQuote | None = None
+    for n in range(1, max_steps + 1):
+        candidate = strikes_away(contracts, anchor, n, direction)
+        if candidate is None:
+            break
+        if candidate.symbol == anchor.symbol:
+            continue
+        # Stale-quote guard, same as the width walk: the far leg must be cheaper.
+        if candidate.mid >= anchor.mid:
+            continue
+
+        estimated = est_loss(anchor, candidate) * BUDGET_FILL_MARGIN
+        width = abs(candidate.strike - anchor.strike)
+        if narrowest is None:
+            narrowest = (width, estimated)
+        if estimated <= budget:
+            best = candidate  # keep walking — a wider fit may still exist
+        else:
+            break  # loss grows with width; the first miss ends the walk
+
+    if best is not None:
+        return best
+    if narrowest is not None:
+        raise BudgetTooTight(anchor.underlying, narrowest[0], narrowest[1], budget)
+    return None
+
+
+def credit_vertical_loss(short: ContractQuote, long_leg: ContractQuote) -> float:
+    """Estimated max loss in dollars for one credit vertical: width − credit."""
+    width = abs(short.strike - long_leg.strike)
+    credit = max(0.0, short.mid - long_leg.mid)
+    return (width - credit) * 100.0
+
+
+def debit_vertical_loss(long_leg: ContractQuote, short: ContractQuote) -> float:
+    """Estimated max loss in dollars for one debit vertical: the debit paid."""
+    return max(0.0, long_leg.mid - short.mid) * 100.0
+
+
 def select_credit_vertical(
     chain: OptionChain,
     expiry: date,
@@ -153,13 +237,18 @@ def select_credit_vertical(
     width_pct: float = DEFAULT_WIDTH_PCT,
     min_open_interest: int = 0,
     max_spread_pct: float = 1.0,
+    budget: float | None = None,
 ) -> tuple[ContractQuote, ContractQuote] | None:
     """Pick ``(short, long)`` for a credit spread.
 
-    Sell near ``short_delta``; buy far enough out of the money that the spread is
-    a meaningful width. Out of the money means *lower* strikes for a put spread
-    and *higher* for a call spread — the long leg is always the cheaper one,
-    which is what makes the position a credit and caps the loss.
+    Sell near ``short_delta``; place the long leg by BUDGET when one is given —
+    the widest listed strike whose estimated max loss still fits the per-trade
+    cap — and by width target otherwise. Out of the money means *lower* strikes
+    for a put spread and *higher* for a call spread — the long leg is always the
+    cheaper one, which is what makes the position a credit and caps the loss.
+
+    Raises :class:`BudgetTooTight` when a budget is given and no listed interval
+    fits it.
     """
     contracts = usable_contracts(chain, expiry, right, min_open_interest, max_spread_pct)
     if len(contracts) < 2:
@@ -170,7 +259,10 @@ def select_credit_vertical(
         return None
 
     direction = -1 if right == "PUT" else 1
-    long_leg = _walk_to_width(contracts, short, direction, target_width(chain.spot, width_pct))
+    if budget is not None:
+        long_leg = _walk_to_budget(contracts, short, direction, budget, credit_vertical_loss)
+    else:
+        long_leg = _walk_to_width(contracts, short, direction, target_width(chain.spot, width_pct))
     if long_leg is None:
         log.debug("no protective leg found for %s on %s", short.symbol, chain.symbol)
         return None
@@ -185,11 +277,13 @@ def select_debit_vertical(
     width_pct: float = DEFAULT_WIDTH_PCT,
     min_open_interest: int = 0,
     max_spread_pct: float = 1.0,
+    budget: float | None = None,
 ) -> tuple[ContractQuote, ContractQuote] | None:
     """Pick ``(long, short)`` for a debit spread.
 
     Buy near the money at ``long_delta``, then sell further out to reduce the
-    cost. The debit paid is the maximum loss.
+    cost. The debit paid is the maximum loss — wider means more debit, so with a
+    budget the walk keeps the widest spread whose debit still fits.
     """
     contracts = usable_contracts(chain, expiry, right, min_open_interest, max_spread_pct)
     if len(contracts) < 2:
@@ -200,7 +294,10 @@ def select_debit_vertical(
         return None
 
     direction = 1 if right == "CALL" else -1
-    short = _walk_to_width(contracts, long_leg, direction, target_width(chain.spot, width_pct))
+    if budget is not None:
+        short = _walk_to_budget(contracts, long_leg, direction, budget, debit_vertical_loss)
+    else:
+        short = _walk_to_width(contracts, long_leg, direction, target_width(chain.spot, width_pct))
     if short is None:
         return None
     return long_leg, short
@@ -213,17 +310,37 @@ def select_condor_wings(
     width_pct: float = DEFAULT_WIDTH_PCT,
     min_open_interest: int = 0,
     max_spread_pct: float = 1.0,
+    budget: float | None = None,
 ) -> tuple[ContractQuote, ContractQuote, ContractQuote, ContractQuote] | None:
     """Pick ``(short_put, long_put, short_call, long_call)`` for an iron condor.
 
     A put credit spread and a call credit spread on the same expiry: the maximum
     expression of "volatility is overpriced and I do not care which way it goes".
+
+    The budget is split across both wings per the sizing spec. This is
+    conservative: only one wing can finish in the money, so a condor sized this
+    way carries a true max loss of roughly HALF the per-trade cap.
     """
+    wing_budget = budget / 2.0 if budget is not None else None
     put_side = select_credit_vertical(
-        chain, expiry, "PUT", short_delta, width_pct, min_open_interest, max_spread_pct
+        chain,
+        expiry,
+        "PUT",
+        short_delta,
+        width_pct,
+        min_open_interest,
+        max_spread_pct,
+        budget=wing_budget,
     )
     call_side = select_credit_vertical(
-        chain, expiry, "CALL", short_delta, width_pct, min_open_interest, max_spread_pct
+        chain,
+        expiry,
+        "CALL",
+        short_delta,
+        width_pct,
+        min_open_interest,
+        max_spread_pct,
+        budget=wing_budget,
     )
     if put_side is None or call_side is None:
         return None

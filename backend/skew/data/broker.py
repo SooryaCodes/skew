@@ -155,12 +155,12 @@ class Broker:
                 "hackathon account. Set it before the demo."
             )
 
-        competition_error = competition_account_gate(
-            number, self.settings.competition_account_id
-        )
+        competition_error = competition_account_gate(number, self.settings.competition_account_id)
         if competition_error:
-            log.error("COMPETITION ACCOUNT MISMATCH — the desk will NOT report ARMED: %s",
-                      competition_error)
+            log.error(
+                "COMPETITION ACCOUNT MISMATCH — the desk will NOT report ARMED: %s",
+                competition_error,
+            )
 
         target = self.settings.expected_equity
         if target > 0 and abs(equity - target) / target > 0.25:

@@ -23,6 +23,7 @@ from skew.models import Structure
 from skew.structures.base import StructureError, assemble, leg_from_contract
 from skew.structures.selection import (
     DEFAULT_WIDTH_PCT,
+    BudgetTooTight,
     choose_expiry,
     select_debit_vertical,
 )
@@ -43,6 +44,7 @@ def _build(
     min_open_interest: int,
     max_spread_pct: float,
     as_of: date | None,
+    budget: float | None = None,
 ) -> Structure | None:
     ref = as_of or chain.as_of.date()
     chosen = expiry or choose_expiry(chain, dte_min, dte_max, as_of=ref)
@@ -50,7 +52,14 @@ def _build(
         return None
 
     picked = select_debit_vertical(
-        chain, chosen, right, long_delta, width_pct, min_open_interest, max_spread_pct
+        chain,
+        chosen,
+        right,
+        long_delta,
+        width_pct,
+        min_open_interest,
+        max_spread_pct,
+        budget=budget,
     )
     if picked is None:
         return None
@@ -67,6 +76,7 @@ def _build(
             spot=chain.spot,
             qty=qty,
             as_of=ref,
+            max_loss_cap=budget,
         )
     except StructureError as exc:
         log.debug("%s on %s rejected at assembly: %s", kind, chain.symbol, exc)
@@ -84,6 +94,7 @@ def call_debit_spread(
     min_open_interest: int = 0,
     max_spread_pct: float = 1.0,
     as_of: date | None = None,
+    budget: float | None = None,
 ) -> Structure | None:
     """Buy a call, sell a higher one. Long vega, defined risk."""
     return _build(
@@ -99,6 +110,7 @@ def call_debit_spread(
         min_open_interest,
         max_spread_pct,
         as_of,
+        budget=budget,
     )
 
 
@@ -113,6 +125,7 @@ def put_debit_spread(
     min_open_interest: int = 0,
     max_spread_pct: float = 1.0,
     as_of: date | None = None,
+    budget: float | None = None,
 ) -> Structure | None:
     """Buy a put, sell a lower one."""
     return _build(
@@ -128,6 +141,7 @@ def put_debit_spread(
         min_open_interest,
         max_spread_pct,
         as_of,
+        budget=budget,
     )
 
 
@@ -141,12 +155,16 @@ def build_debit_candidates(
     min_open_interest: int = 0,
     max_spread_pct: float = 1.0,
     as_of: date | None = None,
+    budget: float | None = None,
 ) -> list[Structure]:
     """Both debit verticals, when the chain supports them.
 
     We build one on each side deliberately. The desk has no directional view —
     offering only a call debit spread would smuggle one in, and the point is to
     own volatility, not to pick a way for the underlying to go.
+
+    Budget-sized like the credit side: the widest spread whose debit fits the
+    per-trade cap. BudgetTooTight propagates only when nothing could be built.
     """
     kwargs = {
         "qty": qty,
@@ -157,6 +175,21 @@ def build_debit_candidates(
         "min_open_interest": min_open_interest,
         "max_spread_pct": max_spread_pct,
         "as_of": as_of,
+        "budget": budget,
     }
-    built = [call_debit_spread(chain, **kwargs), put_debit_spread(chain, **kwargs)]
-    return [s for s in built if s is not None]
+    built: list[Structure] = []
+    tight: BudgetTooTight | None = None
+    for build in (
+        lambda: call_debit_spread(chain, **kwargs),
+        lambda: put_debit_spread(chain, **kwargs),
+    ):
+        try:
+            structure = build()
+        except BudgetTooTight as exc:
+            tight = tight or exc
+            continue
+        if structure is not None:
+            built.append(structure)
+    if not built and tight is not None:
+        raise tight
+    return built

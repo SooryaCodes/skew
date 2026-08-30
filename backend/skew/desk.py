@@ -34,6 +34,7 @@ from skew.models import Candidate, RiskAuthority, VolState
 from skew.risk import authority
 from skew.structures.credit import build_credit_candidates
 from skew.structures.debit import build_debit_candidates
+from skew.structures.selection import BudgetTooTight
 from skew.vol.term import term_structure_slope
 from skew.vol.vrp import build_vol_state
 
@@ -189,7 +190,16 @@ class Desk:
             return result
 
         stage("building")
-        structures = self._build_structures(chain, vol_state, ref)
+        try:
+            structures = self._build_structures(chain, vol_state, ref, result.risk)
+        except BudgetTooTight as exc:
+            # The builder worked backwards from the budget and even the
+            # narrowest listed interval did not fit. Abstaining with the numbers
+            # is the honest outcome — a candidate built anyway would only exist
+            # to be refused.
+            result.error = str(exc)
+            log.info("abstaining on %s: %s", symbol, exc)
+            return result
         if not structures:
             result.error = (
                 f"No structure could be built from the {symbol} chain inside "
@@ -226,14 +236,23 @@ class Desk:
 
     # ------------------------------------------------------------------
 
-    def _build_structures(self, chain: OptionChain, vol_state: VolState, ref: date):
-        """Structures appropriate to the regime.
+    def _build_structures(
+        self, chain: OptionChain, vol_state: VolState, ref: date, risk: RiskAuthority
+    ):
+        """Structures appropriate to the regime, sized to the risk budget.
 
         SELL_VOL builds premium sales, BUY_VOL builds premium purchases. Nothing
         here consults a price forecast — the regime is a statement about whether
         volatility is expensive, and the structure follows from that alone.
+
+        The builders work BACKWARDS from the budget: the binding cap is the
+        smaller of the per-trade limit and the portfolio headroom left, so a
+        structure is never built wider than the desk is permitted to take. The
+        budget gate stays as the safety net; when it fires now it means a
+        genuine constraint moved between build and gate, not builder noise.
         """
         cfg = self.settings
+        budget = min(risk.budget_dollars, risk.available_dollars)
         common = {
             "qty": 1,
             "dte_min": cfg.target_dte_min,
@@ -242,6 +261,7 @@ class Desk:
             "min_open_interest": cfg.min_open_interest,
             "max_spread_pct": cfg.max_spread_pct,
             "as_of": ref,
+            "budget": budget,
         }
         if vol_state.regime == "SELL_VOL":
             return build_credit_candidates(chain, short_delta=cfg.short_leg_delta_target, **common)

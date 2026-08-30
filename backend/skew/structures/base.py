@@ -271,12 +271,18 @@ def assemble(
     spot: float,
     qty: int = 1,
     as_of: date | None = None,
+    max_loss_cap: float | None = None,
 ) -> Structure:
     """The single place a Structure comes into existence.
 
     Normalises ratios, computes the cash, derives max loss / max profit /
     breakevens, sums the Greeks, and lets ``Structure``'s own validators refuse
     anything with a non-positive max loss or a bad leg ratio.
+
+    ``max_loss_cap`` is the construction-time budget assertion: the builders
+    size their strikes to the risk budget, and this refuses any structure whose
+    computed max loss exceeds it anyway — a sizing bug must die here, not reach
+    the gate chain as noise.
     """
     if not 2 <= len(legs) <= 4:
         # Checked before the risk arithmetic so the diagnosis names the real
@@ -291,6 +297,11 @@ def assemble(
         raise StructureError(
             f"Computed a non-positive max loss ({max_loss:.2f}) for {kind} on {symbol}. "
             f"Refusing to build a structure whose worst case is unknown."
+        )
+    if max_loss_cap is not None and max_loss > max_loss_cap:
+        raise StructureError(
+            f"Constructed {kind} on {symbol} with max loss ${max_loss:,.0f} above the "
+            f"per-trade cap ${max_loss_cap:,.0f} — the builder sized its strikes wrong."
         )
 
     expiry = min(leg.expiry for leg in legs)
