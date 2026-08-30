@@ -16,6 +16,7 @@ import type {
   Candidate,
   CycleStatus,
   RefusalExhibit,
+  Surface,
   Decision,
   Position,
   RiskAuthority,
@@ -77,3 +78,5 @@ export const useCycleStatus = () => usePoll<CycleStatus>("/api/cycle/status", 15
 export const useSession = () => usePoll<SessionSummary>("/api/session", 15000);
 export const useRefusalExhibit = () =>
   usePoll<RefusalExhibit>("/api/refusal-exhibit", 60000);
+export const useSurface = (symbol: string) =>
+  usePoll<Surface>(`/api/surface/${symbol}`, 15 * 60 * 1000);

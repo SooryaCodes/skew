@@ -295,3 +295,88 @@ body {
     filter: none;
   }
 }
+
+/* ------------------------------------------------------------------
+   Landing page — texture and reveals.
+
+   Grain and a faint grid give the print-object feel that gradients cannot.
+   Reveals are opacity plus a 4px horizontal drift — never fade-up-from-below.
+   The .js gate means a reader with JavaScript disabled sees everything
+   immediately; hidden-until-revealed only exists when the reveal can happen.
+   ------------------------------------------------------------------ */
+
+.paper-grid {
+  background-image:
+    linear-gradient(var(--line-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+  background-size: 48px 48px;
+  opacity: 0.04;
+}
+
+.js .reveal {
+  opacity: 0;
+  transform: translateX(-4px);
+}
+.js .reveal.revealed {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 480ms ease var(--reveal-delay, 0ms),
+    transform 480ms ease var(--reveal-delay, 0ms);
+}
+
+/* The hero surface breathes — ±3px over 12s, barely perceptible. */
+@keyframes surface-breathe {
+  from {
+    transform: translateY(-3px);
+  }
+  to {
+    transform: translateY(3px);
+  }
+}
+.surface-breathe {
+  animation: surface-breathe 12s ease-in-out infinite alternate;
+}
+
+/* Draw-in for surface curves: pathLength is normalised to 1 in the SVG. */
+@keyframes curve-in {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Landing stress grid: cells fill in sequence, then the contour, then the
+   ring — timings are per-cell inline. */
+@keyframes cell-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface-breathe {
+    animation: none;
+  }
+  .js .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Landing stress grid, pre-entrance: cells wait invisible until scrolled to.
+   .js-gated so a no-JS reader sees the grid immediately. */
+.js .grid-pending .cell-anim {
+  opacity: 0;
+}
+
+/* The rule the keyframes were waiting for: each curve draws left-to-right,
+   staggered far-to-near via inline animation-delay. */
+.curve-in {
+  animation: curve-in 1000ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}

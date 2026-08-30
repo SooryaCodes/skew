@@ -295,3 +295,15 @@ export interface RefusalExhibit {
   cells?: StressCell[];
   note?: string;
 }
+
+export interface SurfaceSlice {
+  dte: number;
+  points: Array<{ strike: number; iv: number; moneyness: number }>;
+}
+
+export interface Surface {
+  symbol: string;
+  spot?: number;
+  slices: SurfaceSlice[];
+  error?: string;
+}
