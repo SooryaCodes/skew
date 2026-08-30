@@ -17,6 +17,7 @@
 import { useMemo, useState } from "react";
 
 import { money } from "@/lib/format";
+import { useInView } from "@/lib/useInView";
 import type { StressCell, TimePoint } from "@/lib/types";
 
 const TIME_POINTS: Array<{ key: TimePoint; label: string }> = [
@@ -29,6 +30,9 @@ interface Props {
   cells: StressCell[];
   maxLoss: number;
   refused?: boolean;
+  /** Landing mode: cells fill left-to-right at 25ms, then the contour draws,
+   *  then the worst-cell ring — about 900ms end to end, once, on scroll. */
+  animateOnView?: boolean;
 }
 
 /** The continuous ramp. Intensity from the cell's own share of the extremes. */
@@ -47,10 +51,12 @@ function cellStyle(cell: StressCell, maxProfit: number, maxLoss: number): React.
     };
   }
   if (cell.pnl >= 0) {
+    // Profits stay nearly neutral — the landing treatment. A grid that glows
+    // green everywhere buries the one thing that matters, the breach region.
     const t = Math.min(1, cell.pnl / Math.max(1, maxProfit));
     return {
       ...base,
-      background: `color-mix(in srgb, var(--verdigris) ${4 + t * 26}%, var(--panel))`,
+      background: `color-mix(in srgb, var(--verdigris) ${2 + t * 9}%, var(--panel))`,
       color: "var(--text-dim)",
     };
   }
@@ -62,9 +68,11 @@ function cellStyle(cell: StressCell, maxProfit: number, maxLoss: number): React.
   };
 }
 
-export function StressGrid({ cells, maxLoss, refused = false }: Props) {
+export function StressGrid({ cells, maxLoss, refused = false, animateOnView = false }: Props) {
   const [timePoint, setTimePoint] = useState<TimePoint>("MID");
   const [hovered, setHovered] = useState<StressCell | null>(null);
+  const { ref: viewRef, inView } = useInView<HTMLDivElement>(0.35);
+  const entrance = animateOnView && inView;
 
   const view = useMemo(() => {
     const slice = cells.filter((c) => c.time_point === timePoint);
@@ -112,7 +120,7 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
   const detail = hovered ?? view.worst;
 
   return (
-    <div>
+    <div ref={viewRef} className={animateOnView && !inView ? "grid-pending" : undefined}>
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <span className="mono text-[11px] uppercase tracking-widest text-[color:var(--text-dim)]">
           stress · {cells.length} scenarios
@@ -164,6 +172,15 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
               const isWorst = cell === view.worst;
               const contour = view.contour(pi, ii);
               const hasContour = Object.keys(contour).length > 0;
+              // Entrance timings, per cell: fill at index*25ms, contour at
+              // 700ms, ring at 850ms. Inline `animation` so the three parts
+              // sequence on one element.
+              const anims: string[] = [];
+              if (entrance) {
+                anims.push(`cell-in 160ms ease both ${ii * view.priceShocks.length * 25 + pi * 25}ms`);
+                if (hasContour) anims.push("contour-in 300ms ease both 700ms");
+                if (isWorst) anims.push("ring-in 150ms ease both 850ms");
+              }
               return (
                 <button
                   key={`${px}-${iv}`}
@@ -173,12 +190,13 @@ export function StressGrid({ cells, maxLoss, refused = false }: Props) {
                   aria-label={`${px} sigma, IV times ${iv}, profit and loss ${money(cell.pnl, 0)}${
                     cell.breached ? ", breaches the budget" : ""
                   }${isWorst ? ", worst cell" : ""}`}
-                  className={`mono h-7 text-[10px] tabular-nums${
-                    hasContour ? " contour-in" : ""
+                  className={`mono h-7 cell-anim text-[10px] tabular-nums${
+                    hasContour && !animateOnView ? " contour-in" : ""
                   }${isWorst ? " cell-worst" : ""}`}
                   style={{
                     ...cellStyle(cell, view.maxProfit, maxLoss),
                     ...contour,
+                    ...(anims.length > 0 ? { animation: anims.join(", ") } : {}),
                   }}
                 >
                   {Math.abs(cell.pnl) >= 1000

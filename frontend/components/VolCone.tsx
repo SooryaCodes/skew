@@ -20,11 +20,11 @@ import { useMemo } from "react";
 import type { ConePoint } from "@/lib/types";
 
 const W = 340;
-const H = 120;
+const H = 190;
 const PAD_L = 30;
-const PAD_R = 26;
-const PAD_T = 8;
-const PAD_B = 16;
+const PAD_R = 44; // room for the band labels at the right edge
+const PAD_T = 10;
+const PAD_B = 18;
 
 interface Props {
   cone: ConePoint[];
@@ -52,6 +52,7 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
         ...[...sorted].reverse().map((c) => `${x(c.horizon)},${y(lo(c))}`),
       ].join(" ");
 
+    const last = sorted.at(-1)!;
     return {
       sorted,
       outer: band((c) => c.p90, (c) => c.p10),
@@ -59,6 +60,15 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
       median: sorted.map((c) => `${x(c.horizon)},${y(c.p50)}`).join(" "),
       current: sorted.map((c) => ({ cx: x(c.horizon), cy: y(c.current) })),
       iv: { cx: x(Math.min(Math.max(ivDte, minH), maxH)), cy: y(ivAtm) },
+      // Direct labels at the right edge — opacity alone did not name the bands.
+      bandLabels: [
+        { text: "90th", cy: y(last.p90) },
+        { text: "75th", cy: y(last.p75) },
+        { text: "median", cy: y(last.p50) },
+        { text: "25th", cy: y(last.p25) },
+        { text: "10th", cy: y(last.p10) },
+      ],
+      rvLabel: { cy: y(last.current) },
       x,
       minV,
       maxV,
@@ -76,7 +86,7 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
-      className="h-auto w-full max-w-[340px]"
+      className="h-auto w-full max-w-[380px]"
       role="img"
       aria-label="Realized volatility percentile cone with current implied vol"
     >
@@ -128,6 +138,20 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
           fill="var(--text-dim)"
         >
           {c.horizon}
+        </text>
+      ))}
+
+      {/* the bands, named — collision-free enough at this height */}
+      {geo.bandLabels.map((label) => (
+        <text
+          key={label.text}
+          x={W - PAD_R + 5}
+          y={label.cy + 2.5}
+          className="mono"
+          fontSize={7.5}
+          fill="var(--text-dim)"
+        >
+          {label.text}
         </text>
       ))}
     </svg>

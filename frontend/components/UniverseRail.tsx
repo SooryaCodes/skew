@@ -56,8 +56,9 @@ export function UniverseRail({ states, selected, onSelect, loading }: Props) {
                 className="t-fast flex w-full items-baseline gap-2 px-2 py-1.5 text-left"
                 style={{
                   background: active ? "var(--panel-alt)" : "transparent",
-                  borderLeft: `2px solid ${color}`,
-                  opacity: active ? 1 : 0.85,
+                  // Inactive rows dim the BAR, never the text — 85% opacity on
+                  // the whole row pushed light-theme text-dim to 4.05:1.
+                  borderLeft: `2px solid ${active ? color : `color-mix(in srgb, ${color} 55%, var(--ground))`}`,
                   borderRadius: "var(--radius)",
                 }}
               >

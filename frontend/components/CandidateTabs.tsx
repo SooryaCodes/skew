@@ -110,7 +110,7 @@ export function CandidateTabs({ candidates, activeId, onSelect }: Props) {
                     }`}
                     style={{
                       color: gate.skipped
-                        ? "var(--text-faint)"
+                        ? "var(--text-dim)"
                         : gate.passed
                           ? "var(--verdigris)"
                           : "var(--oxide)",

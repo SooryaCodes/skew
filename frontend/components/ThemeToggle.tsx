@@ -33,14 +33,17 @@ export function ThemeToggle() {
     setTheme(next);
   };
 
+  const target = theme === "dark" ? "light" : "dark";
   return (
     <button
       type="button"
       onClick={flip}
-      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+      aria-label={`Switch to the ${target} theme`}
+      title={`Switch to the ${target} theme`}
       className="mono t-fast px-1 text-[10px] uppercase tracking-wider text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
     >
-      {theme === null ? "…" : theme === "dark" ? "light" : "dark"}
+      {/* The arrow marks this as the ACTION, not the current state. */}
+      {theme === null ? "…" : `→ ${target}`}
     </button>
   );
 }

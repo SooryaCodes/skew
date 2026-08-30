@@ -32,7 +32,7 @@ function PhaseTrail({ phase, symbol, index, total }: {
           key={p}
           className="mono t-fast text-[9px] uppercase tracking-wider"
           style={{
-            color: p === phase ? "var(--text)" : "var(--text-faint)",
+            color: p === phase ? "var(--text)" : "var(--text-dim)",
             borderBottom: p === phase ? "1px solid var(--brass)" : "1px solid transparent",
           }}
         >
