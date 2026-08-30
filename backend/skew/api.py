@@ -648,7 +648,10 @@ def get_surface(symbol: str) -> dict[str, Any]:
         dte = (expiry - datetime.now(UTC).date()).days
         if dte < 5 or dte > 370:
             continue
-        points = skew_slice(chain, expiry=expiry, width_pct=0.10)
+        # The surface's chain skips the (expensive, per-contract) open-interest
+        # merge, so OI is unknown here — gate on quotes and spread only. The
+        # desk's own skew slices keep the full OI filter.
+        points = skew_slice(chain, expiry=expiry, width_pct=0.10, min_open_interest=0)
         if len(points) < 6:
             continue
         slices.append(

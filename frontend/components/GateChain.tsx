@@ -91,11 +91,15 @@ export function GateChain() {
                   className="mono border px-3 py-1.5 text-[11px] uppercase tracking-wider"
                   style={{
                     borderRadius: "var(--radius)",
+                    // Gates the token has cleared light --verdigris; the gate
+                    // it sits at is --brass; a stopped pass flashes --oxide.
                     borderColor: isStop
                       ? "var(--oxide)"
-                      : !reduced && i === pos && !flashing
+                      : !reduced && !flashing && i === pos
                         ? "var(--brass)"
-                        : "var(--line)",
+                        : !reduced && !flashing && i < pos
+                          ? "var(--verdigris)"
+                          : "var(--line)",
                     color: "var(--text)",
                     opacity: beyond ? 0.45 : 1,
                     transition: "border-color 200ms ease, opacity 300ms ease",

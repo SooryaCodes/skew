@@ -16,16 +16,15 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { CountUp } from "@/components/CountUp";
-import { GateChain } from "@/components/GateChain";
+import { Bento } from "@/components/landing/Bento";
+import { PinnedRefusal } from "@/components/landing/PinnedRefusal";
+import { SmoothScroll } from "@/components/landing/SmoothScroll";
 import { Reveal } from "@/components/Reveal";
-import { Sparkline } from "@/components/Sparkline";
-import { StressGrid } from "@/components/StressGrid";
 import { Texture } from "@/components/Texture";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { VolatilitySurface } from "@/components/VolatilitySurface";
-import { useAuditCounts, useRefusalExhibit, useStatus, useUniverse } from "@/lib/api";
-import { clockTime, regimeColor, timeAgo, volPoints } from "@/lib/format";
+import { useAudit, useAuditCounts, useRefusalExhibit, useStatus, useUniverse } from "@/lib/api";
+import { timeAgo } from "@/lib/format";
 import { prefersReducedMotion } from "@/lib/useInView";
 
 const GITHUB = "https://github.com/USER/skew";
@@ -33,15 +32,12 @@ const GITHUB = "https://github.com/USER/skew";
 /** Vertical rhythm on the 96 / 144 / 192 scale — nothing in between. */
 const RHYTHM = { minor: "96px", major: "144px", grand: "192px" };
 
-function stateLabel(regime: string): string {
-  return regime === "SELL_VOL" ? "vol rich" : regime === "BUY_VOL" ? "vol cheap" : "abstaining";
-}
-
 export default function Landing() {
   const { data: status } = useStatus();
-  const { data: universe, error: universeError } = useUniverse();
+  const { data: universe } = useUniverse();
   const { data: exhibit } = useRefusalExhibit();
   const { data: counts } = useAuditCounts();
+  const { data: audit } = useAudit(1);
 
   // Hero scroll progress: 0 at the top, 1 once a viewport has scrolled by.
   const [progress, setProgress] = useState(0);
@@ -63,8 +59,6 @@ export default function Landing() {
   }, []);
 
   const states = universe ?? [];
-  const byGap = [...states].sort((a, b) => Math.abs(b.vrp) - Math.abs(a.vrp));
-  const hero = byGap[0];
   const closed = status ? !status.market_open : false;
 
   const refused = counts?.REFUSED ?? 0;
@@ -73,6 +67,7 @@ export default function Landing() {
 
   return (
     <div className="relative min-h-screen">
+      <SmoothScroll />
       <Texture />
 
       {/* minimal chrome — the page is the pitch, not an app shell */}
@@ -81,12 +76,23 @@ export default function Landing() {
         <ThemeToggle />
       </div>
 
-      {/* 1 — HERO: the surface, then the claim on top of it */}
+      {/* 1 — HERO: type upper-left on a scrim, the surface sweeping beneath */}
       <section aria-label="Hero" className="relative z-10" style={{ height: "175vh" }}>
         <div className="sticky top-0 h-screen overflow-hidden">
           <VolatilitySurface symbol="SPY" progress={progress} />
+          {/* The scrim — the ONE sanctioned gradient: --ground pooling behind
+              the type so the headline sits on darkness while the curves stay
+              visible at the edges. */}
           <div
-            className="relative mx-auto flex h-full w-full max-w-5xl flex-col justify-center px-6"
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse 62% 55% at 30% 34%, color-mix(in srgb, var(--ground) 90%, transparent) 0%, color-mix(in srgb, var(--ground) 62%, transparent) 48%, transparent 74%)",
+            }}
+          />
+          <div
+            className="relative mx-auto flex h-full w-full max-w-5xl flex-col justify-start px-6 pt-[16vh]"
             style={{
               // The type yields to the argument as the surface recedes.
               opacity: Math.max(0, 1 - progress * 1.6),
@@ -101,29 +107,74 @@ export default function Landing() {
             <p className="mono mt-6 text-[11px] uppercase tracking-[0.2em] text-[color:var(--text-dim)]">
               autonomous volatility desk · alpaca paper
             </p>
-            {hero && (
-              <p className="mono mt-2 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
-                behind this text: SPY implied volatility, every expiry 7–365d, live
-              </p>
-            )}
+            <p className="mono mt-2 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
+              beneath this text: SPY implied volatility, every expiry 7–365d, live
+            </p>
             <div className="mt-10">
+              {/* The only CTA on the page: solid panel, brass border, fill on
+                  hover — it must never be lost in the curves again. */}
               <Link
                 href="/desk"
-                className="mono t-fast inline-block border border-[color:var(--text)] px-5 py-2.5 text-[12px] uppercase tracking-widest text-[color:var(--text)] hover:bg-[color:var(--panel-alt)]"
+                className="t-fast mono inline-block border border-[color:var(--brass)] bg-[color:var(--panel)] px-6 py-3 text-[12px] uppercase tracking-widest text-[color:var(--text)] hover:bg-[color:var(--brass)] hover:text-[color:var(--ground)]"
                 style={{ borderRadius: "var(--radius)" }}
               >
                 Enter the desk
               </Link>
             </div>
+            {/* live status chip — immediate proof it is running */}
+            {status && (
+              <p className="mono mt-5 text-[10px] text-[color:var(--text-dim)]">
+                <span
+                  className="mr-1.5 inline-block h-[7px] w-[7px] align-middle"
+                  style={{
+                    background: status.broker_connected ? "var(--verdigris)" : "var(--line)",
+                    borderRadius: "1px",
+                  }}
+                  aria-hidden
+                />
+                {status.broker_connected ? "live" : "standby"} ·{" "}
+                {status.universe_size ?? status.universe.length} names scanned
+                {status.last_cycle ? ` · last cycle ${timeAgo(status.last_cycle)}` : ""}
+              </p>
+            )}
           </div>
+          {/* scroll cue, fading on first scroll */}
+          <p
+            aria-hidden
+            className="mono absolute bottom-6 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.25em] text-[color:var(--text-dim)]"
+            style={{ opacity: Math.max(0, 1 - progress * 4) }}
+          >
+            scroll ↓
+          </p>
         </div>
       </section>
 
-      {/* 2 — THE ARGUMENT */}
+      {/* 2 — THE BENTO: real instruments, live from the API */}
+      <section
+        aria-label="The desk, live"
+        className="relative z-10 mx-auto w-full max-w-6xl px-6"
+        style={{ paddingBlock: RHYTHM.major }}
+      >
+        <Reveal>
+          <p className="mono mb-8 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+            the desk, live — every cell reads the real API
+          </p>
+        </Reveal>
+        <Bento
+          states={states}
+          counts={counts}
+          latest={audit?.[0]}
+          exhibit={exhibit}
+          status={status}
+          closed={closed}
+        />
+      </section>
+
+      {/* 3 — THE ARGUMENT */}
       <section
         aria-label="The argument"
         className="relative z-10 mx-auto w-full max-w-5xl px-6"
-        style={{ paddingBlock: RHYTHM.major }}
+        style={{ paddingBlock: RHYTHM.minor }}
       >
         <div className="grid gap-12 md:grid-cols-2">
           <div className="text-[15px] leading-relaxed text-[color:var(--text-dim)]">
@@ -160,122 +211,11 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* 3 — LIVE PROOF: the premium, right now */}
-      <section
-        aria-label="Live proof"
-        className="relative z-10 mx-auto w-full max-w-5xl px-6"
-        style={{ paddingBlock: RHYTHM.major }}
-      >
-        <Reveal>
-          <p className="mono mb-10 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
-            the premium, right now
-          </p>
-        </Reveal>
-        {universeError || states.length === 0 ? (
-          // Quiet degradation. Never a fabricated number.
-          <p className="text-sm text-[color:var(--text-dim)]">
-            {universeError
-              ? "The desk is not reachable from here right now — and nothing on this page is invented in its absence."
-              : "The desk has not published its first scan yet."}
-          </p>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-x-10 gap-y-12 sm:grid-cols-4">
-              {byGap.slice(0, 8).map((state, i) => (
-                <Reveal key={state.symbol} delay={i * 40}>
-                  <p className="mono text-[11px] text-[color:var(--text-dim)]">{state.symbol}</p>
-                  {/* Metal at dial size — the >=24px / 3:1 tier both metals clear. */}
-                  <CountUp
-                    value={state.vrp}
-                    format={(v) => volPoints(v)}
-                    className="font-display block text-[2.4rem] leading-tight"
-                    style={{ color: regimeColor(state.regime) }}
-                  />
-                  <p className="mono mb-2 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
-                    {stateLabel(state.regime)}
-                  </p>
-                  <Sparkline slices={state.skew_slices} color={regimeColor(state.regime)} />
-                </Reveal>
-              ))}
-            </div>
-            <Reveal delay={160}>
-              <p className="mono mt-12 text-[10px] text-[color:var(--text-dim)]">
-                {closed && hero
-                  ? `as of ${clockTime(hero.as_of)} · last session · reading from the desk`
-                  : "reading live from the desk"}
-              </p>
-            </Reveal>
-          </>
-        )}
-      </section>
+      {/* 4 — THE REFUSAL — the one pinned, scrubbed section */}
+      <PinnedRefusal exhibit={exhibit} />
 
-      {/* 4 — THE REFUSAL */}
-      <section
-        aria-label="The refusal"
-        className="relative z-10 mx-auto w-full max-w-5xl px-6"
-        style={{ paddingBlock: RHYTHM.grand }}
-      >
-        {exhibit?.available && exhibit.cells ? (
-          <div className="grid items-start gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <div>
-              <Reveal>
-                <h2 className="font-display text-[length:var(--fs-lg)] leading-tight">
-                  84 scenarios. One breach.
-                  <br />
-                  It doesn&rsquo;t trade.
-                </h2>
-              </Reveal>
-              <Reveal delay={40}>
-                <p className="mt-5 max-w-md text-[13px] leading-relaxed text-[color:var(--text)]">
-                  {exhibit.reason}
-                </p>
-              </Reveal>
-              <Reveal delay={80}>
-                <p className="mono mt-4 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
-                  a real refusal · {exhibit.symbol} ·{" "}
-                  {exhibit.kind?.replaceAll("_", " ").toLowerCase()} ·{" "}
-                  {exhibit.ts && timeAgo(exhibit.ts)}
-                </p>
-              </Reveal>
-            </div>
-            <div className="panel p-4">
-              <StressGrid
-                cells={exhibit.cells}
-                maxLoss={exhibit.max_loss ?? 1}
-                refused
-                animateOnView
-              />
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-[color:var(--text-dim)]">
-            The stress engine refuses any structure whose grid breaches the
-            earned budget. No breach has been recorded yet — this exhibit fills
-            in with the first real one, never with a mock.
-          </p>
-        )}
-      </section>
-
-      {/* 5 — ARCHITECTURE */}
-      <section
-        aria-label="Architecture"
-        className="relative z-10 mx-auto w-full max-w-5xl px-6"
-        style={{ paddingBlock: RHYTHM.major, paddingBottom: RHYTHM.minor }}
-      >
-        <Reveal>
-          <p className="mono mb-8 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
-            deterministic gates · bounded selector
-          </p>
-        </Reveal>
-        <Reveal delay={40}>
-          <GateChain />
-        </Reveal>
-        <Reveal delay={80}>
-          <p className="mt-8 max-w-xl text-[14px] leading-relaxed text-[color:var(--text)]">
-            The model can choose among approved structures. It cannot invent one.
-          </p>
-        </Reveal>
-      </section>
+      {/* 5 — ARCHITECTURE lives in the bento's gate-chain cell; running the
+          same animated token loop twice on one page would cheapen both. */}
 
       {/* 6 — FOOTER */}
       <footer className="relative z-10 border-t border-[color:var(--line)]">

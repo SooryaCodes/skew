@@ -66,7 +66,8 @@ export function VolatilitySurface({ symbol = "SPY", progress }: Props) {
 
     return ordered.map((slice, i) => {
       const t = n === 1 ? 1 : i / (n - 1); // 0 = farthest, 1 = front month
-      const rowY = 120 + t * 400;
+      // Pushed low: the type owns the upper-left, the surface sweeps beneath.
+      const rowY = 210 + t * 360;
       const shear = (1 - t) * 130;
       const inset = (1 - t) * 60;
       const pts = [...slice.points]
