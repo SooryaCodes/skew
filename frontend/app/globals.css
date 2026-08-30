@@ -1,27 +1,22 @@
 @import "tailwindcss";
 
 /* ------------------------------------------------------------------
-   SKEW — brass and steel on graphite.
+   SKEW — near-black, near-white, one confident accent.
 
-   Instruments are made of brass and steel; their readings print on paper.
-   The metals are muted and slightly dirty, not saturated data-viz hues:
+   The system is built on restraint: layered neutrals a few percent apart,
+   generous whitespace, large type, and a single iris accent doing the work
+   the old brass did. Semantics survive the revamp:
 
-     --brass      volatility is EXPENSIVE — sell premium
-     --steel      volatility is CHEAP — buy premium
-     --oxide      a gate FAILED. Nowhere else in the app, ever.
-     --verdigris  a good outcome: a fill, a profit region
+     --accent    volatility is EXPENSIVE — sell premium; also the brand/CTA
+     --cheap     volatility is CHEAP — buy premium
+     --negative  a gate FAILED. Nowhere else in the app, ever.
+     --positive  a good outcome: a fill, a profit region
 
-   Light is NOT an inversion. Brass and steel darken on paper, and the -dim
-   variants become tints rather than shades. Every colour in the app resolves
-   from one of these tokens; there is no hardcoded hex anywhere downstream.
+   Light is not an inversion: the accents deepen for contrast on white and
+   the neutral ladder rebuilds from paper-white down.
 
-   USAGE RULE, from the contrast audit: the metals are for glyphs, markers,
-   strokes, fills and large numerals (>=24px, the WCAG 3:1 tier — every metal
-   clears it in both themes). Small text is always --text or --text-dim; state
-   at small sizes is a colored marker beside neutral ink. Metals as small text
-   fail 4.5:1 in one theme or the other (steel and oxide in dark, brass in
-   light) and are not shipped that way. --text-faint is decorative only and is
-   never used for words.
+   Legacy aliases (--brass/--steel/--oxide/--verdigris) resolve to the new
+   tokens so every instrument recolors from one place.
 
    Theme: data-theme on <html>, set before paint by the boot script in
    layout.tsx — localStorage first, prefers-color-scheme as the default.
@@ -29,54 +24,61 @@
 
 /* Fallback = dark, so a failed boot script still renders a legible page. */
 :root {
-  --ground: #101318;
-  --panel: #171b22;
-  --panel-alt: #1c212a;
-  --line: #242a34;
-  --line-soft: #1b2028;
-  --text: #e4e6ea;
-  --text-dim: #8b93a1;
-  --text-faint: #5a6270;
-  --brass: #c8a44d;
-  --brass-dim: #6e5c2c;
-  --steel: #5b7c99;
-  --steel-dim: #33475a;
-  --oxide: #c4453c;
-  --verdigris: #4e8a76;
+  --ground: #09090b;
+  --panel: #101013;
+  --panel-alt: #17171b;
+  --line: #232329;
+  --line-soft: #1a1a1f;
+  --text: #f4f4f6;
+  --text-dim: #9d9da8;
+  --text-faint: #5b5b66;
+  --accent: #7c7cf2;
+  --accent-dim: #3a3a78;
+  --cheap: #35b6d0;
+  --cheap-dim: #1d4b57;
+  --negative: #f2555a;
+  --positive: #46c288;
+
+  --brass: var(--accent);
+  --brass-dim: var(--accent-dim);
+  --steel: var(--cheap);
+  --steel-dim: var(--cheap-dim);
+  --oxide: var(--negative);
+  --verdigris: var(--positive);
 }
 
 :root[data-theme="dark"] {
-  --ground: #101318;
-  --panel: #171b22;
-  --panel-alt: #1c212a;
-  --line: #242a34;
-  --line-soft: #1b2028;
-  --text: #e4e6ea;
-  --text-dim: #8b93a1;
-  --text-faint: #5a6270;
-  --brass: #c8a44d;
-  --brass-dim: #6e5c2c;
-  --steel: #5b7c99;
-  --steel-dim: #33475a;
-  --oxide: #c4453c;
-  --verdigris: #4e8a76;
+  --ground: #09090b;
+  --panel: #101013;
+  --panel-alt: #17171b;
+  --line: #232329;
+  --line-soft: #1a1a1f;
+  --text: #f4f4f6;
+  --text-dim: #9d9da8;
+  --text-faint: #5b5b66;
+  --accent: #7c7cf2;
+  --accent-dim: #3a3a78;
+  --cheap: #35b6d0;
+  --cheap-dim: #1d4b57;
+  --negative: #f2555a;
+  --positive: #46c288;
 }
 
 :root[data-theme="light"] {
-  --ground: #edebe6;
-  --panel: #f7f6f3;
-  --panel-alt: #e6e3dc;
-  --line: #d2cec5;
-  --line-soft: #e0ddd5;
-  --text: #14171c;
-  --text-dim: #575d68;
-  --text-faint: #8a8f99;
-  --brass: #8a6d1f;
-  --brass-dim: #c9b77e;
-  --steel: #3a5a75;
-  --steel-dim: #94aabc;
-  --oxide: #a33028;
-  --verdigris: #2f6350;
+  --ground: #ffffff;
+  --panel: #fafafb;
+  --panel-alt: #f1f1f4;
+  --line: #e5e5ea;
+  --line-soft: #efeff3;
+  --text: #101014;
+  --text-dim: #55555f;
+  --text-faint: #9c9ca6;
+  --accent: #4c4cca;
+  --accent-dim: #b9b9ec;
+  --cheap: #0d7a94;
+  --cheap-dim: #b3dde7;
+  --negative: #cf3339;
+  --positive: #157a56;
 }
 
 @theme inline {
@@ -94,26 +96,30 @@
   --color-steel-dim: var(--steel-dim);
   --color-oxide: var(--oxide);
   --color-verdigris: var(--verdigris);
+  --color-accent: var(--accent);
+  --color-negative: var(--negative);
+  --color-positive: var(--positive);
 
-  --font-display: var(--font-serif), "Instrument Serif", Georgia, serif;
-  --font-body: var(--font-sans), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --font-display: var(--font-sans), "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-sans), "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, Menlo, monospace;
 
   --radius-panel: var(--radius);
 }
 
 :root {
-  /* Type scale: 11 / 12 / 14 / 16 / 20 / 28, plus the hero dial size.  */
-  --fs-xs: 0.75rem;
-  --fs-sm: 0.875rem;
-  --fs-base: 1rem;
-  --fs-md: 1.25rem;
-  --fs-lg: 1.75rem;
-  --fs-xl: 2.5rem;
-  /* The one deliberate risk: hero metrics as serif numerals at dial size. */
-  --fs-hero: 3.75rem;
+  /* Type scale, one step larger across the board: nothing under 12px carries
+     information anywhere in the product. */
+  --fs-xs: 0.8125rem;
+  --fs-sm: 0.9375rem;
+  --fs-base: 1.0625rem;
+  --fs-md: 1.375rem;
+  --fs-lg: 2rem;
+  --fs-xl: clamp(2.75rem, 5vw, 4rem);
+  --fs-hero: 4rem;
 
-  --radius: 2px;
+  --radius: 10px;
+  --radius-lg: 16px;
   --dur-fast: 120ms;
   --dur-curve: 400ms;
 }
@@ -135,55 +141,58 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Display face: Instrument Serif. Hero numerals and landing headlines read as
-   values on a dial, not stats in an app. Everything else stays sans or mono. */
+/* Display face: Manrope, heavy and tight. Headlines and hero numerals are the
+   page's visual — big, confident, never decorated. */
 .font-display {
-  font-family: var(--font-serif), "Instrument Serif", Georgia, serif;
-  font-weight: 400;
-  letter-spacing: -0.01em;
+  font-family: var(--font-sans), "Manrope", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 .hero-num {
-  font-family: var(--font-serif), "Instrument Serif", Georgia, serif;
-  font-weight: 400;
+  font-family: var(--font-sans), "Manrope", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
   font-size: var(--fs-hero);
   line-height: 0.95;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 /* Data face. Tabular numerals are non-negotiable on anything numeric —
    figures that jitter horizontally as digits change read as amateur. */
 .mono,
 .font-mono {
-  font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  font-family: var(--font-geist-mono), "Geist Mono", ui-monospace, Menlo, monospace;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
 
-/* Panels: --panel on --ground, 1px --line, 2px radius. No shadows anywhere —
-   depth comes from the border and the background step. An instrument, not an
-   app. */
+/* Panels: --panel on --ground, 1px --line, generous radius. No shadows —
+   depth comes from the border and the background step. */
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
 }
 
 /* Contract symbols: always mono, always uppercase, never wrapped. */
 .contract {
-  font-family: var(--font-plex-mono), ui-monospace, Menlo, monospace;
+  font-family: var(--font-geist-mono), ui-monospace, Menlo, monospace;
   font-variant-numeric: tabular-nums;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 :focus-visible {
-  outline: 2px solid var(--steel);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--steel) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 * {
@@ -191,12 +200,19 @@ body {
   scrollbar-color: var(--line) transparent;
 }
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 *::-webkit-scrollbar-thumb {
-  background: var(--line);
-  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--text-faint) 55%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
@@ -384,7 +400,7 @@ body {
 /* Bento cells: --panel on --ground, 1px --line, 3px radius. Hover lifts 2px
    and warms the border to --brass — 150ms, no shadows, no gradients. */
 .bento-cell {
-  border-radius: 3px;
+  border-radius: var(--radius-lg);
   transition:
     transform 150ms ease,
     border-color 150ms ease;

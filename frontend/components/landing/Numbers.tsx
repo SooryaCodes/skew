@@ -30,11 +30,11 @@ export function Numbers({ traced, tracedProvenance }: Props) {
             format={(v) => Math.round(v).toLocaleString("en-US")}
             className="font-display block text-[3.4rem] leading-none"
           />
-          <p className="mono mt-2 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+          <p className="mt-3 text-[14px] font-semibold uppercase tracking-[0.12em] text-[color:var(--text-dim)]">
             {figure.label}
           </p>
           {figure.note && (
-            <p className="mono mt-1 text-[9px] text-[color:var(--text-dim)]">{figure.note}</p>
+            <p className="mono mt-1 text-[12px] text-[color:var(--text-dim)]">{figure.note}</p>
           )}
         </Reveal>
       ))}

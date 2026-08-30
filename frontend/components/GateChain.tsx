@@ -88,7 +88,7 @@ export function GateChain() {
                   ref={(el) => {
                     gateRefs.current[i] = el;
                   }}
-                  className="mono border px-3 py-1.5 text-[11px] uppercase tracking-wider"
+                  className="border px-3.5 py-2 text-[13px] font-semibold uppercase tracking-[0.1em]"
                   style={{
                     borderRadius: "var(--radius)",
                     // Gates the token has cleared light --verdigris; the gate
@@ -118,7 +118,7 @@ export function GateChain() {
         </div>
       </div>
       <p
-        className="mono mt-4 text-[10px] uppercase tracking-wider"
+        className="mt-5 text-[14px] font-semibold uppercase tracking-[0.12em]"
         style={{
           color: flashing || reduced ? "var(--text)" : "var(--text-dim)",
           transition: "color 300ms ease",

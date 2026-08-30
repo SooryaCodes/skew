@@ -79,7 +79,7 @@ export function VRPHistory({ symbol }: { symbol: string }) {
 
   if (!data || !geo) {
     return (
-      <p className="mono text-[10px] leading-relaxed text-[color:var(--text-dim)]">
+      <p className="mono text-[12px] leading-relaxed text-[color:var(--text-dim)]">
         {data
           ? `${data.observations} observation(s) so far — the poller builds this history forward from first run; the chart fills in as days accrue.`
           : "loading vrp history…"}
@@ -96,10 +96,10 @@ export function VRPHistory({ symbol }: { symbol: string }) {
         aria-label={`Implied versus realized volatility over ${data.window_days} day(s) of self-collected history`}
       >
         <line x1={PAD_L} y1={H - PAD_B} x2={W - PAD_R} y2={H - PAD_B} stroke="var(--line)" />
-        <text x={PAD_L - 4} y={PAD_T + 8} textAnchor="end" className="mono" fontSize={8} fill="var(--text-dim)">
+        <text x={PAD_L - 4} y={PAD_T + 8} textAnchor="end" className="mono" fontSize={9.5} fill="var(--text-dim)">
           {(geo.maxV * 100).toFixed(0)}
         </text>
-        <text x={PAD_L - 4} y={H - PAD_B} textAnchor="end" className="mono" fontSize={8} fill="var(--text-dim)">
+        <text x={PAD_L - 4} y={H - PAD_B} textAnchor="end" className="mono" fontSize={9.5} fill="var(--text-dim)">
           {(geo.minV * 100).toFixed(0)}
         </text>
 
@@ -109,15 +109,15 @@ export function VRPHistory({ symbol }: { symbol: string }) {
         <polyline points={geo.iv} fill="none" stroke="var(--brass)" strokeWidth={1.5} />
         <polyline points={geo.rv} fill="none" stroke="var(--steel)" strokeWidth={1.5} />
 
-        <text x={PAD_L} y={H - 5} className="mono" fontSize={8} fill="var(--text-dim)">
+        <text x={PAD_L} y={H - 5} className="mono" fontSize={9.5} fill="var(--text-dim)">
           {geo.firstDate.slice(5)}
         </text>
-        <text x={W - PAD_R} y={H - 5} textAnchor="end" className="mono" fontSize={8} fill="var(--text-dim)">
+        <text x={W - PAD_R} y={H - 5} textAnchor="end" className="mono" fontSize={9.5} fill="var(--text-dim)">
           {geo.lastDate.slice(5)}
         </text>
       </svg>
       {/* The honest label. Never implies more history than exists. */}
-      <p className="mono mt-1 text-[9px] text-[color:var(--text-dim)]">
+      <p className="mono mt-1 text-[12px] text-[color:var(--text-dim)]">
         since first run · {spanLabel(data)} window · {data.observations} obs · brass = iv leads,
         steel = rv leads
       </p>

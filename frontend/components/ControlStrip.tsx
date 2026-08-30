@@ -30,7 +30,7 @@ function PhaseTrail({ phase, symbol, index, total }: {
       {PHASES.map((p) => (
         <span
           key={p}
-          className="mono t-fast text-[9px] uppercase tracking-wider"
+          className="mono t-fast text-[12px] uppercase tracking-wider"
           style={{
             color: p === phase ? "var(--text)" : "var(--text-dim)",
             borderBottom: p === phase ? "1px solid var(--brass)" : "1px solid transparent",
@@ -40,7 +40,7 @@ function PhaseTrail({ phase, symbol, index, total }: {
         </span>
       ))}
       {symbol && (
-        <span className="mono text-[9px] text-[color:var(--text-dim)]">
+        <span className="mono text-[12px] text-[color:var(--text-dim)]">
           {symbol} {index}/{total}
         </span>
       )}
@@ -78,7 +78,7 @@ export function ControlStrip() {
       aria-label="Operator controls"
     >
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <span className="mono text-[9px] uppercase tracking-widest text-[color:var(--text-dim)]">
+        <span className="mono text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
           operator
         </span>
 
@@ -95,7 +95,7 @@ export function ControlStrip() {
             type="button"
             disabled={busy}
             onClick={() => act("/api/cycle")}
-            className="mono t-fast border border-[color:var(--line)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[color:var(--text)] hover:border-[color:var(--brass)]"
+            className="mono t-fast border border-[color:var(--line)] px-2 py-0.5 text-[12px] uppercase tracking-wider text-[color:var(--text)] hover:border-[color:var(--brass)]"
             style={{ borderRadius: "var(--radius)" }}
           >
             run cycle now
@@ -107,7 +107,7 @@ export function ControlStrip() {
           type="button"
           disabled={busy}
           onClick={() => act(`/api/kill?engage=${status?.kill_switch ? "false" : "true"}`)}
-          className="mono t-fast border px-2 py-0.5 text-[10px] uppercase tracking-wider"
+          className="mono t-fast border px-2 py-0.5 text-[12px] uppercase tracking-wider"
           style={{
             borderRadius: "var(--radius)",
             borderColor: status?.kill_switch ? "var(--brass)" : "var(--line)",
@@ -122,7 +122,7 @@ export function ControlStrip() {
           {(status?.universe ?? []).map((symbol) => (
             <span
               key={symbol}
-              className="mono flex items-center gap-1 border border-[color:var(--line)] px-1.5 py-0.5 text-[10px]"
+              className="mono flex items-center gap-1 border border-[color:var(--line)] px-1.5 py-0.5 text-[12px]"
               style={{ borderRadius: "var(--radius)" }}
             >
               {symbol}
@@ -150,16 +150,16 @@ export function ControlStrip() {
               onChange={(e) => setAddSymbol(e.target.value)}
               placeholder="+ SYM"
               aria-label="Add a symbol to the universe"
-              className="mono w-16 border border-[color:var(--line)] bg-transparent px-1.5 py-0.5 text-[10px] uppercase text-[color:var(--text)] placeholder:text-[color:var(--text-faint)]"
+              className="mono w-16 border border-[color:var(--line)] bg-transparent px-1.5 py-0.5 text-[12px] uppercase text-[color:var(--text)] placeholder:text-[color:var(--text-faint)]"
               style={{ borderRadius: "var(--radius)" }}
               maxLength={7}
             />
           </form>
-          <span className="mono text-[9px] text-[color:var(--text-dim)]">next cycle</span>
+          <span className="mono text-[12px] text-[color:var(--text-dim)]">next cycle</span>
         </span>
 
         {error && (
-          <span className="mono text-[10px] text-[color:var(--text)]" role="alert">
+          <span className="mono text-[12px] text-[color:var(--text)]" role="alert">
             <span
               className="mr-1.5 inline-block h-[7px] w-[7px] align-middle"
               style={{ background: "var(--brass)", borderRadius: "1px" }}

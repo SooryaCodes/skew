@@ -57,7 +57,7 @@ export function TermStructure({ points, slope }: Props) {
 
   if (!geo) {
     return (
-      <p className="mono text-[10px] text-[color:var(--text-dim)]">
+      <p className="mono text-[12px] text-[color:var(--text-dim)]">
         term structure unavailable — fewer than two usable expiries
       </p>
     );
@@ -81,10 +81,10 @@ export function TermStructure({ points, slope }: Props) {
       aria-label={`ATM implied vol by days to expiry, ${inverted ? "inverted — backwardation" : "upward — contango"}`}
     >
       <line x1={PAD_L} y1={H - PAD_B} x2={W - PAD_R} y2={H - PAD_B} stroke="var(--line)" />
-      <text x={PAD_L - 4} y={PAD_T + 8} textAnchor="end" className="mono" fontSize={8} fill="var(--text-dim)">
+      <text x={PAD_L - 4} y={PAD_T + 8} textAnchor="end" className="mono" fontSize={9.5} fill="var(--text-dim)">
         {(geo.maxV * 100).toFixed(0)}
       </text>
-      <text x={PAD_L - 4} y={H - PAD_B} textAnchor="end" className="mono" fontSize={8} fill="var(--text-dim)">
+      <text x={PAD_L - 4} y={H - PAD_B} textAnchor="end" className="mono" fontSize={9.5} fill="var(--text-dim)">
         {(geo.minV * 100).toFixed(0)}
       </text>
 
@@ -110,7 +110,7 @@ export function TermStructure({ points, slope }: Props) {
         y={PAD_T + 2}
         textAnchor="end"
         className="mono"
-        fontSize={7.5}
+        fontSize={9}
         fill="var(--text-dim)"
       >
         {isDefault ? "front · " : ""}
@@ -124,7 +124,7 @@ export function TermStructure({ points, slope }: Props) {
           y={H - 5}
           textAnchor={i === 0 ? "start" : "end"}
           className="mono"
-          fontSize={8}
+          fontSize={9.5}
           fill="var(--text-dim)"
         >
           {d.dte}d

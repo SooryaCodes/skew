@@ -38,13 +38,13 @@ function GateRow({ gate }: { gate: GateResult }) {
       >
         {glyph}
       </span>
-      <span className="mono w-16 shrink-0 text-[11px] uppercase leading-5 tracking-wider text-[color:var(--text-dim)]">
+      <span className="mono w-16 shrink-0 text-[13px] uppercase leading-5 tracking-wider text-[color:var(--text-dim)]">
         {gate.gate}
       </span>
       {/* Reason text stays ink in both states — oxide as 12px text fails 4.5:1
           in dark. The glyph carries the state; a failure also gets weight. */}
       <span
-        className={`text-[12px] leading-5 text-[color:var(--text)] ${
+        className={`text-[14px] leading-5 text-[color:var(--text)] ${
           state === "fail" ? "font-medium" : ""
         }`}
       >
@@ -77,7 +77,7 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
               .join(" / ")}
           </span>
         </h3>
-        <span className="mono text-[11px] text-[color:var(--text-dim)]">
+        <span className="mono text-[13px] text-[color:var(--text-dim)]">
           {s.dte}d · {s.qty}x
         </span>
       </header>
@@ -87,7 +87,7 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
         {[...s.legs]
           .sort((a, b) => a.right.localeCompare(b.right) || a.strike - b.strike)
           .map((leg) => (
-            <li key={leg.symbol} className="flex items-baseline gap-2 text-[11px]">
+            <li key={leg.symbol} className="flex items-baseline gap-2 text-[13px]">
               <span className="flex w-11 shrink-0 items-center gap-1">
                 <span
                   className="inline-block h-[6px] w-[6px] shrink-0"
@@ -113,26 +113,26 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
       {/* The three numbers that matter */}
       <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-[color:var(--line)] pt-3">
         <div>
-          <dt className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
+          <dt className="mono text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
             {s.net_credit >= 0 ? "credit" : "debit"}
           </dt>
           <dd className="mono text-[length:var(--fs-base)]">{dollars(s.net_credit, 2)}</dd>
         </div>
         <div>
-          <dt className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
+          <dt className="mono text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
             max loss
           </dt>
           <dd className="mono text-[length:var(--fs-base)]">{dollars(s.max_loss, 2)}</dd>
         </div>
         <div>
-          <dt className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
+          <dt className="mono text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
             net vega
           </dt>
           <dd className="mono text-[length:var(--fs-base)]">{signed(s.net_vega, 1)}</dd>
         </div>
       </dl>
 
-      <p className="mono mt-2 text-[10px] text-[color:var(--text-dim)]">
+      <p className="mono mt-2 text-[12px] text-[color:var(--text-dim)]">
         breakeven {s.breakevens.map((b) => num(b, 2)).join(" / ")} · max profit{" "}
         {dollars(s.max_profit, 2)} · theta {signed(s.net_theta, 2)}
       </p>
@@ -152,7 +152,7 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
       </ul>
 
       <footer className="mt-2 border-t border-[color:var(--line)] pt-2">
-        <p className="mono flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[color:var(--text)]">
+        <p className="mono flex items-center gap-1.5 text-[13px] uppercase tracking-wider text-[color:var(--text)]">
           <span
             className="inline-block h-[7px] w-[7px] shrink-0"
             style={{

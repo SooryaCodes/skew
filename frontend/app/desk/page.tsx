@@ -39,7 +39,7 @@ import { captureOperatorToken, isOperator } from "@/lib/operator";
 function Instrument({ caption, children }: { caption: string; children: React.ReactNode }) {
   return (
     <div className="panel p-3">
-      <p className="mono mb-2 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+      <p className="mono mb-2 text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
         {caption}
       </p>
       {children}
@@ -119,7 +119,7 @@ export default function DeskPage() {
       {operator && <ControlStrip />}
       <SessionStrip />
 
-      <div className="grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-[13rem_minmax(0,1fr)_19rem] lg:grid-rows-[minmax(0,1fr)]">
+      <div className="grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-[15rem_minmax(0,1fr)_23rem] lg:grid-rows-[minmax(0,1fr)]">
         {/* scan */}
         <aside className="border-b border-[color:var(--line)] lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <UniverseRail
@@ -131,7 +131,7 @@ export default function DeskPage() {
         </aside>
 
         {/* decide */}
-        <main className="min-w-0 p-4 lg:overflow-y-auto">
+        <main className="min-w-0 p-6 lg:overflow-y-auto">
           {universeError ? (
             <p className="text-sm text-[color:var(--text-dim)]">
               Cannot reach the desk API. Start the backend with{" "}
@@ -144,7 +144,7 @@ export default function DeskPage() {
             <div className="max-w-md text-sm leading-relaxed text-[color:var(--text-dim)]">
               {status && !status.broker_connected ? (
                 <>
-                  <p className="mono mb-2 text-[10px] uppercase tracking-widest">
+                  <p className="mono mb-2 text-[12px] uppercase tracking-widest">
                     <span
                       className="mr-1.5 inline-block h-[7px] w-[7px] align-middle"
                       style={{ background: "var(--oxide)", borderRadius: "1px" }}
@@ -160,7 +160,7 @@ export default function DeskPage() {
                 </>
               ) : status && status.has_published_state === false ? (
                 <>
-                  <p className="mono mb-2 text-[10px] uppercase tracking-widest">
+                  <p className="mono mb-2 text-[12px] uppercase tracking-widest">
                     <span
                       className="mr-1.5 inline-block h-[7px] w-[7px] align-middle"
                       style={{ background: "var(--brass)", borderRadius: "1px" }}
@@ -183,7 +183,7 @@ export default function DeskPage() {
           ) : (
             <>
               {status && !status.market_open && (
-                <p className="mono mb-2 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
+                <p className="mono mb-2 text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
                   as of {clockTime(focused.as_of)} · last session
                 </p>
               )}
@@ -214,11 +214,11 @@ export default function DeskPage() {
               {/* one candidate at full depth */}
               <section className="mt-6" aria-label="Candidates">
                 <div className="mb-3 flex items-baseline justify-between">
-                  <h2 className="mono text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+                  <h2 className="mono text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
                     candidates
                   </h2>
                   {focusedCandidates.length > 0 && (
-                    <span className="mono text-[10px] text-[color:var(--text-dim)]">
+                    <span className="mono text-[12px] text-[color:var(--text-dim)]">
                       {focusedCandidates.filter((c) => c.passed_all).length} of{" "}
                       {focusedCandidates.length} survived the gate chain
                     </span>
@@ -280,7 +280,7 @@ export default function DeskPage() {
       </div>
 
       <footer className="border-t border-[color:var(--line)] px-4 py-2">
-        <p className="mono text-[10px] text-[color:var(--text-dim)]">
+        <p className="mono text-[12px] text-[color:var(--text-dim)]">
           paper trading only · no live code path exists · direction is never an input
         </p>
       </footer>

@@ -104,7 +104,7 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
 
   if (!geo) {
     return (
-      <p className="mono text-[10px] text-[color:var(--text-dim)]">
+      <p className="mono text-[12px] text-[color:var(--text-dim)]">
         cone unavailable — not enough bar history for percentile bands
       </p>
     );
@@ -131,10 +131,10 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
       aria-label="Realized volatility percentile cone with current implied vol"
     >
       <line x1={PAD_L} y1={H - PAD_B} x2={W - PAD_R} y2={H - PAD_B} stroke="var(--line)" />
-      <text x={PAD_L - 4} y={PAD_T + 8} textAnchor="end" className="mono" fontSize={8} fill="var(--text-dim)">
+      <text x={PAD_L - 4} y={PAD_T + 8} textAnchor="end" className="mono" fontSize={9.5} fill="var(--text-dim)">
         {(geo.maxV * 100).toFixed(0)}
       </text>
-      <text x={PAD_L - 4} y={H - PAD_B} textAnchor="end" className="mono" fontSize={8} fill="var(--text-dim)">
+      <text x={PAD_L - 4} y={H - PAD_B} textAnchor="end" className="mono" fontSize={9.5} fill="var(--text-dim)">
         {(geo.minV * 100).toFixed(0)}
       </text>
 
@@ -177,7 +177,7 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
         y={PAD_T + 2}
         textAnchor="end"
         className="mono"
-        fontSize={7.5}
+        fontSize={9}
         fill="var(--text-dim)"
       >
         {hovered.horizon}d · median {(hovered.p50 * 100).toFixed(1)} · current{" "}
@@ -190,7 +190,7 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
         x={geo.iv.cx + 6}
         y={geo.iv.cy + 3}
         className="mono"
-        fontSize={8}
+        fontSize={9.5}
         fill="var(--text-dim)"
       >
         iv
@@ -203,7 +203,7 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
           y={H - 5}
           textAnchor="middle"
           className="mono"
-          fontSize={8}
+          fontSize={9.5}
           fill="var(--text-dim)"
         >
           {c.horizon}
@@ -217,7 +217,7 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
           x={W - PAD_R + 5}
           y={label.cy + 2.5}
           className="mono"
-          fontSize={7.5}
+          fontSize={9}
           fill="var(--text-dim)"
         >
           {label.text}

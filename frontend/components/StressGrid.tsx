@@ -122,7 +122,7 @@ export function StressGrid({ cells, maxLoss, refused = false, animateOnView = fa
   return (
     <div ref={viewRef} className={animateOnView && !inView ? "grid-pending" : undefined}>
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <span className="mono text-[11px] uppercase tracking-widest text-[color:var(--text-dim)]">
+        <span className="mono text-[13px] uppercase tracking-widest text-[color:var(--text-dim)]">
           stress · {cells.length} scenarios
         </span>
         <div className="flex gap-1" role="tablist" aria-label="Time point">
@@ -133,7 +133,7 @@ export function StressGrid({ cells, maxLoss, refused = false, animateOnView = fa
               role="tab"
               aria-selected={timePoint === tp.key}
               onClick={() => setTimePoint(tp.key)}
-              className="mono t-fast px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
+              className="mono t-fast px-1.5 py-0.5 text-[12px] uppercase tracking-wider"
               style={{
                 color: timePoint === tp.key ? "var(--text)" : "var(--text-dim)",
                 borderBottom:
@@ -155,7 +155,7 @@ export function StressGrid({ cells, maxLoss, refused = false, animateOnView = fa
         {view.priceShocks.map((shock) => (
           <span
             key={`h-${shock}`}
-            className="mono pb-1 text-center text-[10px] text-[color:var(--text-dim)]"
+            className="mono pb-1 text-center text-[12px] text-[color:var(--text-dim)]"
           >
             {shock > 0 ? `+${shock}` : shock}σ
           </span>
@@ -163,7 +163,7 @@ export function StressGrid({ cells, maxLoss, refused = false, animateOnView = fa
 
         {view.ivShocks.map((iv, ii) => (
           <div key={`row-${iv}`} className="contents">
-            <span className="mono self-center pr-1 text-right text-[10px] text-[color:var(--text-dim)]">
+            <span className="mono self-center pr-1 text-right text-[12px] text-[color:var(--text-dim)]">
               ×{iv.toFixed(1)}
             </span>
             {view.priceShocks.map((px, pi) => {
@@ -190,7 +190,7 @@ export function StressGrid({ cells, maxLoss, refused = false, animateOnView = fa
                   aria-label={`${px} sigma, IV times ${iv}, profit and loss ${money(cell.pnl, 0)}${
                     cell.breached ? ", breaches the budget" : ""
                   }${isWorst ? ", worst cell" : ""}`}
-                  className={`mono h-7 cell-anim text-[10px] tabular-nums${
+                  className={`mono h-7 cell-anim text-[12px] tabular-nums${
                     hasContour && !animateOnView ? " contour-in" : ""
                   }${isWorst ? " cell-worst" : ""}`}
                   style={{
@@ -211,7 +211,7 @@ export function StressGrid({ cells, maxLoss, refused = false, animateOnView = fa
 
       {/* the callout: worst cell by default, hovered cell when exploring */}
       {detail && (
-        <p className="mono mt-2 text-[10px] text-[color:var(--text-dim)]">
+        <p className="mono mt-2 text-[12px] text-[color:var(--text-dim)]">
           {detail === view.worst && !hovered ? "◯ worst " : ""}
           {detail.price_shock > 0 ? `+${detail.price_shock}` : detail.price_shock}σ, iv{" "}
           {detail.iv_shock === 1

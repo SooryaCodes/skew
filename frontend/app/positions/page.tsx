@@ -65,14 +65,14 @@ export default function PositionsPage() {
       <main className="flex-1 p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-4">
           <h1 className="font-display text-[length:var(--fs-md)]">Positions</h1>
-          <p className="mono text-[11px] text-[color:var(--text-dim)]">
+          <p className="mono text-[13px] text-[color:var(--text-dim)]">
             {rows.length} open · {dollars(totalRisk)} at risk
             {risk && ` · tier ${risk.tier}`}
           </p>
         </div>
 
         {/* Present, but not the headline. Performance over a few days is noise. */}
-        <p className="mono mt-1 text-[11px] text-[color:var(--text-dim)]">
+        <p className="mono mt-1 text-[13px] text-[color:var(--text-dim)]">
           unrealised {money(totalPnl)} — over a handful of paper-trading days this
           number is noise, and the desk does not lead with it
         </p>
@@ -93,7 +93,7 @@ export default function PositionsPage() {
                       <th
                         key={h}
                         scope="col"
-                        className="mono px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-[color:var(--text-dim)]"
+                        className="mono px-3 py-2 text-[12px] font-medium uppercase tracking-wider text-[color:var(--text-dim)]"
                       >
                         {h}
                       </th>
@@ -104,8 +104,8 @@ export default function PositionsPage() {
               <tbody>
                 {rows.map((position) => (
                   <tr key={position.id} className="border-b border-[color:var(--line)] last:border-0">
-                    <td className="mono px-3 py-2 text-[12px]">{position.symbol}</td>
-                    <td className="px-3 py-2 text-[12px]">
+                    <td className="mono px-3 py-2 text-[14px]">{position.symbol}</td>
+                    <td className="px-3 py-2 text-[14px]">
                       {position.kind ? structureLabel(position.kind) : "—"}
                     </td>
                     <td className="px-3 py-2">
@@ -113,23 +113,23 @@ export default function PositionsPage() {
                         {position.legs.map((leg) => (
                           <li
                             key={leg}
-                            className="contract text-[10px] text-[color:var(--text-dim)]"
+                            className="contract text-[12px] text-[color:var(--text-dim)]"
                           >
                             {contractLabel(leg)}
                           </li>
                         ))}
                       </ul>
                     </td>
-                    <td className="mono px-3 py-2 text-[12px]">{position.dte}</td>
-                    <td className="mono px-3 py-2 text-[12px]">{daysHeld(position)}</td>
-                    <td className="mono px-3 py-2 text-[12px]">
+                    <td className="mono px-3 py-2 text-[14px]">{position.dte}</td>
+                    <td className="mono px-3 py-2 text-[14px]">{daysHeld(position)}</td>
+                    <td className="mono px-3 py-2 text-[14px]">
                       {dollars(position.entry_credit, 2)}
                     </td>
-                    <td className="mono px-3 py-2 text-[12px] text-[color:var(--text-dim)]">
+                    <td className="mono px-3 py-2 text-[14px] text-[color:var(--text-dim)]">
                       {money(position.current_value, 0)}
                     </td>
                     <td
-                      className="mono px-3 py-2 text-[12px]"
+                      className="mono px-3 py-2 text-[14px]"
                       style={{
                         // Deliberately NOT --oxide. That colour is spent on
                         // failed gates and nothing else, losses included.
@@ -139,10 +139,10 @@ export default function PositionsPage() {
                     >
                       {money(position.unrealized_pnl)}
                     </td>
-                    <td className="mono px-3 py-2 text-[12px]">
+                    <td className="mono px-3 py-2 text-[14px]">
                       {dollars(position.max_loss, 2)}
                     </td>
-                    <td className="mono px-3 py-2 text-[10px] text-[color:var(--text-dim)]">
+                    <td className="mono px-3 py-2 text-[12px] text-[color:var(--text-dim)]">
                       {exitConditions(position, status)}
                     </td>
                   </tr>
@@ -157,7 +157,7 @@ export default function PositionsPage() {
           <div className="flex flex-wrap items-baseline justify-between gap-4">
             <h2 className="font-display text-[length:var(--fs-sm)]">Closed trades</h2>
             {closedRows.length > 0 && (
-              <p className="mono text-[11px] text-[color:var(--text-dim)]">
+              <p className="mono text-[13px] text-[color:var(--text-dim)]">
                 {closedRows.length} closed · realised {money(realizedTotal)}
               </p>
             )}
@@ -178,7 +178,7 @@ export default function PositionsPage() {
                         <th
                           key={h}
                           scope="col"
-                          className="mono px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-[color:var(--text-dim)]"
+                          className="mono px-3 py-2 text-[12px] font-medium uppercase tracking-wider text-[color:var(--text-dim)]"
                         >
                           {h}
                         </th>
@@ -189,24 +189,24 @@ export default function PositionsPage() {
                 <tbody>
                   {closedRows.map((trade) => (
                     <tr key={trade.id} className="border-b border-[color:var(--line)] last:border-0">
-                      <td className="mono px-3 py-2 text-[12px]">{trade.symbol}</td>
-                      <td className="px-3 py-2 text-[12px]">
+                      <td className="mono px-3 py-2 text-[14px]">{trade.symbol}</td>
+                      <td className="px-3 py-2 text-[14px]">
                         {trade.kind ? structureLabel(trade.kind) : "—"}
                       </td>
-                      <td className="mono px-3 py-2 text-[11px] text-[color:var(--text-dim)]">
+                      <td className="mono px-3 py-2 text-[13px] text-[color:var(--text-dim)]">
                         {trade.opened_at ? timeAgo(trade.opened_at) : "—"}
                       </td>
-                      <td className="mono px-3 py-2 text-[11px] text-[color:var(--text-dim)]">
+                      <td className="mono px-3 py-2 text-[13px] text-[color:var(--text-dim)]">
                         {trade.closed_at ? timeAgo(trade.closed_at) : "—"}
                       </td>
-                      <td className="mono px-3 py-2 text-[12px]">
+                      <td className="mono px-3 py-2 text-[14px]">
                         {trade.days_held !== null ? `${trade.days_held}d` : "—"}
                       </td>
-                      <td className="mono px-3 py-2 text-[12px]">
+                      <td className="mono px-3 py-2 text-[14px]">
                         {dollars(trade.entry_credit, 2)}
                       </td>
                       <td
-                        className="mono px-3 py-2 text-[12px]"
+                        className="mono px-3 py-2 text-[14px]"
                         style={{
                           color:
                             (trade.realized_pnl ?? 0) >= 0 ? "var(--verdigris)" : "var(--brass)",
@@ -214,7 +214,7 @@ export default function PositionsPage() {
                       >
                         {trade.realized_pnl !== null ? money(trade.realized_pnl) : "—"}
                       </td>
-                      <td className="mono px-3 py-2 text-[10px] uppercase tracking-wide text-[color:var(--text)]">
+                      <td className="mono px-3 py-2 text-[12px] uppercase tracking-wide text-[color:var(--text)]">
                         {EXIT_LABEL[trade.exit_reason ?? ""] ?? trade.exit_reason ?? "—"}
                       </td>
                     </tr>
@@ -225,7 +225,7 @@ export default function PositionsPage() {
           )}
         </section>
 
-        <p className="mono mt-6 max-w-2xl text-[10px] leading-relaxed text-[color:var(--text-dim)]">
+        <p className="mono mt-6 max-w-2xl text-[12px] leading-relaxed text-[color:var(--text-dim)]">
           Every position is defined-risk: the maximum loss was computed and
           gated before submission, and each spread was filled as a single atomic
           multi-leg order. Exits fire on the profit target, the loss limit, the

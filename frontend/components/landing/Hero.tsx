@@ -12,12 +12,11 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { VolatilitySurface } from "@/components/VolatilitySurface";
-import { timeAgo } from "@/lib/format";
 import type { Surface, SystemStatus } from "@/lib/types";
 
 interface Props {
   status?: SystemStatus;
+  /** Unused since the reset — the hero is type + product shot, nothing behind. */
   surface?: Surface;
   isLive: boolean;
   recordedAt?: string;
@@ -25,7 +24,7 @@ interface Props {
 
 const SHOT_RECORDED = "Aug 30";
 
-export function Hero({ status, surface, isLive, recordedAt }: Props) {
+export function Hero({ status, isLive, recordedAt }: Props) {
   // The live desk only earns the frame when it would actually show data.
   const showLiveDesk = isLive && Boolean(status?.broker_connected);
   const [iframeDead, setIframeDead] = useState(false);
@@ -45,66 +44,36 @@ export function Hero({ status, surface, isLive, recordedAt }: Props) {
 
   return (
     <section aria-label="Hero" className="relative overflow-hidden pt-16">
-      {/* ambient surface — behind and below, never competing */}
-      <div aria-hidden className="absolute inset-0 opacity-35">
-        <VolatilitySurface surface={surface} progress={0} />
-      </div>
-
-      <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-12 px-6 pb-24 pt-16 lg:grid-cols-[45fr_55fr] lg:pt-24">
-        {/* type block */}
+      <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-14 px-6 pb-28 pt-20 lg:grid-cols-[46fr_54fr] lg:pt-32">
+        {/* type block — the type IS the visual */}
         <div>
-          <p
-            className="mono inline-flex items-center gap-2 border border-[color:var(--line)] bg-[color:var(--panel)] px-3 py-1.5 text-[9px] uppercase tracking-[0.2em] text-[color:var(--text-dim)]"
-            style={{ borderRadius: "999px" }}
+          <h1
+            className="font-display text-[3rem] leading-[1.04] sm:text-[3.6rem] lg:text-[3.9rem]"
+            style={{ letterSpacing: "-0.035em" }}
           >
-            <span
-              className="inline-block h-[6px] w-[6px]"
-              style={{ background: "var(--brass)", borderRadius: "1px" }}
-              aria-hidden
-            />
-            alpaca paper · mcp · autonomous
-          </p>
-          <h1 className="font-display mt-6 text-[2.9rem] leading-[1.04] sm:text-[4rem] lg:text-[4.4rem]">
             It doesn&rsquo;t predict the market. It prices it.
           </h1>
-          <p className="mt-6 max-w-[60ch] text-[15px] leading-relaxed text-[color:var(--text-dim)]">
+          <p className="mt-7 max-w-[54ch] text-[18px] leading-[1.65] text-[color:var(--text-dim)]">
             An options desk that measures what movement costs against what
             movement actually is — and refuses any trade whose stress grid
-            breaches its budget.
+            breaches its budget. Paper only, by construction.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link
               href="/desk"
-              className="t-fast mono border border-[color:var(--brass)] bg-[color:var(--brass)] px-5 py-2.5 text-[11px] uppercase tracking-widest text-[color:var(--ground)] hover:bg-transparent hover:text-[color:var(--text)]"
+              className="t-fast bg-[color:var(--accent)] px-6 py-3.5 text-[15px] font-semibold text-white hover:opacity-90"
               style={{ borderRadius: "var(--radius)" }}
             >
               Enter the desk
             </Link>
             <a
               href="#architecture"
-              className="t-fast mono border border-[color:var(--line)] px-5 py-2.5 text-[11px] uppercase tracking-widest text-[color:var(--text)] hover:border-[color:var(--text)]"
+              className="t-fast border border-[color:var(--line)] px-6 py-3.5 text-[15px] font-semibold text-[color:var(--text)] hover:bg-[color:var(--panel-alt)]"
               style={{ borderRadius: "var(--radius)" }}
             >
               Read the architecture
             </a>
           </div>
-          {status && (
-            <p className="mono mt-6 text-[10px] text-[color:var(--text-dim)]">
-              <span
-                className="mr-1.5 inline-block h-[7px] w-[7px] align-middle"
-                style={{
-                  background: showLiveDesk ? "var(--verdigris)" : "var(--line)",
-                  borderRadius: "1px",
-                }}
-                aria-hidden
-              />
-              {showLiveDesk
-                ? `armed · ${status.universe_size ?? status.universe.length} names${
-                    status.last_cycle ? ` · last cycle ${timeAgo(status.last_cycle)}` : ""
-                  }`
-                : "paper account · desk idle"}
-            </p>
-          )}
         </div>
 
         {/* product shot — the real desk in a browser frame, tilted 2.5deg */}
@@ -113,9 +82,9 @@ export function Hero({ status, surface, isLive, recordedAt }: Props) {
           style={{ perspective: "1400px" }}
         >
           <div
-            className="overflow-hidden border border-[color:var(--brass)]"
+            className="overflow-hidden border border-[color:var(--line)]"
             style={{
-              borderRadius: "4px",
+              borderRadius: "14px",
               transform: "rotateY(-2.5deg) rotateX(1deg)",
               transformOrigin: "center",
               background: "var(--panel)",
@@ -131,7 +100,7 @@ export function Hero({ status, surface, isLive, recordedAt }: Props) {
                   />
                 ))}
               </span>
-              <span className="mono flex-1 text-center text-[9px] text-[color:var(--text-dim)]">
+              <span className="mono flex-1 text-center text-[12px] text-[color:var(--text-dim)]">
                 skew — the desk
               </span>
             </div>
@@ -160,10 +129,10 @@ export function Hero({ status, surface, isLive, recordedAt }: Props) {
               />
             )}
           </div>
-          <figcaption className="mono mt-2 text-right text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
+          <figcaption className="mt-3 text-right text-[13px] text-[color:var(--text-dim)]">
             {live
-              ? "the desk, live right now"
-              : `the desk · recorded ${recordedAt ? new Date(recordedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : SHOT_RECORDED}`}
+              ? "The desk — live right now"
+              : `The desk — recorded ${recordedAt ? new Date(recordedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : SHOT_RECORDED}`}
           </figcaption>
         </figure>
       </div>

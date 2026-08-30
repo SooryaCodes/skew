@@ -40,7 +40,7 @@ function stateLabel(regime: string): string {
 
 function CellCaption({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mono mb-3 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+    <p className="mb-4 text-[13px] font-semibold uppercase tracking-[0.12em] text-[color:var(--text-dim)]">
       {children}
     </p>
   );
@@ -114,21 +114,21 @@ export function Bento({ states, counts, latest, risk, closed, provenance }: Prop
             <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
               {byGap.slice(0, 8).map((state) => (
                 <div key={state.symbol}>
-                  <p className="mono text-[10px] text-[color:var(--text-dim)]">{state.symbol}</p>
+                  <p className="mono text-[12px] text-[color:var(--text-dim)]">{state.symbol}</p>
                   <CountUp
                     value={state.vrp}
                     format={(v) => volPoints(v)}
                     className="font-display block text-[1.7rem] leading-tight"
                     style={{ color: regimeColor(state.regime) }}
                   />
-                  <p className="mono mb-1 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
+                  <p className="mono mb-1 text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
                     {stateLabel(state.regime)}
                   </p>
                   <Sparkline slices={state.skew_slices} color={regimeColor(state.regime)} />
                 </div>
               ))}
             </div>
-            <p className="mono mt-4 text-[9px] text-[color:var(--text-dim)]">
+            <p className="mono mt-4 text-[12px] text-[color:var(--text-dim)]">
               {provenance ??
                 (closed && hero ? `as of ${clockTime(hero.as_of)} · last session` : "")}
             </p>
@@ -144,7 +144,7 @@ export function Bento({ states, counts, latest, risk, closed, provenance }: Prop
           format={(v) => Math.round(v).toLocaleString("en-US")}
           className="font-display block text-[3rem] leading-none"
         />
-        <p className="mono mt-3 text-[10px] leading-relaxed text-[color:var(--text-dim)]">
+        <p className="mono mt-3 text-[12px] leading-relaxed text-[color:var(--text-dim)]">
           {(counts?.REFUSED ?? 0).toLocaleString("en-US")} refused ·{" "}
           {(counts?.EXECUTED ?? 0).toLocaleString("en-US")} executed — every one
           replayable to its inputs
@@ -157,7 +157,7 @@ export function Bento({ states, counts, latest, risk, closed, provenance }: Prop
         <p className="font-display text-[1.4rem] leading-tight">
           No live code path exists.
         </p>
-        <ul className="mono mt-3 space-y-1 text-[10px] leading-relaxed text-[color:var(--text-dim)]">
+        <ul className="mono mt-3 space-y-1 text-[12px] leading-relaxed text-[color:var(--text-dim)]">
           <li>base url pinned to the paper endpoint</li>
           <li>startup refuses anything else</li>
           <li>defined-risk structures only</li>
@@ -195,7 +195,7 @@ export function Bento({ states, counts, latest, risk, closed, provenance }: Prop
         <CellCaption>last decision</CellCaption>
         {latest ? (
           <Link href={`/trace/${latest.id}`} className="group block">
-            <p className="mono text-[10px] text-[color:var(--text-dim)]">
+            <p className="mono text-[12px] text-[color:var(--text-dim)]">
               {clockTime(latest.ts)} · {timeAgo(latest.ts)}
             </p>
             <p className="mt-1 flex items-baseline gap-2">
@@ -212,19 +212,19 @@ export function Bento({ states, counts, latest, risk, closed, provenance }: Prop
                 }}
                 aria-hidden
               />
-              <span className="mono text-[11px] uppercase tracking-wider">
+              <span className="mono text-[13px] uppercase tracking-wider">
                 {latest.action.toLowerCase()}
               </span>
               {latest.symbol && (
-                <span className="mono text-[11px] text-[color:var(--text-dim)]">
+                <span className="mono text-[13px] text-[color:var(--text-dim)]">
                   {latest.symbol}
                 </span>
               )}
             </p>
-            <p className="mt-2 line-clamp-3 text-[12px] leading-relaxed text-[color:var(--text)]">
+            <p className="mt-2 line-clamp-3 text-[14px] leading-relaxed text-[color:var(--text)]">
               {latest.reason}
             </p>
-            <p className="mono mt-3 text-[10px] uppercase tracking-wider text-[color:var(--text-dim)] group-hover:text-[color:var(--brass)]">
+            <p className="mono mt-3 text-[12px] uppercase tracking-wider text-[color:var(--text-dim)] group-hover:text-[color:var(--brass)]">
               open the full decision trace →
             </p>
           </Link>
@@ -242,11 +242,11 @@ export function Bento({ states, counts, latest, risk, closed, provenance }: Prop
           <div className="flex flex-wrap items-end justify-between gap-6">
             <div>
               <p className="font-display text-[2.6rem] leading-none">Tier {risk.tier}</p>
-              <p className="mono mt-2 text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
+              <p className="mono mt-2 text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
                 {(risk.max_loss_pct * 100).toFixed(1)}% per trade · earned, never configured
               </p>
             </div>
-            <ul className="mono space-y-1.5 text-[11px]">
+            <ul className="mono space-y-1.5 text-[13px]">
               <li>
                 <span className="text-[color:var(--text-dim)]">per trade&nbsp;&nbsp;</span>
                 {dollars(risk.budget_dollars)}
@@ -268,7 +268,7 @@ export function Bento({ states, counts, latest, risk, closed, provenance }: Prop
         ) : (
           <p className="text-xs text-[color:var(--text-dim)]">loading…</p>
         )}
-        <p className="mono mt-4 text-[10px] leading-relaxed text-[color:var(--text-dim)]">
+        <p className="mono mt-4 text-[12px] leading-relaxed text-[color:var(--text-dim)]">
           Budgets grow only with clean closed trades; a drawdown demotes the
           tier automatically. There is no setting to raise them.
         </p>
@@ -279,15 +279,15 @@ export function Bento({ states, counts, latest, risk, closed, provenance }: Prop
         <CellCaption>mcp surface · the desk as tools</CellCaption>
         <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
           {MCP_TOOLS.map((tool) => (
-            <li key={tool.name} className="mono flex items-baseline gap-2 text-[11px]">
+            <li key={tool.name} className="mono flex items-baseline gap-2 text-[13px]">
               <span className="text-[color:var(--text)]">{tool.name}</span>
-              <span className="truncate text-[9px] text-[color:var(--text-dim)]">
+              <span className="truncate text-[12px] text-[color:var(--text-dim)]">
                 {tool.blurb}
               </span>
             </li>
           ))}
         </ul>
-        <p className="mono mt-4 text-[10px] leading-relaxed text-[color:var(--text-dim)]">
+        <p className="mono mt-4 text-[12px] leading-relaxed text-[color:var(--text-dim)]">
           Every read is open; the two mutating tools run the same gate chain and
           require explicit confirmation. Claude connects to this desk the same
           way you do.

@@ -37,12 +37,12 @@ const TONE: Record<StepTone, { marker: string; opacity: number }> = {
 };
 
 function Mono({ children }: { children: React.ReactNode }) {
-  return <span className="mono text-[12px] text-[color:var(--text)]">{children}</span>;
+  return <span className="mono text-[14px] text-[color:var(--text)]">{children}</span>;
 }
 
 function NotRecorded() {
   return (
-    <p className="mono text-[11px] text-[color:var(--text-dim)]">
+    <p className="mono text-[13px] text-[color:var(--text-dim)]">
       not recorded — this decision predates the trace schema
     </p>
   );
@@ -60,7 +60,7 @@ function GateStep({
   const failed = gates.filter((g) => !g.passed && !g.skipped);
   return (
     <div>
-      <p className="mono flex flex-wrap gap-x-3 gap-y-1 text-[12px]">
+      <p className="mono flex flex-wrap gap-x-3 gap-y-1 text-[14px]">
         {gates.map((g) => (
           <span key={g.gate} className="flex items-center gap-1">
             <span
@@ -81,10 +81,10 @@ function GateStep({
       {/* The failing gate expands with its complete reason. */}
       {failed.map((g) => (
         <div key={g.gate} className="mt-2 border-l-2 pl-3" style={{ borderColor: "var(--oxide)" }}>
-          <p className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
+          <p className="mono text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
             ↳ {g.gate} failed
           </p>
-          <p className="mt-1 text-[12px] leading-relaxed text-[color:var(--text)]">{g.reason}</p>
+          <p className="mt-1 text-[14px] leading-relaxed text-[color:var(--text)]">{g.reason}</p>
           {g.gate === "stress" && grid && grid.length > 0 && (
             <div className="mt-3 max-w-md">
               <StressGrid cells={grid} maxLoss={maxLoss ?? 1} refused />
@@ -158,7 +158,7 @@ function buildSteps(decision: Decision): Step[] {
       abstainedAtClassify ? "stop" : "done",
       <div>
         <Mono>{String(classify.regime)}</Mono>
-        <p className="mt-1 text-[12px] leading-relaxed text-[color:var(--text)]">
+        <p className="mt-1 text-[14px] leading-relaxed text-[color:var(--text)]">
           {String(classify.note)}
         </p>
       </div>,
@@ -214,7 +214,7 @@ function buildSteps(decision: Decision): Step[] {
       <div>
         <Mono>the bounded selector chose {String(detail.kind ?? decision.structure_id)}</Mono>
         {decision.model_rationale && (
-          <p className="mt-1 border-l border-[color:var(--line)] pl-2 text-[12px] italic leading-relaxed text-[color:var(--text)]">
+          <p className="mt-1 border-l border-[color:var(--line)] pl-2 text-[14px] italic leading-relaxed text-[color:var(--text)]">
             {decision.model_rationale}
           </p>
         )}
@@ -226,11 +226,11 @@ function buildSteps(decision: Decision): Step[] {
       <div>
         <Mono>order {decision.order_id ?? "—"}</Mono>
         {Array.isArray(detail.legs) && (
-          <p className="contract mt-1 text-[10px] text-[color:var(--text-dim)]">
+          <p className="contract mt-1 text-[12px] text-[color:var(--text-dim)]">
             {(detail.legs as string[]).join(" · ")}
           </p>
         )}
-        <p className="mono mt-1 text-[11px] text-[color:var(--text-dim)]">
+        <p className="mono mt-1 text-[13px] text-[color:var(--text-dim)]">
           one atomic mleg order · limit {num(Number(detail.limit_price ?? 0), 2)} · status{" "}
           {String(detail.status ?? "submitted")}
         </p>
@@ -253,7 +253,7 @@ function buildSteps(decision: Decision): Step[] {
       <div>
         <Mono>ABSTAINED — {decision.reason}</Mono>
         {decision.model_rationale && (
-          <p className="mt-1 border-l border-[color:var(--line)] pl-2 text-[12px] italic leading-relaxed text-[color:var(--text)]">
+          <p className="mt-1 border-l border-[color:var(--line)] pl-2 text-[14px] italic leading-relaxed text-[color:var(--text)]">
             {decision.model_rationale}
           </p>
         )}
@@ -284,7 +284,7 @@ export function TracePanel({ decision }: { decision: Decision }) {
             {/* the spine */}
             <div className="flex flex-col items-center">
               <span
-                className="mono flex h-7 w-7 shrink-0 items-center justify-center border text-[10px]"
+                className="mono flex h-7 w-7 shrink-0 items-center justify-center border text-[12px]"
                 style={{
                   borderColor: tone.marker,
                   color: "var(--text)",
@@ -304,7 +304,7 @@ export function TracePanel({ decision }: { decision: Decision }) {
             </div>
             <div className="min-w-0 flex-1 pb-6">
               <p
-                className="mono mb-1 text-[10px] uppercase tracking-widest"
+                className="mono mb-1 text-[12px] uppercase tracking-widest"
                 style={{
                   color:
                     step.tone === "fail"

@@ -95,13 +95,13 @@ export function FAQ() {
           key={entry.q}
           className="faq-item border-b border-[color:var(--line)] py-1 first:border-t"
         >
-          <summary className="cursor-pointer list-none py-4 text-[15px] text-[color:var(--text)] [&::-webkit-details-marker]:hidden">
-            <span className="mono mr-3 text-[10px] text-[color:var(--text-dim)]" aria-hidden>
+          <summary className="cursor-pointer list-none py-4 text-[16px] text-[color:var(--text)] [&::-webkit-details-marker]:hidden">
+            <span className="mono mr-3 text-[12px] text-[color:var(--text-dim)]" aria-hidden>
               +
             </span>
             {entry.q}
           </summary>
-          <div className="pb-5 pl-6 text-[13px] leading-relaxed text-[color:var(--text-dim)]">
+          <div className="pb-5 pl-6 text-[15px] leading-relaxed text-[color:var(--text-dim)]">
             {entry.a}
           </div>
         </details>

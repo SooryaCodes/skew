@@ -92,16 +92,16 @@ export function CandidateTabs({ candidates, activeId, onSelect }: Props) {
           >
             <span className="flex items-baseline gap-2">
               <span
-                className="text-[12px]"
+                className="text-[14px]"
                 style={{ color: active ? "var(--text)" : "var(--text-dim)" }}
               >
                 {structureLabel(s.kind)}
               </span>
-              <span className="mono text-[10px] text-[color:var(--text-dim)]">{strikes}</span>
+              <span className="mono text-[12px] text-[color:var(--text-dim)]">{strikes}</span>
             </span>
             <span className="mt-0.5 flex items-baseline gap-2">
               {/* The verdict, visible without clicking: failing gates in oxide. */}
-              <span className="mono flex gap-[3px] text-[10px]" aria-hidden>
+              <span className="mono flex gap-[3px] text-[12px]" aria-hidden>
                 {candidate.gates.map((gate) => (
                   <span
                     key={gate.gate}
@@ -120,7 +120,7 @@ export function CandidateTabs({ candidates, activeId, onSelect }: Props) {
                   </span>
                 ))}
               </span>
-              <span className="mono text-[9px] text-[color:var(--text-dim)]">
+              <span className="mono text-[12px] text-[color:var(--text-dim)]">
                 {dollars(s.max_loss, 0)}
               </span>
             </span>

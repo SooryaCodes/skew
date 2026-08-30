@@ -27,13 +27,13 @@ function Dial({
 }) {
   return (
     <div>
-      <p className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
+      <p className="mono text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
         {label}
       </p>
       <p className="hero-num mt-1" style={{ color }}>
         {value}
       </p>
-      {hint && <p className="mono mt-1 text-[9px] text-[color:var(--text-dim)]">{hint}</p>}
+      {hint && <p className="mono mt-1 text-[12px] text-[color:var(--text-dim)]">{hint}</p>}
     </div>
   );
 }
@@ -60,7 +60,7 @@ export function VolReadout({ state }: { state: VolState }) {
             style={{ background: color, borderRadius: "1px" }}
             aria-hidden
           />
-          <span className="mono text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+          <span className="mono text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
             {regimeLabel(state.regime)}
           </span>
         </span>
@@ -78,11 +78,11 @@ export function VolReadout({ state }: { state: VolState }) {
       </div>
 
       {/* Rendered verbatim. It names the exact threshold that was hit. */}
-      <p className="mt-5 max-w-2xl text-[13px] leading-relaxed text-[color:var(--text)]">
+      <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-[color:var(--text)]">
         {state.note}
       </p>
 
-      <p className="mono mt-2 text-[10px] text-[color:var(--text-dim)]">
+      <p className="mono mt-2 text-[12px] text-[color:var(--text-dim)]">
         rv percentile {state.rv_percentile.toFixed(0)} over its own 252d range ·{" "}
         {state.iv_rank === null
           ? `IV rank unavailable — building history, ${state.iv_rank_window_days} day(s) collected (20 needed; Alpaca serves no historical IV)`

@@ -1,29 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Instrument_Serif } from "next/font/google";
+import { Geist_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 
-// Three roles, three faces.
-// Display: Instrument Serif — hero numerals and headlines, read as values on a
-// dial. UI: IBM Plex Sans — labels, prose, gate reasons. Data: IBM Plex Mono,
-// tabular — every figure, contract symbol and log line.
-const serif = Instrument_Serif({
+// Two roles, two faces.
+// Manrope carries everything human — headlines, labels, prose — one premium
+// variable family from 96px displays down to 13px captions. Geist Mono carries
+// everything machine: figures, contract symbols, log lines.
+const sans = Manrope({
   subsets: ["latin"],
-  weight: "400",
-  variable: "--font-serif",
-  display: "swap",
-});
-
-const sans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700", "800"],
   variable: "--font-sans",
   display: "swap",
 });
 
-const plexMono = IBM_Plex_Mono({
+const mono = Geist_Mono({
   subsets: ["latin"],
   weight: ["400", "500"],
-  variable: "--font-plex-mono",
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
@@ -37,8 +30,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#101318" },
-    { media: "(prefers-color-scheme: light)", color: "#EDEBE6" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090B" },
+    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -59,7 +52,7 @@ export default function RootLayout({
       lang="en"
       data-theme="dark"
       suppressHydrationWarning
-      className={`${serif.variable} ${sans.variable} ${plexMono.variable}`}
+      className={`${sans.variable} ${mono.variable}`}
     >
       <body className="min-h-screen bg-ground text-text antialiased">
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />

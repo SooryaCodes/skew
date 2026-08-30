@@ -133,29 +133,29 @@ function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boole
           TRACE glyph all say so; nothing here is decoration. */}
       <Link
         href={`/trace/${decision.id}`}
-        className="t-fast group block cursor-pointer px-1 py-2 hover:bg-[color:var(--panel-alt)]"
+        className="t-fast group block cursor-pointer rounded-lg px-2 py-3 hover:bg-[color:var(--panel-alt)]"
         aria-label={`Open the decision trace for ${decision.symbol ?? "this decision"}`}
       >
         {/* line 1 — time, outcome, symbol, affordance */}
         <div className="flex items-center gap-2">
           <time
-            className="mono shrink-0 text-[10px] text-[color:var(--text-dim)]"
+            className="mono shrink-0 text-[12px] text-[color:var(--text-dim)]"
             dateTime={decision.ts}
             title={timeAgo(decision.ts)}
           >
             {clockTime(decision.ts)}
           </time>
           <Marker color={style.color} />
-          <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text)]">
+          <span className="mono text-[12px] uppercase tracking-wider text-[color:var(--text)]">
             {style.label}
           </span>
           {decision.symbol && (
-            <span className="mono shrink-0 text-[10px] text-[color:var(--text-dim)]">
+            <span className="mono shrink-0 text-[12px] text-[color:var(--text-dim)]">
               {decision.symbol}
             </span>
           )}
           <span
-            className="mono ml-auto shrink-0 text-[9px] tracking-wider text-[color:var(--text-faint)] group-hover:text-[color:var(--brass)] group-focus-visible:text-[color:var(--brass)]"
+            className="mono ml-auto shrink-0 text-[12px] tracking-wider text-[color:var(--text-faint)] group-hover:text-[color:var(--brass)] group-focus-visible:text-[color:var(--brass)]"
             aria-hidden
           >
             TRACE →
@@ -163,21 +163,21 @@ function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boole
         </div>
         {/* line 2 — the failing gate, the scannable key */}
         {gateLine && (
-          <p className="mono mt-0.5 text-[10px] lowercase tracking-wide text-[color:var(--text)]">
+          <p className="mono mt-0.5 text-[12px] lowercase tracking-wide text-[color:var(--text)]">
             {gateLine}
           </p>
         )}
         {/* line 3 — the reason, two lines max. Full text lives on the trace.
             Fills are the product's rarest output and never truncate. */}
         <p
-          className={`mt-0.5 text-[11px] leading-snug text-[color:var(--text)]${
+          className={`mt-0.5 text-[13px] leading-snug text-[color:var(--text)]${
             filled ? "" : " line-clamp-2"
           }`}
         >
           {stripPromotionTail(decision.reason)}
         </p>
         {decision.model_rationale && filled && (
-          <p className="mt-1 border-l border-[color:var(--line)] pl-2 text-[10px] italic leading-snug text-[color:var(--text-dim)]">
+          <p className="mt-1 border-l border-[color:var(--line)] pl-2 text-[12px] italic leading-snug text-[color:var(--text-dim)]">
             {decision.model_rationale}
           </p>
         )}
@@ -199,10 +199,10 @@ function Run({ first, rest, isNewest }: { first: Decision; rest: Decision[]; isN
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="t-fast mono flex items-center gap-2 text-[10px] text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
+          className="t-fast mono flex items-center gap-2 text-[12px] text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
         >
           <span
-            className="border border-[color:var(--line)] px-1 text-[9px]"
+            className="border border-[color:var(--line)] px-1 text-[12px]"
             style={{ borderRadius: "var(--radius)" }}
           >
             {open ? "−" : `+${rest.length}`}
@@ -217,10 +217,10 @@ function Run({ first, rest, isNewest }: { first: Decision; rest: Decision[]; isN
                   href={`/trace/${entry.id}`}
                   className="t-fast block hover:bg-[color:var(--panel)]"
                 >
-                  <p className="mono text-[10px] text-[color:var(--text-dim)]">
+                  <p className="mono text-[12px] text-[color:var(--text-dim)]">
                     {clockTime(entry.ts)} · {entry.symbol ?? "—"}
                   </p>
-                  <p className="line-clamp-2 text-[11px] leading-snug text-[color:var(--text)]">
+                  <p className="line-clamp-2 text-[13px] leading-snug text-[color:var(--text)]">
                     {stripPromotionTail(entry.reason)}
                   </p>
                 </Link>
@@ -242,20 +242,18 @@ export function AuditStream({ decisions, counts }: Props) {
   const groups = useMemo(() => groupDecisions(decisions), [decisions]);
 
   return (
-    <section className="flex h-full min-h-0 flex-1 flex-col p-3" aria-label="Decision stream">
-      <div className="mb-2 flex items-baseline justify-between">
-        <p className="mono text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
-          audit
+    <section className="flex h-full min-h-0 flex-1 flex-col p-4" aria-label="Decision stream">
+      <h2 className="whitespace-nowrap text-[16px] font-bold tracking-tight text-[color:var(--text)]">
+        Audit log
+      </h2>
+      {counts && (
+        <p className="mono mt-0.5 text-[12px] text-[color:var(--text-dim)]">
+          {counts.EXECUTED ?? 0} filled · {counts.REFUSED ?? 0} refused ·{" "}
+          {counts.ABSTAINED ?? 0} abstained
         </p>
-        {counts && (
-          <p className="mono text-[10px] text-[color:var(--text-dim)]">
-            {counts.EXECUTED ?? 0} filled · {counts.REFUSED ?? 0} refused ·{" "}
-            {counts.ABSTAINED ?? 0} abstained
-          </p>
-        )}
-      </div>
-      <p className="mb-2 text-[10px] leading-snug text-[color:var(--text-dim)]">
-        every decision is traceable — click any entry
+      )}
+      <p className="mb-3 mt-1.5 text-[13px] leading-snug text-[color:var(--text-dim)]">
+        Every decision is traceable — click any entry.
       </p>
 
       {groups.length === 0 ? (
@@ -264,15 +262,28 @@ export function AuditStream({ decisions, counts }: Props) {
           only the trades it takes.
         </p>
       ) : (
-        <ul className="min-h-0 flex-1 overflow-y-auto pr-1">
-          {groups.map((group, i) =>
-            group.kind === "single" ? (
-              <FullEntry key={group.entry.id} decision={group.entry} isNewest={i === 0} />
-            ) : (
-              <Run key={group.key} first={group.first} rest={group.rest} isNewest={i === 0} />
-            ),
-          )}
-        </ul>
+        // The list must LOOK scrollable: a persistent scrollbar plus a fade at
+        // the bottom edge saying "there is more below" — nobody should have to
+        // guess that the log continues.
+        <div className="relative min-h-0 flex-1">
+          <ul className="h-full overflow-y-auto pr-2">
+            {groups.map((group, i) =>
+              group.kind === "single" ? (
+                <FullEntry key={group.entry.id} decision={group.entry} isNewest={i === 0} />
+              ) : (
+                <Run key={group.key} first={group.first} rest={group.rest} isNewest={i === 0} />
+              ),
+            )}
+            <li className="py-3 text-center text-[12px] text-[color:var(--text-faint)]">
+              end of the loaded window — the full history lives in the audit DB
+            </li>
+          </ul>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-14"
+            style={{ background: "linear-gradient(to bottom, transparent, var(--ground))" }}
+          />
+        </div>
       )}
     </section>
   );

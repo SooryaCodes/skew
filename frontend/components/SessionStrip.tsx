@@ -35,7 +35,7 @@ export function KillBanner() {
         style={{ background: "var(--brass)", borderRadius: "1px" }}
         aria-hidden
       />
-      <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text)]">
+      <span className="mono text-[12px] uppercase tracking-wider text-[color:var(--text)]">
         Entries halted. Open positions still monitored.
       </span>
     </div>
@@ -44,7 +44,7 @@ export function KillBanner() {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <span className="mono text-[10px] text-[color:var(--text-dim)]">
+    <span className="mono text-[12px] text-[color:var(--text-dim)]">
       <span className="text-[color:var(--text)]">{value}</span> {label}
     </span>
   );
@@ -63,10 +63,10 @@ export function SessionStrip() {
       {/* The closed-market header line. Never looks broken or empty. */}
       {closed && (
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-[color:var(--line)] bg-[color:var(--panel)] px-4 py-1.5">
-          <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text)]">
+          <span className="mono text-[12px] uppercase tracking-wider text-[color:var(--text)]">
             market closed
           </span>
-          <span className="mono text-[10px] text-[color:var(--text-dim)]">
+          <span className="mono text-[12px] text-[color:var(--text-dim)]">
             showing the session of {sessionLabel(session.session_date)}
             {session.as_of && ` · data as of ${clockTime(session.as_of)}`}
           </span>
@@ -75,7 +75,7 @@ export function SessionStrip() {
 
       {/* Two windows, two labels, no mixing. */}
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-b border-[color:var(--line)] px-4 py-1.5">
-        <span className="mono text-[9px] uppercase tracking-widest text-[color:var(--text-dim)]">
+        <span className="mono text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
           last cycle
         </span>
         <Stat label="scanned" value={session.cycle.scanned} />
@@ -83,7 +83,7 @@ export function SessionStrip() {
         <Stat label="survived" value={session.cycle.survivors} />
 
         <span
-          className="mono border-l border-[color:var(--line)] pl-5 text-[9px] uppercase tracking-widest text-[color:var(--text-dim)]"
+          className="mono border-l border-[color:var(--line)] pl-5 text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]"
           title={`decisions since ${new Date(session.counts_since).toLocaleString()}`}
         >
           session
@@ -100,10 +100,10 @@ export function SessionStrip() {
               style={{ background: "var(--verdigris)", borderRadius: "1px" }}
               aria-hidden
             />
-            <span className="mono truncate text-[10px] text-[color:var(--text)]">
+            <span className="mono truncate text-[12px] text-[color:var(--text)]">
               last fill · {session.last_fill.symbol} · {session.last_fill.reason}
             </span>
-            <span className="mono shrink-0 text-[9px] text-[color:var(--text-dim)]">
+            <span className="mono shrink-0 text-[12px] text-[color:var(--text-dim)]">
               {timeAgo(session.last_fill.ts)}
             </span>
           </span>

@@ -37,10 +37,10 @@ function TierPips({ tier }: { tier: number }) {
 function Row({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-2 py-1">
-      <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
+      <span className="mono text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
         {label}
       </span>
-      <span className="mono text-[12px]">
+      <span className="mono text-[14px]">
         {value}
         {hint && <span className="ml-1 text-[color:var(--text-dim)]">{hint}</span>}
       </span>
@@ -52,7 +52,7 @@ export function RiskPanel({ risk }: { risk: RiskAuthority | undefined }) {
   if (!risk) {
     return (
       <section className="p-3" aria-label="Risk authority">
-        <p className="mono mb-2 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+        <p className="mono mb-2 text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
           risk authority
         </p>
         <p className="text-xs text-[color:var(--text-dim)]">
@@ -67,14 +67,14 @@ export function RiskPanel({ risk }: { risk: RiskAuthority | undefined }) {
 
   return (
     <section className="p-3" aria-label="Risk authority">
-      <p className="mono mb-2 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+      <p className="mono mb-2 text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
         risk authority
       </p>
 
       <div className="flex items-baseline gap-2">
         <span className="font-display text-[length:var(--fs-md)]">Tier {risk.tier}</span>
         <TierPips tier={risk.tier} />
-        <span className="mono ml-auto text-[11px] text-[color:var(--text-dim)]">
+        <span className="mono ml-auto text-[13px] text-[color:var(--text-dim)]">
           {pct(risk.max_loss_pct, 1)} / trade
         </span>
       </div>
@@ -101,7 +101,7 @@ export function RiskPanel({ risk }: { risk: RiskAuthority | undefined }) {
       </div>
 
       {/* Finished copy from the backend: what it takes to size up. */}
-      <p className="mt-3 border-t border-[color:var(--line)] pt-2 text-[11px] leading-relaxed text-[color:var(--text-dim)]">
+      <p className="mt-3 border-t border-[color:var(--line)] pt-2 text-[13px] leading-relaxed text-[color:var(--text-dim)]">
         {risk.next_promotion}
       </p>
     </section>

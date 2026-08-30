@@ -138,7 +138,7 @@ export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Prop
 
   if (!geo) {
     return (
-      <p className="mono text-[10px] text-[color:var(--text-dim)]">
+      <p className="mono text-[12px] text-[color:var(--text-dim)]">
         skew unavailable — fewer than three usable strikes on the front expiry
       </p>
     );
@@ -169,7 +169,7 @@ export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Prop
         y={PAD_T + 8}
         textAnchor="end"
         className="mono"
-        fontSize={8}
+        fontSize={9.5}
         fill="var(--text-dim)"
       >
         {(geo.maxIv * 100).toFixed(0)}
@@ -179,7 +179,7 @@ export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Prop
         y={H - PAD_B}
         textAnchor="end"
         className="mono"
-        fontSize={8}
+        fontSize={9.5}
         fill="var(--text-dim)"
       >
         {(geo.minIv * 100).toFixed(0)}
@@ -213,7 +213,7 @@ export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Prop
             y={H - 7}
             textAnchor="middle"
             className="mono"
-            fontSize={8}
+            fontSize={9.5}
             fill="var(--text-dim)"
           >
             atm
@@ -230,7 +230,7 @@ export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Prop
             y={H - 7}
             textAnchor="middle"
             className="mono"
-            fontSize={8}
+            fontSize={9.5}
             fill="var(--text-dim)"
           >
             {w.label}
@@ -269,7 +269,7 @@ export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Prop
         y={PAD_T + 2}
         textAnchor="end"
         className="mono"
-        fontSize={7.5}
+        fontSize={9}
         fill="var(--text-dim)"
       >
         {isDefault ? "atm · " : ""}

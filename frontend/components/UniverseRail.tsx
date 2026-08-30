@@ -23,7 +23,7 @@ export function UniverseRail({ states, selected, onSelect, loading }: Props) {
   if (states.length === 0) {
     return (
       <div className="p-3">
-        <p className="mono mb-2 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+        <p className="mono mb-2 text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
           universe
         </p>
         {/* Empty states are instructions, never "No data". */}
@@ -40,7 +40,7 @@ export function UniverseRail({ states, selected, onSelect, loading }: Props) {
 
   return (
     <nav className="p-3" aria-label="Universe">
-      <p className="mono mb-2 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+      <p className="mono mb-2 text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
         universe · {states.length}
       </p>
       <ul className="space-y-px">
@@ -62,11 +62,11 @@ export function UniverseRail({ states, selected, onSelect, loading }: Props) {
                   borderRadius: "var(--radius)",
                 }}
               >
-                <span className="mono w-11 shrink-0 text-[13px]">{state.symbol}</span>
-                <span className="mono w-14 shrink-0 text-right text-[13px] text-[color:var(--text)]">
+                <span className="mono w-11 shrink-0 text-[15px]">{state.symbol}</span>
+                <span className="mono w-14 shrink-0 text-right text-[15px] text-[color:var(--text)]">
                   {volPoints(state.vrp)}
                 </span>
-                <span className="mono flex-1 truncate text-right text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
+                <span className="mono flex-1 truncate text-right text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
                   {regimeLabel(state.regime)}
                 </span>
               </button>
@@ -74,7 +74,7 @@ export function UniverseRail({ states, selected, onSelect, loading }: Props) {
           );
         })}
       </ul>
-      <p className="mono mt-3 px-2 text-[9px] leading-relaxed text-[color:var(--text-dim)]">
+      <p className="mono mt-3 px-2 text-[12px] leading-relaxed text-[color:var(--text-dim)]">
         sorted by |VRP| — the widest gap between implied and realized sits on
         top, whichever way it points.
       </p>

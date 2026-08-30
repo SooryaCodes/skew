@@ -87,10 +87,10 @@ export function PinnedRefusal({ exhibit, provenance }: Props) {
               <br />
               It doesn&rsquo;t trade.
             </h2>
-            <p className="mt-5 max-w-md text-[13px] leading-relaxed text-[color:var(--text)]">
+            <p className="mt-5 max-w-md text-[15px] leading-relaxed text-[color:var(--text)]">
               {exhibit.reason}
             </p>
-            <p className="mono mt-4 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
+            <p className="mono mt-4 text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
               a real refusal · {exhibit.symbol} ·{" "}
               {exhibit.kind?.replaceAll("_", " ").toLowerCase()} ·{" "}
               {exhibit.ts && timeAgo(exhibit.ts)}

@@ -36,7 +36,7 @@ const RHYTHM = { minor: "96px", major: "144px", grand: "192px" };
 function SectionCaption({ children }: { children: React.ReactNode }) {
   return (
     <Reveal>
-      <p className="mono mb-10 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+      <p className="mb-12 text-[15px] font-semibold uppercase tracking-[0.14em] text-[color:var(--text-dim)]">
         {children}
       </p>
     </Reveal>
@@ -87,10 +87,10 @@ export default function Landing() {
         style={{ paddingBlock: RHYTHM.minor }}
       >
         <div className="grid gap-10 md:grid-cols-2">
-          <div className="text-[15px] leading-relaxed text-[color:var(--text-dim)]">
+          <div className="text-[16px] leading-relaxed text-[color:var(--text-dim)]">
             <Reveal>
-              <p className="mono mb-4 text-[10px] uppercase tracking-widest">
-                what every other agent does
+              <p className="mb-5 text-[14px] font-semibold uppercase tracking-[0.14em]">
+                What every other agent does
               </p>
             </Reveal>
             <Reveal delay={40}>
@@ -102,10 +102,10 @@ export default function Landing() {
               </p>
             </Reveal>
           </div>
-          <div className="text-[15px] leading-relaxed text-[color:var(--text)]">
+          <div className="text-[16px] leading-relaxed text-[color:var(--text)]">
             <Reveal delay={80}>
-              <p className="mono mb-4 text-[10px] uppercase tracking-widest">
-                what this desk does
+              <p className="mb-5 text-[14px] font-semibold uppercase tracking-[0.14em]">
+                What this desk does
               </p>
             </Reveal>
             <Reveal delay={120}>
@@ -212,7 +212,7 @@ export default function Landing() {
           <div className="mt-8">
             <Link
               href="/desk"
-              className="t-fast mono inline-block border border-[color:var(--brass)] bg-[color:var(--brass)] px-7 py-3 text-[12px] uppercase tracking-widest text-[color:var(--ground)] hover:bg-transparent hover:text-[color:var(--text)]"
+              className="t-fast inline-block bg-[color:var(--accent)] px-7 py-3.5 text-[16px] font-semibold text-white hover:opacity-90"
               style={{ borderRadius: "var(--radius)" }}
             >
               Enter the desk
@@ -228,18 +228,18 @@ export default function Landing() {
           style={{ paddingBlock: "48px" }}
         >
           <div>
-            <p className="mono text-[11px] text-[color:var(--text)]">
+            <p className="mono text-[13px] text-[color:var(--text)]">
               Paper trading only. No live code path exists.
             </p>
             {counts && (
-              <p className="mono mt-1.5 text-[10px] text-[color:var(--text-dim)]">
+              <p className="mono mt-1.5 text-[12px] text-[color:var(--text-dim)]">
                 {traced.toLocaleString("en-US")} decisions traced ·{" "}
                 {refused.toLocaleString("en-US")} refused ·{" "}
                 {executed.toLocaleString("en-US")} executed
               </p>
             )}
           </div>
-          <nav className="mono flex gap-5 text-[10px] uppercase tracking-wider" aria-label="Footer">
+          <nav className="mono flex gap-5 text-[12px] uppercase tracking-wider" aria-label="Footer">
             <a
               className="t-fast text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
               href={GITHUB}

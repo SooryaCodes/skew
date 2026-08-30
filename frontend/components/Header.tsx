@@ -53,14 +53,14 @@ export function Header({ status, tab }: Props) {
         <nav className="flex gap-3" aria-label="Views">
           <Link
             href="/desk"
-            className="mono t-fast text-[11px] uppercase tracking-wider"
+            className="mono t-fast text-[13px] uppercase tracking-wider"
             style={{ color: tab === "desk" ? "var(--text)" : "var(--text-dim)" }}
           >
             desk
           </Link>
           <Link
             href="/positions"
-            className="mono t-fast text-[11px] uppercase tracking-wider"
+            className="mono t-fast text-[13px] uppercase tracking-wider"
             style={{ color: tab === "positions" ? "var(--text)" : "var(--text-dim)" }}
           >
             positions
@@ -80,13 +80,13 @@ export function Header({ status, tab }: Props) {
               style={{ background: health.ok ? "var(--verdigris)" : "var(--oxide)" }}
               aria-hidden
             />
-            <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
+            <span className="mono text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
               {health.ok ? "all clear" : "attention"}
             </span>
           </span>
 
           {status?.last_cycle && (
-            <span className="mono text-[10px] text-[color:var(--text-dim)]">
+            <span className="mono text-[12px] text-[color:var(--text-dim)]">
               cycle {timeAgo(status.last_cycle)}
             </span>
           )}

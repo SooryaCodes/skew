@@ -24,10 +24,10 @@ function PayoffMini() {
         stroke="var(--brass)"
         strokeWidth="1.5"
       />
-      <text x="10" y="80" className="mono" fontSize="7.5" fill="var(--text-dim)">
+      <text x="10" y="80" className="mono" fontSize="9" fill="var(--text-dim)">
         max loss — computed before the position exists
       </text>
-      <text x="140" y="16" className="mono" fontSize="7.5" fill="var(--text-dim)">
+      <text x="140" y="16" className="mono" fontSize="9" fill="var(--text-dim)">
         max profit
       </text>
     </svg>
@@ -68,7 +68,7 @@ function StressMini({ exhibit }: { exhibit?: RefusalExhibit }) {
           }),
         )}
       </div>
-      <p className="mono mt-2 text-[8px] uppercase tracking-wider text-[color:var(--text-dim)]">
+      <p className="mono mt-2 text-[11px] uppercase tracking-wider text-[color:var(--text-dim)]">
         a real grid — the shaded corner is why it refused
       </p>
     </div>
@@ -93,7 +93,7 @@ export function HowItWorks({ states, exhibit }: Props) {
         "Direction is never an input.",
       instrument: widest ? (
         <div>
-          <p className="mono text-[10px] text-[color:var(--text-dim)]">
+          <p className="mono text-[12px] text-[color:var(--text-dim)]">
             {widest.symbol} · widest gap now
           </p>
           <CountUp
@@ -102,7 +102,7 @@ export function HowItWorks({ states, exhibit }: Props) {
             className="font-display block text-[2.6rem] leading-tight"
             style={{ color: regimeColor(widest.regime) }}
           />
-          <p className="mono text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
+          <p className="mono text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
             iv − rv, vol points
           </p>
         </div>
@@ -130,12 +130,12 @@ export function HowItWorks({ states, exhibit }: Props) {
     <div className="grid gap-4 md:grid-cols-3">
       {steps.map((step, i) => (
         <Reveal key={step.n} delay={i * 60}>
-          <div className="panel h-full p-6" style={{ borderRadius: "3px" }}>
-            <p className="mono text-[10px] text-[color:var(--text-dim)]">{step.n}</p>
-            <h3 className="mono mt-1 text-[12px] uppercase tracking-[0.2em] text-[color:var(--text)]">
-              {step.title}
+          <div className="panel h-full p-7">
+            <p className="mono text-[13px] text-[color:var(--text-faint)]">{step.n}</p>
+            <h3 className="mt-2 text-[20px] font-bold tracking-tight text-[color:var(--text)]">
+              {step.title[0] + step.title.slice(1).toLowerCase()}
             </h3>
-            <p className="mt-3 text-[13px] leading-relaxed text-[color:var(--text-dim)]">
+            <p className="mt-3 text-[15px] leading-[1.65] text-[color:var(--text-dim)]">
               {step.body}
             </p>
             <div className="mt-5">{step.instrument}</div>

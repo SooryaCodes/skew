@@ -42,10 +42,10 @@ export function Nav() {
       }}
     >
       <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-between px-6">
-        <a href="#" className="font-display text-[length:var(--fs-md)]">
+        <a href="#" className="font-display text-[19px] tracking-tight">
           SKEW
         </a>
-        <nav className="mono hidden gap-7 text-[10px] uppercase tracking-widest sm:flex" aria-label="Page">
+        <nav className="hidden gap-8 text-[14px] font-medium sm:flex" aria-label="Page">
           {LINKS.map((link) => (
             <a
               key={link.href}
@@ -60,8 +60,8 @@ export function Nav() {
           <ThemeToggle />
           <Link
             href="/desk"
-            className="t-fast mono border border-[color:var(--brass)] bg-[color:var(--brass)] px-3.5 py-1.5 text-[10px] uppercase tracking-widest text-[color:var(--ground)] hover:bg-transparent hover:text-[color:var(--text)]"
-            style={{ borderRadius: "var(--radius)" }}
+            className="t-fast bg-[color:var(--accent)] px-4 py-2 text-[14px] font-semibold text-white hover:opacity-90"
+            style={{ borderRadius: "10px" }}
           >
             Enter the desk
           </Link>

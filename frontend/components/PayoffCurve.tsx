@@ -181,10 +181,10 @@ export function PayoffCurve({ structure, rv20 }: Props) {
       </ResponsiveContainer>
 
       {/* asymptote labels at the right edge */}
-      <span className="mono pointer-events-none absolute right-0 top-1 text-[9px] text-[color:var(--text-dim)]">
+      <span className="mono pointer-events-none absolute right-0 top-1 text-[12px] text-[color:var(--text-dim)]">
         max {money(structure.max_profit, 0)}
       </span>
-      <span className="mono pointer-events-none absolute bottom-4 right-0 text-[9px] text-[color:var(--text-dim)]">
+      <span className="mono pointer-events-none absolute bottom-4 right-0 text-[12px] text-[color:var(--text-dim)]">
         {money(-structure.max_loss, 0)}
       </span>
     </div>

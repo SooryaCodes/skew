@@ -42,12 +42,12 @@ export default function TracePage() {
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
         <div className="mb-6 flex items-baseline justify-between gap-4">
-          <p className="mono text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+          <p className="mono text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
             decision trace
           </p>
           <Link
             href="/desk"
-            className="mono t-fast text-[10px] uppercase tracking-wider text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
+            className="mono t-fast text-[12px] uppercase tracking-wider text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
           >
             ← back to the desk
           </Link>
@@ -58,7 +58,7 @@ export default function TracePage() {
             No decision with that id. Traces link from the audit log on the desk.
           </p>
         ) : !decision ? (
-          <p className="mono text-[11px] text-[color:var(--text-dim)]">loading trace…</p>
+          <p className="mono text-[13px] text-[color:var(--text-dim)]">loading trace…</p>
         ) : (
           <>
             <header className="mb-8">
@@ -74,21 +74,21 @@ export default function TracePage() {
                 <h1 className="font-display text-[length:var(--fs-lg)] leading-none">
                   {decision.symbol ?? "—"}
                 </h1>
-                <span className="mono text-[11px] uppercase tracking-wider text-[color:var(--text)]">
+                <span className="mono text-[13px] uppercase tracking-wider text-[color:var(--text)]">
                   {decision.action.toLowerCase()}
                 </span>
-                <span className="mono text-[10px] text-[color:var(--text-dim)]">
+                <span className="mono text-[12px] text-[color:var(--text-dim)]">
                   {clockTime(decision.ts)} · {timeAgo(decision.ts)} · tier {decision.risk_tier}
                 </span>
               </div>
-              <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-[color:var(--text)]">
+              <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-[color:var(--text)]">
                 {decision.reason}
               </p>
             </header>
 
             <TracePanel decision={decision} />
 
-            <p className="mono mt-6 border-t border-[color:var(--line)] pt-4 text-[10px] leading-relaxed text-[color:var(--text-dim)]">
+            <p className="mono mt-6 border-t border-[color:var(--line)] pt-4 text-[12px] leading-relaxed text-[color:var(--text-dim)]">
               Every value above was recorded when this decision was made — nothing
               is recomputed for display. Deterministic gates decided what was
               possible; the bounded selector could only choose among what
