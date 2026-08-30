@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { SkewSlice } from "@/lib/types";
+import { nearestIndex, useCrosshair } from "@/lib/useCrosshair";
 
 const W = 420;
 const H = 120;
@@ -56,6 +57,7 @@ function smoothPath(coords: Array<[number, number]>): string {
 export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Props) {
   const pathRef = useRef<SVGPathElement | null>(null);
   const [dash, setDash] = useState(900);
+  const { svgRef, pointerX, handlers } = useCrosshair(W);
 
   const geo = useMemo(() => {
     const front = slices[0];
@@ -78,12 +80,24 @@ export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Prop
       PAD_B -
       ((iv - (minIv - ivPad)) / (maxIv - minIv + 2 * ivPad || 1)) * (H - PAD_T - PAD_B);
 
-    const toPath = (s: SkewSlice) =>
-      smoothPath(
-        s.points
-          .filter((p) => p.strike >= minStrike && p.strike <= maxStrike)
-          .map((p) => [x(p.strike), y(p.iv)] as [number, number]),
-      );
+    // The RENDERED line is lightly smoothed (3-point moving average) — the
+    // backend already filtered illiquid strikes, and this removes the residual
+    // quote noise. The crosshair snaps to the RAW filtered points, so every
+    // number a reader can summon is a real quote, never the smoothing.
+    const smoothIvs = (values: number[]) =>
+      values.map((_v, i) => {
+        const lo = Math.max(0, i - 1);
+        const hi = Math.min(values.length - 1, i + 1);
+        let sum = 0;
+        for (let j = lo; j <= hi; j += 1) sum += values[j]!;
+        return sum / (hi - lo + 1);
+      });
+
+    const toPath = (s: SkewSlice) => {
+      const inRange = s.points.filter((p) => p.strike >= minStrike && p.strike <= maxStrike);
+      const smoothed = smoothIvs(inRange.map((p) => p.iv));
+      return smoothPath(inRange.map((p, i) => [x(p.strike), y(smoothed[i]!)] as [number, number]));
+    };
 
     // One-sigma move over the front expiry's life: rv × √(dte/365), in dollars.
     const sigma = spot * rv20 * Math.sqrt(Math.max(front.dte, 1) / 365);
@@ -92,7 +106,19 @@ export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Prop
       return k >= minStrike && k <= maxStrike ? x(k) : null;
     };
 
+    // Every real front-expiry point, for the crosshair to snap to.
+    const pts = [...front.points]
+      .sort((a, b) => a.strike - b.strike)
+      .map((point) => ({
+        px: x(point.strike),
+        py: y(point.iv),
+        strike: point.strike,
+        iv: point.iv,
+        delta: point.delta,
+      }));
+
     return {
+      pts,
       front: toPath(front),
       ghosts: slices.slice(1).map(toPath),
       spotX: spot >= minStrike && spot <= maxStrike ? x(spot) : null,
@@ -118,10 +144,19 @@ export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Prop
     );
   }
 
+  // Crosshair: snap to the nearest REAL strike; default to ATM so the corner
+  // readout is never empty.
+  const atmIndex = nearestIndex(geo.pts.map((pt) => pt.px), geo.spotX ?? W / 2);
+  const hoverIndex = pointerX === null ? atmIndex : nearestIndex(geo.pts.map((pt) => pt.px), pointerX);
+  const hovered = geo.pts[hoverIndex]!;
+  const isDefault = pointerX === null;
+
   return (
     <svg
+      ref={svgRef}
+      {...handlers}
       viewBox={`0 0 ${W} ${H}`}
-      className={`h-auto w-full ${large ? "max-w-[760px]" : "max-w-[420px]"}`}
+      className={`h-auto w-full touch-none ${large ? "max-w-[760px]" : "max-w-[420px]"}`}
       role="img"
       aria-label={`Implied volatility across strikes, ${(geo.minIv * 100).toFixed(1)} to ${(
         geo.maxIv * 100
@@ -215,6 +250,33 @@ export function SkewCurve({ slices, spot, rv20, redrawKey, large = false }: Prop
         className="curve-redraw"
         style={{ strokeDasharray: dash, "--dash": dash } as React.CSSProperties}
       />
+
+      {/* crosshair — hairline snapped to the nearest real strike */}
+      {!isDefault && (
+        <line
+          x1={hovered.px}
+          y1={PAD_T}
+          x2={hovered.px}
+          y2={H - PAD_B}
+          stroke="var(--text-faint)"
+          strokeWidth={0.75}
+        />
+      )}
+      <circle cx={hovered.px} cy={hovered.py} r={2.5} fill="var(--brass)" />
+      {/* readout pinned to the corner, never a tooltip over the data */}
+      <text
+        x={W - PAD_R}
+        y={PAD_T + 2}
+        textAnchor="end"
+        className="mono"
+        fontSize={7.5}
+        fill="var(--text-dim)"
+      >
+        {isDefault ? "atm · " : ""}
+        strike {hovered.strike % 1 === 0 ? hovered.strike : hovered.strike.toFixed(2)} · iv{" "}
+        {(hovered.iv * 100).toFixed(1)}
+        {hovered.delta !== null ? ` · Δ ${hovered.delta.toFixed(2)}` : ""}
+      </text>
     </svg>
   );
 }

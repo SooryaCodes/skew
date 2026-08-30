@@ -85,7 +85,7 @@ export function VolReadout({ state }: { state: VolState }) {
       <p className="mono mt-2 text-[10px] text-[color:var(--text-dim)]">
         rv percentile {state.rv_percentile.toFixed(0)} over its own 252d range ·{" "}
         {state.iv_rank === null
-          ? "IV rank unavailable — Alpaca serves no historical IV; this desk builds its own from first run"
+          ? `IV rank unavailable — building history, ${state.iv_rank_window_days} day(s) collected (20 needed; Alpaca serves no historical IV)`
           : `IV rank ${state.iv_rank.toFixed(0)} over ${state.iv_rank_window_days} day(s) of self-collected history — not a 52-week rank`}
       </p>
     </section>

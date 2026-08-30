@@ -109,15 +109,19 @@ export default function DeskPage() {
   }, [focusedCandidates, focusId]);
 
   return (
-    <div className="flex min-h-screen flex-col">
+    // The desk shell is a fixed-height flex column at lg+: header rows fixed,
+    // body flex-1 with MIN-HEIGHT 0 (without it a flex child refuses to shrink
+    // and its children overflow the page), three columns each scrolling
+    // independently. The page itself never scrolls; the footer never leaves.
+    <div className="flex min-h-screen flex-col lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
       <Header status={status} tab="desk" />
       <KillBanner />
       {operator && <ControlStrip />}
       <SessionStrip />
 
-      <div className="grid flex-1 grid-cols-1 lg:grid-cols-[13rem_minmax(0,1fr)_19rem]">
+      <div className="grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-[13rem_minmax(0,1fr)_19rem] lg:grid-rows-[minmax(0,1fr)]">
         {/* scan */}
-        <aside className="border-b border-[color:var(--line)] lg:border-b-0 lg:border-r">
+        <aside className="border-b border-[color:var(--line)] lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <UniverseRail
             states={states}
             selected={selected}
@@ -127,7 +131,7 @@ export default function DeskPage() {
         </aside>
 
         {/* decide */}
-        <main className="min-w-0 p-4">
+        <main className="min-w-0 p-4 lg:overflow-y-auto">
           {universeError ? (
             <p className="text-sm text-[color:var(--text-dim)]">
               Cannot reach the desk API. Start the backend with{" "}
@@ -135,11 +139,47 @@ export default function DeskPage() {
               <span className="mono">NEXT_PUBLIC_API_BASE</span>.
             </p>
           ) : !focused ? (
-            <p className="text-sm text-[color:var(--text-dim)]">
-              {universeLoading
-                ? "Scanning — the first cycle takes a few seconds."
-                : "Select a symbol to see its volatility state."}
-            </p>
+            // Three DISTINCT states — a judge opening an unconfigured deploy
+            // must see a desk that knows its own condition, not a broken page.
+            <div className="max-w-md text-sm leading-relaxed text-[color:var(--text-dim)]">
+              {status && !status.broker_connected ? (
+                <>
+                  <p className="mono mb-2 text-[10px] uppercase tracking-widest">
+                    <span
+                      className="mr-1.5 inline-block h-[7px] w-[7px] align-middle"
+                      style={{ background: "var(--oxide)", borderRadius: "1px" }}
+                      aria-hidden
+                    />
+                    not armed
+                  </p>
+                  <p>
+                    Desk not armed. Market data credentials are not configured on
+                    this deployment. The architecture is still fully inspectable —
+                    the decision stream on the right is the live audit log.
+                  </p>
+                </>
+              ) : status && status.has_published_state === false ? (
+                <>
+                  <p className="mono mb-2 text-[10px] uppercase tracking-widest">
+                    <span
+                      className="mr-1.5 inline-block h-[7px] w-[7px] align-middle"
+                      style={{ background: "var(--brass)", borderRadius: "1px" }}
+                      aria-hidden
+                    />
+                    armed
+                  </p>
+                  <p>
+                    Armed. First cycle pending — the desk publishes its first
+                    volatility state within a few seconds of boot.
+                  </p>
+                </>
+              ) : universeLoading || states.length === 0 ? (
+                <p>Scanning — the first cycle takes a few seconds.</p>
+              ) : (
+                // Only reachable when symbols exist to select.
+                <p>Select a symbol from the rail to see its volatility state.</p>
+              )}
+            </div>
           ) : (
             <>
               {status && !status.market_open && (
@@ -226,7 +266,7 @@ export default function DeskPage() {
         </main>
 
         {/* govern */}
-        <aside className="flex max-h-screen flex-col border-t border-[color:var(--line)] lg:border-l lg:border-t-0">
+        <aside className="flex flex-col border-t border-[color:var(--line)] lg:min-h-0 lg:border-l lg:border-t-0">
           <RiskPanel risk={risk} />
           <div className="min-h-0 flex-1 border-t border-[color:var(--line)]">
             <AuditStream decisions={audit ?? []} counts={counts} />

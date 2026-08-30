@@ -16,6 +16,36 @@ import { useMemo, useState } from "react";
 import { clockTime, timeAgo } from "@/lib/format";
 import type { Decision, DecisionAction } from "@/lib/types";
 
+/** Strip the legacy tier-promotion tail from rows written before it was
+ *  removed at the source — identical on every refusal, already in the risk
+ *  panel, and it doubled the length of each entry. */
+function stripPromotionTail(reason: string): string {
+  return reason.replace(/\s*Tier \d \([^)]*\) needs [^.]*\.\s*$/, "").trim();
+}
+
+const CHECK_LABEL: Record<string, string> = {
+  per_trade: "per-trade cap",
+  portfolio: "portfolio cap",
+  capacity: "capacity",
+};
+
+/** "budget · per-trade cap" — the scannable key, pulled out of the prose. */
+function failingGateLine(decision: Decision): string | null {
+  if (decision.action !== "REFUSED") return null;
+  const gates = decision.detail?.gates as
+    | Array<{ gate: string; passed: boolean; skipped?: boolean; detail?: Record<string, unknown> }>
+    | undefined;
+  if (!gates) return null;
+  const failing = gates.filter((g) => !g.passed && !g.skipped);
+  if (failing.length === 0) return null;
+  return failing
+    .map((g) => {
+      const check = CHECK_LABEL[String(g.detail?.failed_check ?? "")];
+      return check ? `${g.gate} · ${check}` : g.gate;
+    })
+    .join("  ·  ");
+}
+
 const ACTION_STYLE: Record<DecisionAction, { color: string; label: string }> = {
   EXECUTED: { color: "var(--verdigris)", label: "filled" },
   REFUSED: { color: "var(--oxide)", label: "refused" },
@@ -90,6 +120,8 @@ function Marker({ color }: { color: string }) {
 
 function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boolean }) {
   const style = ACTION_STYLE[decision.action] ?? ACTION_STYLE.ABSTAINED;
+  const gateLine = failingGateLine(decision);
+  const filled = decision.action === "EXECUTED";
   return (
     <li
       className={`border-t border-[color:var(--line)] first:border-t-0 ${
@@ -97,37 +129,58 @@ function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boole
       }`}
     >
       {/* The whole entry links to its decision trace — conclusions here,
-          reasoning one click deeper. */}
+          reasoning one click deeper. Cursor, hover raise and the trailing
+          TRACE glyph all say so; nothing here is decoration. */}
       <Link
         href={`/trace/${decision.id}`}
-        className="t-fast block py-2 hover:bg-[color:var(--panel)]"
+        className="t-fast group block cursor-pointer px-1 py-2 hover:bg-[color:var(--panel-alt)]"
         aria-label={`Open the decision trace for ${decision.symbol ?? "this decision"}`}
       >
-      <div className="flex items-center gap-2">
-        <time
-          className="mono shrink-0 text-[10px] text-[color:var(--text-dim)]"
-          dateTime={decision.ts}
-          title={timeAgo(decision.ts)}
-        >
-          {clockTime(decision.ts)}
-        </time>
-        <Marker color={style.color} />
-        <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text)]">
-          {style.label}
-        </span>
-        {decision.symbol && (
-          <span className="mono shrink-0 text-[10px] text-[color:var(--text-dim)]">
-            {decision.symbol}
+        {/* line 1 — time, outcome, symbol, affordance */}
+        <div className="flex items-center gap-2">
+          <time
+            className="mono shrink-0 text-[10px] text-[color:var(--text-dim)]"
+            dateTime={decision.ts}
+            title={timeAgo(decision.ts)}
+          >
+            {clockTime(decision.ts)}
+          </time>
+          <Marker color={style.color} />
+          <span className="mono text-[10px] uppercase tracking-wider text-[color:var(--text)]">
+            {style.label}
           </span>
+          {decision.symbol && (
+            <span className="mono shrink-0 text-[10px] text-[color:var(--text-dim)]">
+              {decision.symbol}
+            </span>
+          )}
+          <span
+            className="mono ml-auto shrink-0 text-[9px] tracking-wider text-[color:var(--text-faint)] group-hover:text-[color:var(--brass)] group-focus-visible:text-[color:var(--brass)]"
+            aria-hidden
+          >
+            TRACE →
+          </span>
+        </div>
+        {/* line 2 — the failing gate, the scannable key */}
+        {gateLine && (
+          <p className="mono mt-0.5 text-[10px] lowercase tracking-wide text-[color:var(--text)]">
+            {gateLine}
+          </p>
         )}
-      </div>
-      {/* Complete reason text. Fills and refusals are never truncated. */}
-      <p className="mt-0.5 text-[11px] leading-snug text-[color:var(--text)]">{decision.reason}</p>
-      {decision.model_rationale && (
-        <p className="mt-1 border-l border-[color:var(--line)] pl-2 text-[10px] italic leading-snug text-[color:var(--text-dim)]">
-          {decision.model_rationale}
+        {/* line 3 — the reason, two lines max. Full text lives on the trace.
+            Fills are the product's rarest output and never truncate. */}
+        <p
+          className={`mt-0.5 text-[11px] leading-snug text-[color:var(--text)]${
+            filled ? "" : " line-clamp-2"
+          }`}
+        >
+          {stripPromotionTail(decision.reason)}
         </p>
-      )}
+        {decision.model_rationale && filled && (
+          <p className="mt-1 border-l border-[color:var(--line)] pl-2 text-[10px] italic leading-snug text-[color:var(--text-dim)]">
+            {decision.model_rationale}
+          </p>
+        )}
       </Link>
     </li>
   );
@@ -167,14 +220,9 @@ function Run({ first, rest, isNewest }: { first: Decision; rest: Decision[]; isN
                   <p className="mono text-[10px] text-[color:var(--text-dim)]">
                     {clockTime(entry.ts)} · {entry.symbol ?? "—"}
                   </p>
-                  <p className="text-[11px] leading-snug text-[color:var(--text)]">
-                    {entry.reason}
+                  <p className="line-clamp-2 text-[11px] leading-snug text-[color:var(--text)]">
+                    {stripPromotionTail(entry.reason)}
                   </p>
-                  {entry.model_rationale && (
-                    <p className="mt-0.5 text-[10px] italic leading-snug text-[color:var(--text-dim)]">
-                      {entry.model_rationale}
-                    </p>
-                  )}
                 </Link>
               </li>
             ))}
@@ -206,6 +254,9 @@ export function AuditStream({ decisions, counts }: Props) {
           </p>
         )}
       </div>
+      <p className="mb-2 text-[10px] leading-snug text-[color:var(--text-dim)]">
+        every decision is traceable — click any entry
+      </p>
 
       {groups.length === 0 ? (
         <p className="text-xs text-[color:var(--text-dim)]">

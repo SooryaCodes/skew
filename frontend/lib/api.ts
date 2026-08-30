@@ -14,6 +14,7 @@ import useSWR, { type SWRResponse } from "swr";
 
 import type {
   Candidate,
+  ClosedPosition,
   CycleStatus,
   RefusalExhibit,
   Surface,
@@ -68,6 +69,8 @@ export const useUniverse = () => usePoll<VolState[]>("/api/universe");
 export const useCandidates = () => usePoll<Candidate[]>("/api/candidates");
 export const useRisk = () => usePoll<RiskAuthority>("/api/risk");
 export const usePositions = () => usePoll<Position[]>("/api/positions", 10000);
+export const useClosedPositions = () =>
+  usePoll<ClosedPosition[]>("/api/positions/closed", 30000);
 export const useAudit = (limit = 40) => usePoll<Decision[]>(`/api/audit?limit=${limit}`);
 export const useAuditCounts = () =>
   usePoll<Record<string, number>>("/api/audit/counts", 15000);

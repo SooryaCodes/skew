@@ -272,8 +272,14 @@ def get_status() -> dict[str, Any]:
         "broker_connected": desk.broker.available,
         "model_connected": settings.has_model_credentials,
         "universe": effective_universe(settings),
+        "universe_size": len(effective_universe(settings)),
         "last_session": session_day.isoformat(),
         "last_cycle": report.ts.isoformat() if report else None,
+        "last_cycle_at": report.ts.isoformat() if report else None,
+        # Whether the desk has EVER published a volatility state — the frontend
+        # separates "not armed" from "armed, first cycle pending" with this.
+        "has_published_state": bool(_states()),
+        "selector_configured": settings.has_model_credentials,
         "auto_execute": settings.auto_execute,
         "scheduler_running": settings.run_scheduler,
         # An armed desk whose selection step is unreachable looks exactly like a
@@ -287,6 +293,14 @@ def get_status() -> dict[str, Any]:
         "account_id_suffix": loop.ACCOUNT["suffix"],
         "account_error": loop.ACCOUNT["error"],
         "instance_conflict": loop.CONFLICT["message"],
+        # The standing exit rules, so the positions view can print each
+        # position's own exit conditions instead of a vague promise.
+        "exit_rules": {
+            "profit_target_pct": settings.profit_target_pct,
+            "loss_limit_multiple": settings.loss_limit_multiple,
+            "exit_dte_threshold": settings.exit_dte_threshold,
+            "deadline_utc": settings.deadline_utc or None,
+        },
         "armed": (
             settings.auto_execute
             and loop.get_selector().last_error is None
@@ -369,9 +383,15 @@ def get_iv_history(symbol: str) -> dict[str, Any]:
     """
     key = symbol.upper()
     series = daily_closing_iv(key)
+    from skew.data.store import distinct_history_days, history_span
+
+    first_ts, last_ts = history_span(key)
     return {
         "symbol": key,
         "window_days": history_window_days(key),
+        "distinct_days": distinct_history_days(key),
+        "first_ts": first_ts.isoformat() if first_ts else None,
+        "last_ts": last_ts.isoformat() if last_ts else None,
         "observations": observation_count(key),
         "series": [{"date": d, "atm_iv": iv} for d, iv in series],
         "note": (
@@ -413,9 +433,15 @@ def get_vrp_history(symbol: str) -> dict[str, Any]:
         candidates = [d for d in rv_by_date if d <= day]
         return rv_by_date[max(candidates)] if candidates else None
 
+    from skew.data.store import distinct_history_days, history_span
+
+    first_ts, last_ts = history_span(key)
     return {
         "symbol": key,
         "window_days": history_window_days(key),
+        "distinct_days": distinct_history_days(key),
+        "first_ts": first_ts.isoformat() if first_ts else None,
+        "last_ts": last_ts.isoformat() if last_ts else None,
         "observations": observation_count(key),
         "series": [{"date": d, "iv": iv, "rv": rv_on_or_before(d)} for d, iv in iv_days],
         "note": (
@@ -423,6 +449,54 @@ def get_vrp_history(symbol: str) -> dict[str, Any]:
             "This window is exactly as long as it says it is."
         ),
     }
+
+
+@api.get("/positions/closed", summary="Closed trades, with realized P&L")
+def get_closed_positions() -> list[dict[str, Any]]:
+    """The full lifecycle record: every structure this desk opened and closed.
+
+    Realized P&L per trade, holding period, and WHICH rule closed it — the
+    exit reason is the point, not the dollar figure.
+    """
+    from sqlalchemy import select
+
+    from skew.audit.models import PositionRow
+    from skew.db import session_scope
+
+    out: list[dict[str, Any]] = []
+    with session_scope() as session:
+        rows = session.scalars(
+            select(PositionRow)
+            .where(PositionRow.is_open.is_(False))
+            .order_by(PositionRow.closed_at.desc())
+        ).all()
+        for row in rows:
+            opened = row.opened_at
+            closed = row.closed_at
+            days = None
+            if opened is not None and closed is not None:
+                days = round(
+                    (closed.replace(tzinfo=UTC) if closed.tzinfo is None else closed).timestamp()
+                    - (opened.replace(tzinfo=UTC) if opened.tzinfo is None else opened).timestamp(),
+                )
+                days = round(days / 86400, 1)
+            out.append(
+                {
+                    "id": row.id,
+                    "symbol": row.symbol,
+                    "kind": row.kind,
+                    "legs": list(row.legs or []),
+                    "qty": row.qty,
+                    "opened_at": opened.isoformat() if opened else None,
+                    "closed_at": closed.isoformat() if closed else None,
+                    "entry_credit": row.entry_credit,
+                    "max_loss": row.max_loss,
+                    "realized_pnl": row.realized_pnl,
+                    "exit_reason": row.exit_reason,
+                    "days_held": days,
+                }
+            )
+    return out
 
 
 @api.get("/cycle/status", summary="What the desk is doing right now")

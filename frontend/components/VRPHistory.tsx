@@ -14,6 +14,20 @@
 import { useMemo } from "react";
 
 import { useVrpHistory } from "@/lib/api";
+import type { VrpHistory } from "@/lib/types";
+
+/** The window, from the ACTUAL first/last observation timestamps — in hours
+ *  while it is under a day, so "0d window · 52 obs" can never appear. */
+function spanLabel(data: VrpHistory): string {
+  if (data.first_ts && data.last_ts) {
+    const ms = new Date(data.last_ts).getTime() - new Date(data.first_ts).getTime();
+    const hours = ms / 3_600_000;
+    if (hours < 1) return "<1h";
+    if (hours < 24) return `${hours.toFixed(hours < 10 ? 1 : 0)}h`;
+    return `${Math.round(hours / 24)}d`;
+  }
+  return `${data.window_days}d`;
+}
 
 const W = 340;
 const H = 100;
@@ -104,7 +118,7 @@ export function VRPHistory({ symbol }: { symbol: string }) {
       </svg>
       {/* The honest label. Never implies more history than exists. */}
       <p className="mono mt-1 text-[9px] text-[color:var(--text-dim)]">
-        since first run · {data.window_days}d window · {data.observations} obs · brass = iv leads,
+        since first run · {spanLabel(data)} window · {data.observations} obs · brass = iv leads,
         steel = rv leads
       </p>
     </div>

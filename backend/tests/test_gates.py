@@ -476,11 +476,14 @@ def test_budget_fails_at_the_concurrent_position_cap():
     assert "Capacity, not conviction" in r.reason
 
 
-def test_budget_failure_tells_the_operator_what_would_change_it():
+def test_budget_failure_names_the_cap_without_the_promotion_tail():
+    """The promotion path lives in the risk panel — repeating it on every
+    refusal doubled each audit entry with identical text."""
     risk = make_risk(tier=0, budget=300.0)
     r = budget_gate(make_candidate(), make_ctx(risk=risk))
     assert not r.passed
-    assert "Tier 2" in r.reason or "Tier 1" in r.reason
+    assert "Per-trade cap" in r.reason
+    assert "needs" not in r.reason and "Tier 1 (" not in r.reason
 
 
 def test_capacity_failure_names_itself():

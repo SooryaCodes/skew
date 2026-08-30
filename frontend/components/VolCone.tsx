@@ -18,6 +18,7 @@
 import { useMemo } from "react";
 
 import type { ConePoint } from "@/lib/types";
+import { nearestIndex, useCrosshair } from "@/lib/useCrosshair";
 
 const W = 340;
 const H = 190;
@@ -33,7 +34,32 @@ interface Props {
   ivDte: number;
 }
 
+/** Where current RV sits inside its own percentile band, from the band edges
+ *  the backend actually computed — piecewise between known percentiles, capped
+ *  at the edges. Display maths only; nothing here feeds a decision. */
+function bandPercentile(c: ConePoint): number {
+  const marks: Array<[number, number]> = [
+    [10, c.p10],
+    [25, c.p25],
+    [50, c.p50],
+    [75, c.p75],
+    [90, c.p90],
+  ];
+  if (c.current <= c.p10) return 10;
+  if (c.current >= c.p90) return 90;
+  for (let i = 0; i < marks.length - 1; i += 1) {
+    const [pctLo, lo] = marks[i]!;
+    const [pctHi, hi] = marks[i + 1]!;
+    if (c.current >= lo && c.current <= hi) {
+      const t = hi === lo ? 0 : (c.current - lo) / (hi - lo);
+      return Math.round(pctLo + t * (pctHi - pctLo));
+    }
+  }
+  return 50;
+}
+
 export function VolCone({ cone, ivAtm, ivDte }: Props) {
+  const { svgRef, pointerX, handlers } = useCrosshair(W);
   const geo = useMemo(() => {
     if (cone.length < 2) return null;
     const sorted = [...cone].sort((a, b) => a.horizon - b.horizon);
@@ -55,6 +81,7 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
     const last = sorted.at(-1)!;
     return {
       sorted,
+      xs: sorted.map((c) => x(c.horizon)),
       outer: band((c) => c.p90, (c) => c.p10),
       inner: band((c) => c.p75, (c) => c.p25),
       median: sorted.map((c) => `${x(c.horizon)},${y(c.p50)}`).join(" "),
@@ -83,10 +110,23 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
     );
   }
 
+  // Crosshair: nearest real horizon. Resting readout = the horizon nearest the
+  // front expiry, where the IV dot lives.
+  const defaultIndex = nearestIndex(
+    geo.sorted.map((c) => Math.abs(c.horizon - ivDte)),
+    0,
+  );
+  const hoverIndex = pointerX === null ? defaultIndex : nearestIndex(geo.xs, pointerX);
+  const hovered = geo.sorted[hoverIndex]!;
+  const hoveredX = geo.xs[hoverIndex]!;
+  const isDefault = pointerX === null;
+
   return (
     <svg
+      ref={svgRef}
+      {...handlers}
       viewBox={`0 0 ${W} ${H}`}
-      className="h-auto w-full max-w-[380px]"
+      className="h-auto w-full touch-none max-w-[380px]"
       role="img"
       aria-label="Realized volatility percentile cone with current implied vol"
     >
@@ -114,6 +154,35 @@ export function VolCone({ cone, ivAtm, ivDte }: Props) {
       {geo.current.map((p, i) => (
         <circle key={i} cx={p.cx} cy={p.cy} r={1.8} fill="var(--text)" />
       ))}
+
+      {/* crosshair — snapped to a real horizon */}
+      {!isDefault && (
+        <line
+          x1={hoveredX}
+          y1={PAD_T}
+          x2={hoveredX}
+          y2={H - PAD_B}
+          stroke="var(--text-faint)"
+          strokeWidth={0.75}
+        />
+      )}
+      <circle
+        cx={hoveredX}
+        cy={geo.current[hoverIndex]!.cy}
+        r={3}
+        fill="var(--text)"
+      />
+      <text
+        x={W - PAD_R}
+        y={PAD_T + 2}
+        textAnchor="end"
+        className="mono"
+        fontSize={7.5}
+        fill="var(--text-dim)"
+      >
+        {hovered.horizon}d · median {(hovered.p50 * 100).toFixed(1)} · current{" "}
+        {(hovered.current * 100).toFixed(1)} · {bandPercentile(hovered)}th pct
+      </text>
 
       {/* today's implied vol — the brass dot the whole chart exists to place */}
       <circle cx={geo.iv.cx} cy={geo.iv.cy} r={3.5} fill="var(--brass)" />

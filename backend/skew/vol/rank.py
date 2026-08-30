@@ -28,6 +28,10 @@ from pydantic import BaseModel
 from skew.data.store import MIN_OBSERVATIONS_FOR_RANK
 from skew.vol.realized import rolling_close_to_close
 
+# A percentile needs a distribution. Twenty distinct trading days is the floor
+# below which "IV rank" is an artefact of a short window, not a measurement.
+MIN_DAYS_FOR_RANK = 20
+
 
 class RankedValue(BaseModel):
     """A percentile that carries its own provenance.
@@ -124,19 +128,37 @@ def iv_rank_from_history(
     current_iv: float,
     history: list[float],
     window_days: int,
+    distinct_days: int | None = None,
 ) -> RankedValue:
     """IV rank over the window we have actually accumulated.
 
     ``window_days`` is not decoration — it is the disclosure. Callers must
-    render it next to the number. A rank over five days of self-collected
-    observations is a real measurement of a short window, and saying so is what
-    separates this from the projects that pretend the data was there.
+    render it next to the number.
+
+    Two gates, both required. Observations: a distribution needs members.
+    Distinct DAYS: the poller writes many rows a day, so an observation count
+    alone lets "IV rank 100 over 0 days" through — 52 rows from one afternoon
+    are one data point wearing 52 hats. Below ``MIN_DAYS_FOR_RANK`` distinct
+    days, no rank is printed at all.
     """
     clean = [v for v in history if v is not None and np.isfinite(v) and v > 0]
+    days = distinct_days if distinct_days is not None else window_days
+    if days < MIN_DAYS_FOR_RANK:
+        return RankedValue(
+            value=current_iv,
+            window_days=days,
+            observations=len(clean),
+            computable=False,
+            label=(
+                f"IV rank unavailable — building history, {days} day(s) collected of "
+                f"the {MIN_DAYS_FOR_RANK} needed. Alpaca serves no historical IV, so "
+                f"this history is built forward from first run."
+            ),
+        )
     if len(clean) < MIN_OBSERVATIONS_FOR_RANK:
         return RankedValue(
             value=current_iv,
-            window_days=window_days,
+            window_days=days,
             observations=len(clean),
             computable=False,
             label=(

@@ -52,8 +52,7 @@ def budget_gate(candidate: Candidate, ctx: GateContext) -> GateResult:
             reason=(
                 f"Per-trade cap — max loss ${max_loss:,.0f} exceeds the tier {risk.tier} "
                 f"limit of ${risk.budget_dollars:,.0f} per position "
-                f"({risk.max_loss_pct:.1%} of ${risk.equity:,.0f} equity). "
-                f"{risk.next_promotion}"
+                f"({risk.max_loss_pct:.1%} of ${risk.equity:,.0f} equity)."
             ),
             detail={
                 "failed_check": "per_trade",

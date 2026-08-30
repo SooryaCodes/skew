@@ -119,6 +119,36 @@ def history_window_days(symbol: str) -> int:
     return max(0, (_aware(last) - _aware(first)).days)
 
 
+def distinct_history_days(symbol: str) -> int:
+    """Distinct calendar DAYS with at least one IV observation.
+
+    The rank gate counts days, not rows: the poller writes many observations a
+    day, so 52 rows can all live inside one afternoon — a rank over that window
+    is undefined no matter how many rows exist.
+    """
+    with session_scope() as session:
+        count = session.execute(
+            select(func.count(func.distinct(func.date(IVSnapshotRow.ts)))).where(
+                IVSnapshotRow.symbol == symbol.upper()
+            )
+        ).scalar_one()
+    return int(count or 0)
+
+
+def history_span(symbol: str):
+    """First and last observation timestamps, for honest window labels."""
+    with session_scope() as session:
+        row = session.execute(
+            select(func.min(IVSnapshotRow.ts), func.max(IVSnapshotRow.ts)).where(
+                IVSnapshotRow.symbol == symbol.upper()
+            )
+        ).one()
+    first, last = row
+    if first is None or last is None:
+        return None, None
+    return _aware(first), _aware(last)
+
+
 def observation_count(symbol: str) -> int:
     with session_scope() as session:
         return int(

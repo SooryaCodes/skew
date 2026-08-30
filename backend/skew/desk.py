@@ -28,7 +28,7 @@ from skew.data.bars import BarClient
 from skew.data.broker import Broker
 from skew.data.calendar import EarningsCalendar, MarketCalendar
 from skew.data.chains import ChainClient, OptionChain
-from skew.data.store import history_window_days, iv_series
+from skew.data.store import distinct_history_days, history_window_days, iv_series
 from skew.gates.base import GateContext, run_gates
 from skew.models import Candidate, RiskAuthority, VolState
 from skew.risk import authority
@@ -135,6 +135,7 @@ class Desk:
             series,
             iv_history=iv_series(symbol),
             iv_history_window_days=history_window_days(symbol),
+            iv_history_days=distinct_history_days(symbol),
             settings=cfg,
         )
 
@@ -175,6 +176,7 @@ class Desk:
                 series,
                 iv_history=iv_series(symbol),
                 iv_history_window_days=history_window_days(symbol),
+                iv_history_days=distinct_history_days(symbol),
                 settings=cfg,
             )
         except Exception as exc:  # noqa: BLE001 — abstain loudly, never guess

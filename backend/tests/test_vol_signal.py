@@ -180,15 +180,23 @@ def test_iv_rank_refuses_until_enough_observations_are_collected():
     assert "Alpaca serves no historical IV" in ranked.label
 
 
-def test_iv_rank_carries_its_window_length_as_disclosure():
-    """The window travels with the number so a 5-day rank can never be shown as
-    a 52-week one."""
+def test_iv_rank_needs_twenty_distinct_days_before_it_prints():
+    """A percentile over a short window is an artefact, not a measurement.
+
+    40 observations crammed into 5 distinct days must NOT produce a rank —
+    that is "IV rank 100 over 0 day(s)" wearing a different hat. The same
+    series over 25 days ranks normally, window disclosed.
+    """
     history = list(np.linspace(0.15, 0.25, 40))
-    ranked = iv_rank_from_history(0.25, history, window_days=5)
+    building = iv_rank_from_history(0.25, history, window_days=5, distinct_days=5)
+    assert not building.computable
+    assert "building history, 5 day(s) collected" in building.label
+
+    ranked = iv_rank_from_history(0.25, history, window_days=25, distinct_days=25)
     assert ranked.computable
     assert ranked.percentile == pytest.approx(100.0)
-    assert ranked.window_days == 5
-    assert "5 day(s)" in ranked.label
+    assert ranked.window_days == 25
+    assert "25 day(s)" in ranked.label
     assert "not a 52-week rank" in ranked.label
 
 

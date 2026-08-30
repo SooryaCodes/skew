@@ -120,6 +120,8 @@ def skew_slice(
     target_dte: int = 30,
     width_pct: float = 0.15,
     as_of: date | None = None,
+    min_open_interest: int = 10,
+    max_spread_pct: float = 0.30,
 ) -> list[SkewPoint]:
     """IV plotted across strike — the curve in the header.
 
@@ -139,10 +141,30 @@ def skew_slice(
         return []
 
     lo, hi = chain.spot * (1 - width_pct), chain.spot * (1 + width_pct)
+
+    # Hygiene before plotting. A jagged skew is not a market feature — it is
+    # stale one-sided quotes on illiquid strikes leaking into the picture. Only
+    # two-sided, open-interest-backed quotes with a sane spread make the curve;
+    # is_tradeable already requires a non-zero bid and an IV.
+    def clean(c) -> bool:
+        return (
+            c.is_tradeable
+            and c.open_interest >= min_open_interest
+            and c.spread_pct <= max_spread_pct
+        )
+
+    candidates = [c for c in chain.by_expiry(chosen) if clean(c) and lo <= c.strike <= hi]
+
+    # Drop strikes beyond ~3 sigma of the expiry's own implied move: quotes out
+    # there are placeholder marks, and they oscillate.
+    atm = min(candidates, key=lambda c: abs(c.strike - chain.spot), default=None)
+    if atm is not None and atm.iv > 0:
+        dte = max((chosen - ref).days, 1)
+        band = 3.0 * chain.spot * atm.iv * (dte / 365.0) ** 0.5
+        candidates = [c for c in candidates if abs(c.strike - chain.spot) <= band]
+
     points: list[SkewPoint] = []
-    for c in chain.by_expiry(chosen):
-        if not c.is_tradeable or not (lo <= c.strike <= hi):
-            continue
+    for c in candidates:
         otm = (c.right == "PUT" and c.strike <= chain.spot) or (
             c.right == "CALL" and c.strike > chain.spot
         )

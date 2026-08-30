@@ -212,6 +212,7 @@ def build_vol_state(
     bars: BarSeries,
     iv_history: list[float] | None = None,
     iv_history_window_days: int = 0,
+    iv_history_days: int | None = None,
     target_dte: int = 30,
     as_of: date | None = None,
     settings: Settings | None = None,
@@ -243,7 +244,9 @@ def build_vol_state(
     rv_pct = rv_percentile(bars.closes, window=20, lookback=252)
     call = classify_regime(vrp, term, rv_pct, settings=cfg)
 
-    iv_rank = iv_rank_from_history(atm.iv, iv_history or [], iv_history_window_days)
+    iv_rank = iv_rank_from_history(
+        atm.iv, iv_history or [], iv_history_window_days, distinct_days=iv_history_days
+    )
 
     return VolState(
         symbol=chain.symbol,
@@ -256,7 +259,11 @@ def build_vol_state(
         term_slope=term.slope if term else 0.0,
         regime=call.regime,
         as_of=chain.as_of,
-        iv_rank_window_days=iv_history_window_days,
+        # Distinct observation DAYS when known — the honest number for "over N
+        # day(s) of self-collected history".
+        iv_rank_window_days=(
+            iv_history_days if iv_history_days is not None else iv_history_window_days
+        ),
         iv_rank=iv_rank.percentile if iv_rank.computable else None,
         skew_curve=skew_slice(chain, target_dte=target_dte, as_of=ref),
         skew_slices=build_skew_slices(chain, atm.expiry, ref),

@@ -203,6 +203,28 @@ export interface Position {
   exit_reason: string | null;
 }
 
+export interface ClosedPosition {
+  id: string;
+  symbol: string;
+  kind: StructureKind | null;
+  legs: string[];
+  qty: number;
+  opened_at: string | null;
+  closed_at: string | null;
+  entry_credit: number;
+  max_loss: number;
+  realized_pnl: number | null;
+  exit_reason: string | null;
+  days_held: number | null;
+}
+
+export interface ExitRules {
+  profit_target_pct: number;
+  loss_limit_multiple: number;
+  exit_dte_threshold: number;
+  deadline_utc: string | null;
+}
+
 export interface SystemStatus {
   ok: boolean;
   paper_only: true;
@@ -219,6 +241,16 @@ export interface SystemStatus {
   selector_error: string | null;
   /** The server's verdict: configured to trade AND the selector passed preflight. */
   armed: boolean;
+  /** Whether the desk has EVER published a volatility state. Separates
+   *  "not armed" from "armed, first cycle pending" on an empty deployment. */
+  has_published_state?: boolean;
+  selector_configured?: boolean;
+  universe_size?: number;
+  last_cycle_at?: string | null;
+  account_id_suffix?: string | null;
+  account_error?: string | null;
+  instance_conflict?: string | null;
+  exit_rules?: ExitRules;
   /** The most recent trading session — what the closed-market header names. */
   last_session: string;
   version: string;
@@ -276,6 +308,10 @@ export interface VrpHistoryRow {
 }
 
 export interface VrpHistory {
+  /** Real observation span, for honest window labels. */
+  first_ts?: string | null;
+  last_ts?: string | null;
+  distinct_days?: number;
   symbol: string;
   /** Exactly how much IV history exists. Never implies more than it holds. */
   window_days: number;
