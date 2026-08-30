@@ -75,6 +75,8 @@ function hasContent(field: string, value: unknown): boolean {
       return (value as { available?: boolean }).available === true;
     case "surface":
       return ((value as { slices?: unknown[] }).slices?.length ?? 0) > 0;
+    case "risk":
+      return (value as { equity?: number }).equity !== undefined;
     default:
       return true; // status is always meaningful live
   }
@@ -87,7 +89,7 @@ function compose(
 ): { data: Record<string, unknown>; fieldStates: Record<string, string> } {
   const data: Record<string, unknown> = {};
   const fieldStates: Record<string, string> = {};
-  for (const field of ["status", "universe", "counts", "latest", "exhibit", "surface"]) {
+  for (const field of ["status", "universe", "counts", "latest", "exhibit", "surface", "risk"]) {
     if (hasContent(field, live[field])) {
       data[field] = live[field];
       fieldStates[field] = "live";
@@ -101,15 +103,16 @@ function compose(
 
 export async function GET() {
   try {
-    const [status, universe, counts, latest, exhibit, surface] = await Promise.all([
+    const [status, universe, counts, latest, exhibit, surface, risk] = await Promise.all([
       fetchJson("/api/status"),
       fetchJson("/api/universe"),
       fetchJson("/api/audit/counts"),
       fetchJson("/api/audit?limit=6"),
       fetchJson("/api/refusal-exhibit"),
       fetchJson("/api/surface/SPY"),
+      fetchJson("/api/risk").catch(() => null),
     ]);
-    const live = { status, universe, counts, latest, exhibit, surface };
+    const live = { status, universe, counts, latest, exhibit, surface, risk };
     const cached: CachedSnapshot = { as_of: new Date().toISOString(), data: live };
     memoryCache = cached;
     // Best-effort disk persistence — a restart of this process should not
@@ -146,7 +149,7 @@ export async function GET() {
       as_of: RECORDED.recorded_at,
       recorded_at: RECORDED.recorded_at,
       field_states: Object.fromEntries(
-        ["status", "universe", "counts", "latest", "exhibit", "surface"].map((f) => [
+        ["status", "universe", "counts", "latest", "exhibit", "surface", "risk"].map((f) => [
           f,
           "recorded",
         ]),

@@ -14,13 +14,25 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 
 import { CountUp } from "@/components/CountUp";
-import { GateChain } from "@/components/GateChain";
 import { Sparkline } from "@/components/Sparkline";
-import { StressGrid } from "@/components/StressGrid";
 import { TermStructure } from "@/components/TermStructure";
 import { VolCone } from "@/components/VolCone";
-import { clockTime, regimeColor, timeAgo, volPoints } from "@/lib/format";
-import type { Decision, RefusalExhibit, SystemStatus, VolState } from "@/lib/types";
+import { clockTime, dollars, regimeColor, timeAgo, volPoints } from "@/lib/format";
+import type { Decision, RiskAuthority, VolState } from "@/lib/types";
+
+/** The desk's MCP surface — the real tool names from skew/mcp_server.py.
+ *  Static by nature: the tool list is code, not market data. */
+const MCP_TOOLS: Array<{ name: string; blurb: string }> = [
+  { name: "scan_volatility", blurb: "vol state for the universe" },
+  { name: "propose_structures", blurb: "defined-risk candidates" },
+  { name: "stress_test", blurb: "the 84-scenario grid" },
+  { name: "risk_status", blurb: "tier, budgets, headroom" },
+  { name: "positions", blurb: "open book, marked" },
+  { name: "audit_log", blurb: "every decision, with reasons" },
+  { name: "desk_status", blurb: "armed, market, account" },
+  { name: "execute", blurb: "gated, confirm-required" },
+  { name: "close", blurb: "gated, confirm-required" },
+];
 
 function stateLabel(regime: string): string {
   return regime === "SELL_VOL" ? "vol rich" : regime === "BUY_VOL" ? "vol cheap" : "abstaining";
@@ -38,24 +50,13 @@ interface Props {
   states: VolState[];
   counts?: Record<string, number>;
   latest?: Decision;
-  exhibit?: RefusalExhibit;
-  status?: SystemStatus;
+  risk?: RiskAuthority;
   closed: boolean;
   /** "reading live from the desk" / "as of 14:43 · last known" / "recorded 30 Aug". */
   provenance?: string | null;
-  isLive?: boolean;
 }
 
-export function Bento({
-  states,
-  counts,
-  latest,
-  exhibit,
-  status,
-  closed,
-  provenance,
-  isLive = false,
-}: Props) {
+export function Bento({ states, counts, latest, risk, closed, provenance }: Props) {
   const gridRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -234,54 +235,65 @@ export function Bento({
         )}
       </div>
 
-      {/* STRESS GRID — a real refusal, compact */}
+      {/* RISK AUTHORITY — the earned-permission model, live or recorded */}
       <div className="bento-cell panel col-span-2 p-5 md:col-span-6">
-        <CellCaption>the stress engine · a real refusal</CellCaption>
-        {exhibit?.available && exhibit.cells ? (
-          <StressGrid cells={exhibit.cells} maxLoss={exhibit.max_loss ?? 1} refused />
+        <CellCaption>risk authority</CellCaption>
+        {risk ? (
+          <div className="flex flex-wrap items-end justify-between gap-6">
+            <div>
+              <p className="font-display text-[2.6rem] leading-none">Tier {risk.tier}</p>
+              <p className="mono mt-2 text-[10px] uppercase tracking-wider text-[color:var(--text-dim)]">
+                {(risk.max_loss_pct * 100).toFixed(1)}% per trade · earned, never configured
+              </p>
+            </div>
+            <ul className="mono space-y-1.5 text-[11px]">
+              <li>
+                <span className="text-[color:var(--text-dim)]">per trade&nbsp;&nbsp;</span>
+                {dollars(risk.budget_dollars)}
+              </li>
+              <li>
+                <span className="text-[color:var(--text-dim)]">portfolio&nbsp;&nbsp;</span>
+                {dollars(risk.used_dollars)} / {dollars(risk.portfolio_cap_dollars)}
+              </li>
+              <li>
+                <span className="text-[color:var(--text-dim)]">positions&nbsp;&nbsp;</span>
+                {risk.open_positions} / {risk.max_concurrent_positions}
+              </li>
+              <li>
+                <span className="text-[color:var(--text-dim)]">breaches&nbsp;&nbsp;&nbsp;</span>
+                {risk.breaches}
+              </li>
+            </ul>
+          </div>
         ) : (
-          <p className="text-sm text-[color:var(--text-dim)]">
-            No breach recorded yet — this cell fills with the first real one,
-            never a mock.
-          </p>
+          <p className="text-xs text-[color:var(--text-dim)]">loading…</p>
         )}
-      </div>
-
-      {/* GATE CHAIN */}
-      <div className="bento-cell panel col-span-2 p-5 md:col-span-6">
-        <CellCaption>deterministic gates · bounded selector</CellCaption>
-        <GateChain />
-        <p className="mt-4 max-w-xl text-[13px] leading-relaxed text-[color:var(--text)]">
-          The model can choose among approved structures. It cannot invent one.
+        <p className="mono mt-4 text-[10px] leading-relaxed text-[color:var(--text-dim)]">
+          Budgets grow only with clean closed trades; a drawdown demotes the
+          tier automatically. There is no setting to raise them.
         </p>
       </div>
 
-      {/* status line cell */}
+      {/* MCP SURFACE — the desk as tools for any MCP client */}
       <div className="bento-cell panel col-span-2 p-5 md:col-span-6">
-        <CellCaption>the desk, now</CellCaption>
-        <ul className="mono space-y-1.5 text-[11px] leading-relaxed">
-          <li>
-            <span className="text-[color:var(--text-dim)]">market</span>{" "}
-            {status ? (status.market_open ? "open" : "closed") : "…"}
-            {!isLive && status ? " (when recorded)" : ""}
-          </li>
-          <li>
-            <span className="text-[color:var(--text-dim)]">universe</span>{" "}
-            {status?.universe_size ?? status?.universe?.length ?? 8} names
-          </li>
-          <li>
-            <span className="text-[color:var(--text-dim)]">last cycle</span>{" "}
-            {status?.last_cycle ? timeAgo(status.last_cycle) : "…"}
-          </li>
-          <li>
-            <span className="text-[color:var(--text-dim)]">account</span>{" "}
-            {status?.account_id_suffix ? `…${status.account_id_suffix} (paper)` : "paper"}
-          </li>
+        <CellCaption>mcp surface · the desk as tools</CellCaption>
+        <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+          {MCP_TOOLS.map((tool) => (
+            <li key={tool.name} className="mono flex items-baseline gap-2 text-[11px]">
+              <span className="text-[color:var(--text)]">{tool.name}</span>
+              <span className="truncate text-[9px] text-[color:var(--text-dim)]">
+                {tool.blurb}
+              </span>
+            </li>
+          ))}
         </ul>
-        {provenance && (
-          <p className="mono mt-3 text-[9px] text-[color:var(--text-dim)]">{provenance}</p>
-        )}
+        <p className="mono mt-4 text-[10px] leading-relaxed text-[color:var(--text-dim)]">
+          Every read is open; the two mutating tools run the same gate chain and
+          require explicit confirmation. Claude connects to this desk the same
+          way you do.
+        </p>
       </div>
+
     </div>
   );
 }

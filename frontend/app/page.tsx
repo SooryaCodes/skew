@@ -1,198 +1,92 @@
 "use client";
 
 /**
- * The landing page — the pitch as a printed object.
+ * The landing page — a product page, not an essay.
  *
- * Hero: the volatility surface itself, drawn from the live chain, which
- * flattens into the margin as the argument scrolls over it. Film grain and a
- * faint grid stand in for depth; there are no gradients anywhere.
+ * Spine: nav → hero with the REAL product shot → built-on → the argument →
+ * how it works → feature bento → the refusal (pinned) → architecture →
+ * by the numbers → FAQ → final CTA → footer.
  *
- * Two honesty rules govern everything below. The live-proof section reads
- * REAL numbers from the running desk or says plainly that it cannot; the
- * refusal section shows a REAL refused grid from the audit history or says
- * none exists yet. Nothing on this page fabricates a number, ever.
+ * Data comes from the three-state snapshot spine: live, last-known, or a real
+ * recorded example from the audit history — labelled, never invented, never
+ * empty. Live data enhances a section; it never constitutes one.
  */
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 import { Bento } from "@/components/landing/Bento";
+import { BuiltOn } from "@/components/landing/BuiltOn";
+import { FAQ } from "@/components/landing/FAQ";
+import { Hero } from "@/components/landing/Hero";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { Nav } from "@/components/landing/Nav";
+import { Numbers } from "@/components/landing/Numbers";
 import { PinnedRefusal } from "@/components/landing/PinnedRefusal";
 import { SmoothScroll } from "@/components/landing/SmoothScroll";
+import { GateChain } from "@/components/GateChain";
 import { Reveal } from "@/components/Reveal";
 import { Texture } from "@/components/Texture";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { VolatilitySurface } from "@/components/VolatilitySurface";
-import { timeAgo } from "@/lib/format";
 import { fieldProvenance, useSnapshot } from "@/lib/snapshot";
-import { prefersReducedMotion } from "@/lib/useInView";
 
 const GITHUB = "https://github.com/USER/skew";
 
 /** Vertical rhythm on the 96 / 144 / 192 scale — nothing in between. */
 const RHYTHM = { minor: "96px", major: "144px", grand: "192px" };
 
+function SectionCaption({ children }: { children: React.ReactNode }) {
+  return (
+    <Reveal>
+      <p className="mono mb-10 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
+        {children}
+      </p>
+    </Reveal>
+  );
+}
+
 export default function Landing() {
-  // One spine, three states: live, last-known (server-cached), or a real
-  // recorded snapshot from the audit history. The page is never empty and
-  // never pretends history is the present — provenance renders alongside.
   const { data: snapshot } = useSnapshot();
   const status = snapshot?.data.status;
-  const universe = snapshot?.data.universe;
+  const states = snapshot?.data.universe ?? [];
   const exhibit = snapshot?.data.exhibit;
   const counts = snapshot?.data.counts;
   const latest = snapshot?.data.latest?.[0];
   const surface = snapshot?.data.surface;
-  const provenance = snapshot ? fieldProvenance(snapshot, "universe") : null;
+  const risk = snapshot?.data.risk;
   const isLive = snapshot?.state === "live" && snapshot.field_states?.status === "live";
-
-  // Hero scroll progress: 0 at the top, 1 once a viewport has scrolled by.
-  const [progress, setProgress] = useState(0);
-  useEffect(() => {
-    if (prefersReducedMotion()) return;
-    let raf = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        setProgress(Math.min(1, Math.max(0, window.scrollY / (window.innerHeight * 0.85))));
-      });
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      cancelAnimationFrame(raf);
-    };
-  }, []);
-
-  const states = universe ?? [];
   const closed = status ? !status.market_open : false;
 
-  const refused = counts?.REFUSED ?? 0;
-  const executed = counts?.EXECUTED ?? 0;
   const traced =
     counts?.TOTAL ??
     Object.entries(counts ?? {})
       .filter(([k]) => k !== "TOTAL")
       .reduce((a, [, v]) => a + (typeof v === "number" ? v : 0), 0);
+  const refused = counts?.REFUSED ?? 0;
+  const executed = counts?.EXECUTED ?? 0;
 
   return (
     <div className="relative min-h-screen">
       <SmoothScroll />
       <Texture />
+      <Nav />
 
-      {/* minimal chrome — the page is the pitch, not an app shell */}
-      <div className="relative z-20 mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
-        <span className="font-display text-[length:var(--fs-md)]">SKEW</span>
-        <ThemeToggle />
-      </div>
+      {/* 2 — HERO + product shot */}
+      <Hero
+        status={status}
+        surface={surface}
+        isLive={isLive}
+        recordedAt={snapshot?.recorded_at}
+      />
 
-      {/* 1 — HERO: type upper-left on a scrim, the surface sweeping beneath */}
-      <section aria-label="Hero" className="relative z-10" style={{ height: "175vh" }}>
-        <div className="sticky top-0 h-screen overflow-hidden">
-          <VolatilitySurface surface={surface} progress={progress} />
-          {/* The scrim — the ONE sanctioned gradient: --ground pooling behind
-              the type so the headline sits on darkness while the curves stay
-              visible at the edges. */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(ellipse 62% 55% at 30% 34%, color-mix(in srgb, var(--ground) 90%, transparent) 0%, color-mix(in srgb, var(--ground) 62%, transparent) 48%, transparent 74%)",
-            }}
-          />
-          <div
-            className="relative mx-auto flex h-full w-full max-w-5xl flex-col justify-start px-6 pt-[16vh]"
-            style={{
-              // The type yields to the argument as the surface recedes.
-              opacity: Math.max(0, 1 - progress * 1.6),
-              transform: `translateY(${(-progress * 40).toFixed(1)}px)`,
-            }}
-          >
-            <h1 className="font-display max-w-3xl text-[length:var(--fs-xl)] leading-[1.05] sm:text-[4.5rem]">
-              It doesn&rsquo;t predict the market.
-              <br />
-              It prices it.
-            </h1>
-            <p className="mono mt-6 text-[11px] uppercase tracking-[0.2em] text-[color:var(--text-dim)]">
-              autonomous volatility desk · alpaca paper
-            </p>
-            <p className="mono mt-2 text-[9px] uppercase tracking-wider text-[color:var(--text-dim)]">
-              beneath this text: SPY implied volatility, every expiry 7–365d, live
-            </p>
-            <div className="mt-10">
-              {/* The only CTA on the page: solid panel, brass border, fill on
-                  hover — it must never be lost in the curves again. */}
-              <Link
-                href="/desk"
-                className="t-fast mono inline-block border border-[color:var(--brass)] bg-[color:var(--panel)] px-6 py-3 text-[12px] uppercase tracking-widest text-[color:var(--text)] hover:bg-[color:var(--brass)] hover:text-[color:var(--ground)]"
-                style={{ borderRadius: "var(--radius)" }}
-              >
-                Enter the desk
-              </Link>
-            </div>
-            {/* status chip — armed reads live; anything else reads calm, never broken */}
-            {status && (
-              <p className="mono mt-5 text-[10px] text-[color:var(--text-dim)]">
-                <span
-                  className="mr-1.5 inline-block h-[7px] w-[7px] align-middle"
-                  style={{
-                    background:
-                      isLive && status.broker_connected ? "var(--verdigris)" : "var(--line)",
-                    borderRadius: "1px",
-                  }}
-                  aria-hidden
-                />
-                {isLive && status.broker_connected
-                  ? `armed · ${status.universe_size ?? status.universe.length} names${
-                      status.last_cycle ? ` · last cycle ${timeAgo(status.last_cycle)}` : ""
-                    }`
-                  : "paper account · desk idle"}
-              </p>
-            )}
-          </div>
-          {/* scroll cue, fading on first scroll */}
-          <p
-            aria-hidden
-            className="mono absolute bottom-6 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.25em] text-[color:var(--text-dim)]"
-            style={{ opacity: Math.max(0, 1 - progress * 4) }}
-          >
-            scroll ↓
-          </p>
-        </div>
-      </section>
+      {/* 3 — BUILT ON */}
+      <BuiltOn />
 
-      {/* 2 — THE BENTO: real instruments, live from the API */}
-      <section
-        aria-label="The desk, live"
-        className="relative z-10 mx-auto w-full max-w-6xl px-6"
-        style={{ paddingBlock: RHYTHM.major }}
-      >
-        <Reveal>
-          <p className="mono mb-8 text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
-            the desk, live — every cell reads the real API
-          </p>
-        </Reveal>
-        <Bento
-          states={states}
-          counts={counts}
-          latest={latest}
-          exhibit={exhibit}
-          status={status}
-          closed={closed}
-          provenance={provenance}
-          isLive={isLive}
-        />
-      </section>
-
-      {/* 3 — THE ARGUMENT */}
+      {/* 4 — THE PROBLEM / THE APPROACH */}
       <section
         aria-label="The argument"
         className="relative z-10 mx-auto w-full max-w-5xl px-6"
         style={{ paddingBlock: RHYTHM.minor }}
       >
-        <div className="grid gap-12 md:grid-cols-2">
+        <div className="grid gap-10 md:grid-cols-2">
           <div className="text-[15px] leading-relaxed text-[color:var(--text-dim)]">
             <Reveal>
               <p className="mono mb-4 text-[10px] uppercase tracking-widest">
@@ -227,16 +121,110 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* 4 — THE REFUSAL — the one pinned, scrubbed section */}
-      <PinnedRefusal exhibit={exhibit} />
+      {/* 5 — HOW IT WORKS */}
+      <section
+        id="how-it-works"
+        aria-label="How it works"
+        className="relative z-10 mx-auto w-full max-w-6xl scroll-mt-20 px-6"
+        style={{ paddingBlock: RHYTHM.major }}
+      >
+        <SectionCaption>how it works — three steps, no forecast</SectionCaption>
+        <HowItWorks states={states} exhibit={exhibit} />
+      </section>
 
-      {/* 5 — ARCHITECTURE lives in the bento's gate-chain cell; running the
-          same animated token loop twice on one page would cheapen both. */}
+      {/* 6 — FEATURE BENTO */}
+      <section
+        aria-label="The desk, live"
+        className="relative z-10 mx-auto w-full max-w-6xl px-6"
+        style={{ paddingBlock: RHYTHM.major, paddingTop: 0 }}
+      >
+        <SectionCaption>the instruments — every cell is the real desk</SectionCaption>
+        <Bento
+          states={states}
+          counts={counts}
+          latest={latest}
+          risk={risk}
+          closed={closed}
+          provenance={snapshot ? fieldProvenance(snapshot, "universe") : null}
+        />
+      </section>
 
-      {/* 6 — FOOTER */}
+      {/* 7 — THE REFUSAL, the one pinned section */}
+      <PinnedRefusal
+        exhibit={exhibit}
+        provenance={snapshot ? fieldProvenance(snapshot, "exhibit") : null}
+      />
+
+      {/* 8 — ARCHITECTURE */}
+      <section
+        id="architecture"
+        aria-label="Architecture"
+        className="relative z-10 mx-auto w-full max-w-5xl scroll-mt-20 px-6"
+        style={{ paddingBlock: RHYTHM.major }}
+      >
+        <SectionCaption>deterministic gates · bounded selector</SectionCaption>
+        <Reveal delay={40}>
+          <GateChain />
+        </Reveal>
+        <Reveal delay={80}>
+          <p className="mt-8 max-w-xl text-[14px] leading-relaxed text-[color:var(--text)]">
+            The model can choose among approved structures. It cannot invent one.
+          </p>
+        </Reveal>
+      </section>
+
+      {/* 9 — BY THE NUMBERS */}
+      <section
+        aria-label="By the numbers"
+        className="relative z-10 mx-auto w-full max-w-5xl px-6"
+        style={{ paddingBlock: RHYTHM.major }}
+      >
+        <SectionCaption>by the numbers</SectionCaption>
+        <Numbers
+          traced={traced}
+          tracedProvenance={snapshot ? fieldProvenance(snapshot, "counts") : null}
+        />
+      </section>
+
+      {/* 10 — FAQ */}
+      <section
+        id="faq"
+        aria-label="FAQ"
+        className="relative z-10 mx-auto w-full max-w-5xl scroll-mt-20 px-6"
+        style={{ paddingBlock: RHYTHM.minor }}
+      >
+        <SectionCaption>questions a judge should ask</SectionCaption>
+        <FAQ />
+      </section>
+
+      {/* 11 — FINAL CTA */}
+      <section
+        aria-label="Final call to action"
+        className="relative z-10 mx-auto w-full max-w-5xl px-6 text-center"
+        style={{ paddingBlock: RHYTHM.grand }}
+      >
+        <Reveal>
+          <h2 className="font-display text-[2.4rem] leading-tight sm:text-[3.4rem]">
+            See what it decided today.
+          </h2>
+        </Reveal>
+        <Reveal delay={60}>
+          <div className="mt-8">
+            <Link
+              href="/desk"
+              className="t-fast mono inline-block border border-[color:var(--brass)] bg-[color:var(--brass)] px-7 py-3 text-[12px] uppercase tracking-widest text-[color:var(--ground)] hover:bg-transparent hover:text-[color:var(--text)]"
+              style={{ borderRadius: "var(--radius)" }}
+            >
+              Enter the desk
+            </Link>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* 12 — FOOTER */}
       <footer className="relative z-10 border-t border-[color:var(--line)]">
         <div
-          className="mx-auto flex w-full max-w-5xl flex-wrap items-baseline justify-between gap-4 px-6"
+          className="mx-auto flex w-full max-w-6xl flex-wrap items-baseline justify-between gap-4 px-6"
           style={{ paddingBlock: "48px" }}
         >
           <div>

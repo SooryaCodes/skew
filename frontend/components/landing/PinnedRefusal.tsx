@@ -21,9 +21,10 @@ import type { RefusalExhibit } from "@/lib/types";
 
 interface Props {
   exhibit?: RefusalExhibit;
+  provenance?: string | null;
 }
 
-export function PinnedRefusal({ exhibit }: Props) {
+export function PinnedRefusal({ exhibit, provenance }: Props) {
   const sectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -75,7 +76,8 @@ export function PinnedRefusal({ exhibit }: Props) {
       ref={sectionRef}
       aria-label="The refusal"
       className="relative z-10 mx-auto flex w-full max-w-5xl flex-col justify-center px-6"
-      style={{ minHeight: exhibit?.available ? "100vh" : undefined, paddingBlock: "96px" }}
+      // Capped: on an unusually tall viewport a bare 100vh becomes a void.
+      style={{ minHeight: exhibit?.available ? "min(100vh, 960px)" : undefined, paddingBlock: "96px" }}
     >
       {exhibit?.available && exhibit.cells ? (
         <div className="grid items-center gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -92,6 +94,7 @@ export function PinnedRefusal({ exhibit }: Props) {
               a real refusal · {exhibit.symbol} ·{" "}
               {exhibit.kind?.replaceAll("_", " ").toLowerCase()} ·{" "}
               {exhibit.ts && timeAgo(exhibit.ts)}
+              {provenance ? ` · ${provenance}` : ""}
             </p>
           </div>
           <div className="panel p-4">

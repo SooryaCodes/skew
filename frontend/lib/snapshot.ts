@@ -12,6 +12,7 @@ import useSWR from "swr";
 import type {
   Decision,
   RefusalExhibit,
+  RiskAuthority,
   Surface,
   SystemStatus,
   VolState,
@@ -33,6 +34,7 @@ export interface Snapshot {
     latest?: Decision[];
     exhibit?: RefusalExhibit;
     surface?: Surface;
+    risk?: RiskAuthority;
   };
 }
 

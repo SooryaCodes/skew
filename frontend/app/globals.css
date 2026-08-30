@@ -400,3 +400,12 @@ body {
     transform: none;
   }
 }
+
+/* FAQ: the + rotates to x when open — pure CSS, works without JS. */
+.faq-item summary span[aria-hidden] {
+  display: inline-block;
+  transition: transform 200ms ease;
+}
+.faq-item[open] summary span[aria-hidden] {
+  transform: rotate(45deg);
+}
