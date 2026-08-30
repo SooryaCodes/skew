@@ -458,3 +458,38 @@ def test_a_live_cycle_downgrades_itself_when_the_market_is_closed(monkeypatch):
     monkeypatch.setattr(loop, "_monitor", lambda *a, **k: [])
     report = loop.run_cycle(dry_run=False, settings=Settings(universe="SPY"), desk=ClosedDesk())
     assert any("market closed" in e for e in report.errors)
+
+
+# ------------------------------------------------------------------ close orders
+
+
+def test_closing_a_credit_spread_reverses_every_leg(credit_spread):
+    """BTO<->STC, BUY<->SELL — a close that repeats a side would double the position."""
+    from skew.exec.exit import build_closing_structure
+
+    closing = build_closing_structure(credit_spread)
+    assert closing.id.endswith(":CLOSE")
+    for opened, closed in zip(credit_spread.legs, closing.legs, strict=True):
+        assert closed.symbol == opened.symbol
+        assert closed.side != opened.side
+        assert closed.position_intent in ("BTC", "STC")
+
+
+def test_closing_a_credit_position_is_a_debit_with_a_positive_limit(credit_spread):
+    """The mleg sign convention on the CLOSE: buying back a credit spread pays.
+
+    Entry collected a credit (negative limit). The close buys the spread back —
+    a debit — so the closing structure must not be a credit and its limit must
+    be positive. Getting this sign wrong inverts the trade (docs/01 §known traps).
+    """
+    from skew.exec.exit import build_closing_structure
+
+    assert credit_spread.is_credit
+    assert credit_spread.limit_price < 0
+    # Fresh marks: the spread now costs less to buy back than it collected.
+    mids = {leg.symbol: max(0.05, leg.mid * 0.5) for leg in credit_spread.legs}
+    closing = build_closing_structure(credit_spread, current_mids=mids)
+    assert not closing.is_credit
+    assert closing.limit_price > 0
+    # And the buy-back costs roughly half the entry credit, from the halved mids.
+    assert closing.limit_price < abs(credit_spread.limit_price)
