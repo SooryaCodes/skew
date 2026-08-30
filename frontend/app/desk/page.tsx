@@ -266,9 +266,14 @@ export default function DeskPage() {
         </main>
 
         {/* govern */}
-        <aside className="flex flex-col border-t border-[color:var(--line)] lg:min-h-0 lg:border-l lg:border-t-0">
-          <RiskPanel risk={risk} />
-          <div className="min-h-0 flex-1 border-t border-[color:var(--line)]">
+        <aside className="flex min-h-0 flex-col border-t border-[color:var(--line)] lg:border-l lg:border-t-0">
+          {/* The risk panel yields on short viewports: capped at 55% of the
+              column with its own scrollbar, so the audit list below always
+              keeps meaningful height. */}
+          <div className="shrink-0 lg:max-h-[55%] lg:overflow-y-auto">
+            <RiskPanel risk={risk} />
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col border-t border-[color:var(--line)]">
             <AuditStream decisions={audit ?? []} counts={counts} />
           </div>
         </aside>

@@ -242,7 +242,7 @@ export function AuditStream({ decisions, counts }: Props) {
   const groups = useMemo(() => groupDecisions(decisions), [decisions]);
 
   return (
-    <section className="flex min-h-0 flex-col p-3" aria-label="Decision stream">
+    <section className="flex h-full min-h-0 flex-1 flex-col p-3" aria-label="Decision stream">
       <div className="mb-2 flex items-baseline justify-between">
         <p className="mono text-[10px] uppercase tracking-widest text-[color:var(--text-dim)]">
           audit
