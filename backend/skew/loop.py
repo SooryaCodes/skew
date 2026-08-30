@@ -83,6 +83,11 @@ _SELECTOR: BoundedSelector | None = None
 # error is a competition-account mismatch, and an armed desk requires it None.
 ACCOUNT: dict[str, str | float | None] = {"suffix": None, "error": None, "equity": None}
 
+# The two-instance guard, set at boot: when the broker holds option positions
+# this instance's book never created, another writer owns the account. Entries
+# stop; monitoring of OUR OWN positions continues.
+CONFLICT: dict[str, object] = {"active": False, "foreign": [], "message": None}
+
 
 def get_selector(settings: Settings | None = None) -> BoundedSelector:
     """Process-wide selector, so its last error survives for /api/status."""
@@ -313,6 +318,23 @@ def _evaluate_and_act(
                     "structure_id": chosen.id,
                     "offered": [c.id for c in survivors],
                 },
+                trace=trace,
+            )
+        )
+        return decisions
+
+    if CONFLICT["active"]:
+        decisions.append(
+            audit.record_abstention(
+                symbol=symbol,
+                reason=(
+                    "Two-instance conflict — the account holds positions this instance "
+                    "did not create. Entries halted; own positions still monitored. "
+                    "Point the two instances at different accounts."
+                ),
+                risk_tier=tier,
+                model_rationale=selection.rationale,
+                detail={"instance_conflict": True, "foreign": CONFLICT["foreign"]},
                 trace=trace,
             )
         )

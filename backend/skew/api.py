@@ -105,6 +105,33 @@ async def lifespan(_app: FastAPI):
             "COMPETITION_ACCOUNT_ID is set but no broker credentials are configured."
         )
 
+    # Two-instance guard: option positions at the broker that our book never
+    # created mean another instance is writing to this account. Refuse to open
+    # anything new; keep monitoring our own book; say so loudly.
+    if desk.broker.available:
+        from skew.exec.guard import foreign_option_symbols, our_leg_symbols
+
+        try:
+            foreign = foreign_option_symbols(desk.broker.get_all_positions(), our_leg_symbols())
+        except Exception:  # status must reflect the failure, not hide it
+            log.exception("two-instance guard could not read broker positions at boot")
+            foreign = []
+        if foreign:
+            loop.CONFLICT.update(
+                active=True,
+                foreign=foreign,
+                message=(
+                    f"{len(foreign)} open option position(s) at the broker were not "
+                    "created by this instance. Another desk is writing to this "
+                    "account — entries are halted until they are separated."
+                ),
+            )
+            log.error(
+                "TWO-INSTANCE CONFLICT — foreign positions %s. Entries halted; "
+                "monitoring continues.",
+                foreign,
+            )
+
     scheduler = None
     if settings.run_scheduler:
         from datetime import timedelta
@@ -259,6 +286,7 @@ def get_status() -> dict[str, Any]:
         # deployed status page, never the full id.
         "account_id_suffix": loop.ACCOUNT["suffix"],
         "account_error": loop.ACCOUNT["error"],
+        "instance_conflict": loop.CONFLICT["message"],
         "armed": (
             settings.auto_execute
             and loop.get_selector().last_error is None
