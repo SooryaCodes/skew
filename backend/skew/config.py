@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # The only broker host SKEW will ever talk to for trading.
@@ -99,8 +99,20 @@ class Settings(BaseSettings):
     vrp_sell_floor: float = 4.0
     # VRP below this (IV cheap relative to realised) flips us to buying premium.
     vrp_buy_ceiling: float = -2.0
-    target_dte_min: int = 21
-    target_dte_max: int = 45
+    # Competition window: 7-14 DTE so a position opened Monday can reach its
+    # profit target and CLOSE before the Thursday finish — position management
+    # is a stated judging requirement. The tradeoff is real and accepted:
+    # shorter DTE means higher gamma near expiry, i.e. P&L moves faster against
+    # a spot move in the final days. Our structures are defined-risk (the long
+    # leg caps the loss regardless of gamma) and the stress grid already prices
+    # the at-expiry scenarios, so the risk is bounded and measured, not wished
+    # away. DTE_MIN / DTE_MAX env vars override.
+    target_dte_min: int = Field(
+        default=7, validation_alias=AliasChoices("dte_min", "target_dte_min")
+    )
+    target_dte_max: int = Field(
+        default=14, validation_alias=AliasChoices("dte_max", "target_dte_max")
+    )
     short_leg_delta_target: float = 0.25
     # Structural liquidity floors.
     min_open_interest: int = 100
@@ -127,10 +139,14 @@ class Settings(BaseSettings):
     # Long premium: the breakeven must sit within this many sigma of spot, or the
     # structure needs a tail event rather than ordinary movement to come good.
     max_breakeven_sigma: float = 1.25
-    # Exit rules.
-    profit_target_pct: float = 0.50
+    # Exit rules. The profit target sits mid 40-50% so short-DTE credit trades
+    # can realistically close inside the competition week.
+    profit_target_pct: float = 0.45
     loss_limit_multiple: float = 2.0
-    exit_dte_threshold: int = 7
+    # At 7-14 DTE entries this must sit BELOW dte_min, or every new position
+    # would qualify for the time-exit on day one. Two days keeps us out of the
+    # worst of expiry gamma without amputating the holding period.
+    exit_dte_threshold: int = 2
     # Hard deadline: flatten everything before the competition ends. ISO-8601, or
     # empty to disable.
     deadline_utc: str = ""

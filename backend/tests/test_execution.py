@@ -362,7 +362,11 @@ def test_dte_threshold_fires_in_the_final_week(credit_spread):
     long_leg = next(leg for leg in credit_spread.legs if leg.side == "BUY")
     mids = {short.symbol: 1.90, long_leg.symbol: 1.15}
 
-    signal = evaluate_exit(credit_spread, mids, as_of=EXPIRY - timedelta(days=5))
+    # Threshold is 2 days for the 7-14 DTE competition window — inside it fires,
+    # just outside it must not (a 7-DTE entry would otherwise close on day one).
+    calm = evaluate_exit(credit_spread, mids, as_of=EXPIRY - timedelta(days=5))
+    assert calm.rule != "dte"
+    signal = evaluate_exit(credit_spread, mids, as_of=EXPIRY - timedelta(days=2))
     assert signal.should_exit
     assert signal.rule == "dte"
     assert "Gamma rises sharply" in signal.reason
