@@ -61,9 +61,13 @@ export default function DeskPage() {
   // Token capture happens once, client-side, and the URL is scrubbed. The
   // operator flag only flips after mount so SSR and hydration agree.
   const [operator, setOperator] = useState(false);
+  // Screenshot mode (?shot=1): hides the app chrome so the landing page's
+  // product shot frames the desk itself, not a second header.
+  const [shotMode, setShotMode] = useState(false);
   useEffect(() => {
     captureOperatorToken();
     setOperator(isOperator());
+    setShotMode(window.location.search.includes("shot=1"));
   }, []);
 
   const states = useMemo(() => universe ?? [], [universe]);
@@ -114,7 +118,7 @@ export default function DeskPage() {
     // and its children overflow the page), three columns each scrolling
     // independently. The page itself never scrolls; the footer never leaves.
     <div className="flex min-h-screen flex-col lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
-      <Header status={status} tab="desk" />
+      {!shotMode && <Header status={status} tab="desk" />}
       <KillBanner />
       {operator && <ControlStrip />}
       <SessionStrip />

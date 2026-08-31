@@ -44,6 +44,10 @@ export function Hero({ status, isLive, recordedAt }: Props) {
 
   return (
     <section aria-label="Hero" className="relative overflow-hidden pt-16">
+      {/* backdrop: one soft accent glow + a fine grid fading out */}
+      <div aria-hidden className="hero-backdrop absolute inset-0" />
+      <div aria-hidden className="hero-grid absolute inset-0" />
+
       <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-14 px-6 pb-28 pt-20 lg:grid-cols-[46fr_54fr] lg:pt-32">
         {/* type block — the type IS the visual */}
         <div>
@@ -61,15 +65,15 @@ export function Hero({ status, isLive, recordedAt }: Props) {
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link
               href="/desk"
-              className="t-fast bg-[color:var(--accent)] px-6 py-3.5 text-[15px] font-semibold text-white hover:opacity-90"
-              style={{ borderRadius: "var(--radius)" }}
+              className="btn-3d t-fast bg-[color:var(--accent)] px-6 py-3.5 text-[15px] font-semibold text-white"
+              style={{ borderRadius: "12px" }}
             >
               Enter the desk
             </Link>
             <a
               href="#architecture"
-              className="t-fast border border-[color:var(--line)] px-6 py-3.5 text-[15px] font-semibold text-[color:var(--text)] hover:bg-[color:var(--panel-alt)]"
-              style={{ borderRadius: "var(--radius)" }}
+              className="btn-3d-ghost t-fast border border-[color:var(--line)] bg-[color:var(--panel)] px-6 py-3.5 text-[15px] font-semibold text-[color:var(--text)]"
+              style={{ borderRadius: "12px" }}
             >
               Read the architecture
             </a>
@@ -109,7 +113,7 @@ export function Hero({ status, isLive, recordedAt }: Props) {
               // it is a product shot, not an embedded app.
               <div ref={frameRef} className="pointer-events-none relative aspect-[1440/860] overflow-hidden">
                 <iframe
-                  src="/desk"
+                  src="/desk?shot=1"
                   title="The live desk"
                   className="absolute left-0 top-0 origin-top-left"
                   style={{ width: 1440, height: 860, transform: "scale(var(--shot-scale, 0.42))" }}
@@ -119,14 +123,24 @@ export function Hero({ status, isLive, recordedAt }: Props) {
                 />
               </div>
             ) : (
-              /* eslint-disable-next-line @next/next/no-img-element -- static shot, exact pixels */
-              <img
-                src="/shots/desk-recorded.png"
-                alt="The SKEW desk: universe rail, volatility instruments, risk authority and the audit stream"
-                className="block w-full"
-                width={1440}
-                height={900}
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element -- static shot, exact pixels */}
+                <img
+                  src="/shots/desk-dark.png"
+                  alt="The SKEW desk: universe rail, volatility instruments, risk authority and the audit stream"
+                  className="shot-dark block w-full"
+                  width={1440}
+                  height={860}
+                />
+                {/* eslint-disable-next-line @next/next/no-img-element -- static shot, exact pixels */}
+                <img
+                  src="/shots/desk-light.png"
+                  alt="The SKEW desk in the light theme"
+                  className="shot-light block w-full"
+                  width={1440}
+                  height={860}
+                />
+              </>
             )}
           </div>
           <figcaption className="mt-3 text-right text-[13px] text-[color:var(--text-dim)]">

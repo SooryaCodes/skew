@@ -212,8 +212,8 @@ export default function Landing() {
           <div className="mt-8">
             <Link
               href="/desk"
-              className="t-fast inline-block bg-[color:var(--accent)] px-7 py-3.5 text-[16px] font-semibold text-white hover:opacity-90"
-              style={{ borderRadius: "var(--radius)" }}
+              className="btn-3d t-fast inline-block bg-[color:var(--accent)] px-7 py-3.5 text-[16px] font-semibold text-white"
+              style={{ borderRadius: "12px" }}
             >
               Enter the desk
             </Link>

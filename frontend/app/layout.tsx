@@ -40,7 +40,7 @@ export const viewport: Viewport = {
 // Runs before paint: localStorage first, prefers-color-scheme as the default.
 // Inline so there is no flash of the wrong theme; try/catch because storage
 // access can throw in private windows.
-const THEME_BOOT = `(function(){document.documentElement.classList.add("js");try{var t=localStorage.getItem("skew-theme");if(t!=="dark"&&t!=="light"){t=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","dark");}})();`;
+const THEME_BOOT = `(function(){document.documentElement.classList.add("js");try{var q=location.search.match(/[?&]theme=(dark|light)/);var t=q?q[1]:localStorage.getItem("skew-theme");if(t!=="dark"&&t!=="light"){t=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","dark");}})();`;
 
 export default function RootLayout({
   children,

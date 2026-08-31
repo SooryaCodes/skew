@@ -12,6 +12,8 @@
 
 import Link from "next/link";
 
+import { LogoMark } from "@/components/Logo";
+
 import { timeAgo } from "@/lib/format";
 import type { SystemStatus } from "@/lib/types";
 
@@ -47,7 +49,7 @@ export function Header({ status, tab }: Props) {
     <header className="border-b border-[color:var(--line)]">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <Link href="/" className="font-display text-[length:var(--fs-md)] leading-none">
-          SKEW
+          <span className="flex items-center gap-2"><LogoMark size={22} /> SKEW</span>
         </Link>
 
         <nav className="flex gap-3" aria-label="Views">

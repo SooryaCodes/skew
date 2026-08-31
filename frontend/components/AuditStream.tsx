@@ -47,10 +47,26 @@ function failingGateLine(decision: Decision): string | null {
 }
 
 const ACTION_STYLE: Record<DecisionAction, { color: string; label: string }> = {
-  EXECUTED: { color: "var(--verdigris)", label: "filled" },
-  REFUSED: { color: "var(--oxide)", label: "refused" },
-  ABSTAINED: { color: "var(--line)", label: "abstained" },
+  EXECUTED: { color: "var(--positive)", label: "Filled" },
+  REFUSED: { color: "var(--negative)", label: "Refused" },
+  ABSTAINED: { color: "var(--text-faint)", label: "Abstained" },
 };
+
+/** Outcome as a small tinted badge — scannable at a glance, readable ink. */
+function Badge({ action }: { action: DecisionAction }) {
+  const style = ACTION_STYLE[action] ?? ACTION_STYLE.ABSTAINED;
+  return (
+    <span
+      className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.06em]"
+      style={{
+        color: action === "ABSTAINED" ? "var(--text-dim)" : style.color,
+        background: `color-mix(in srgb, ${style.color} 12%, transparent)`,
+      }}
+    >
+      {style.label}
+    </span>
+  );
+}
 
 type Group =
   | { kind: "single"; entry: Decision }
@@ -108,18 +124,7 @@ function groupDecisions(decisions: Decision[]): Group[] {
   return groups;
 }
 
-function Marker({ color }: { color: string }) {
-  return (
-    <span
-      className="inline-block h-[7px] w-[7px] shrink-0"
-      style={{ background: color, borderRadius: "1px" }}
-      aria-hidden
-    />
-  );
-}
-
 function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boolean }) {
-  const style = ACTION_STYLE[decision.action] ?? ACTION_STYLE.ABSTAINED;
   const gateLine = failingGateLine(decision);
   const filled = decision.action === "EXECUTED";
   return (
@@ -136,30 +141,27 @@ function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boole
         className="t-fast group block cursor-pointer rounded-lg px-2 py-3 hover:bg-[color:var(--panel-alt)]"
         aria-label={`Open the decision trace for ${decision.symbol ?? "this decision"}`}
       >
-        {/* line 1 — time, outcome, symbol, affordance */}
-        <div className="flex items-center gap-2">
+        {/* line 1 — outcome badge, symbol, time, trace affordance */}
+        <div className="flex items-center gap-2.5">
+          <Badge action={decision.action} />
+          {decision.symbol && (
+            <span className="shrink-0 text-[14px] font-bold tracking-tight text-[color:var(--text)]">
+              {decision.symbol}
+            </span>
+          )}
+          <span
+            className="ml-auto shrink-0 text-[12px] font-semibold text-[color:var(--text-faint)] group-hover:text-[color:var(--accent)] group-focus-visible:text-[color:var(--accent)]"
+            aria-hidden
+          >
+            Trace →
+          </span>
           <time
-            className="mono shrink-0 text-[12px] text-[color:var(--text-dim)]"
+            className="mono shrink-0 text-[12px] text-[color:var(--text-faint)]"
             dateTime={decision.ts}
             title={timeAgo(decision.ts)}
           >
             {clockTime(decision.ts)}
           </time>
-          <Marker color={style.color} />
-          <span className="mono text-[12px] uppercase tracking-wider text-[color:var(--text)]">
-            {style.label}
-          </span>
-          {decision.symbol && (
-            <span className="mono shrink-0 text-[12px] text-[color:var(--text-dim)]">
-              {decision.symbol}
-            </span>
-          )}
-          <span
-            className="mono ml-auto shrink-0 text-[12px] tracking-wider text-[color:var(--text-faint)] group-hover:text-[color:var(--brass)] group-focus-visible:text-[color:var(--brass)]"
-            aria-hidden
-          >
-            TRACE →
-          </span>
         </div>
         {/* line 2 — the failing gate, the scannable key */}
         {gateLine && (
@@ -238,28 +240,65 @@ interface Props {
   counts?: Record<string, number>;
 }
 
+type Filter = "ALL" | DecisionAction;
+
 export function AuditStream({ decisions, counts }: Props) {
-  const groups = useMemo(() => groupDecisions(decisions), [decisions]);
+  const [filter, setFilter] = useState<Filter>("ALL");
+  const filtered = useMemo(
+    () => (filter === "ALL" ? decisions : decisions.filter((d) => d.action === filter)),
+    [decisions, filter],
+  );
+  const groups = useMemo(() => groupDecisions(filtered), [filtered]);
+
+  const chips: Array<{ key: Filter; label: string; count?: number }> = [
+    { key: "ALL", label: "All" },
+    { key: "EXECUTED", label: "Filled", count: counts?.EXECUTED },
+    { key: "REFUSED", label: "Refused", count: counts?.REFUSED },
+    { key: "ABSTAINED", label: "Abstained", count: counts?.ABSTAINED },
+  ];
 
   return (
     <section className="flex h-full min-h-0 flex-1 flex-col p-4" aria-label="Decision stream">
       <h2 className="whitespace-nowrap text-[16px] font-bold tracking-tight text-[color:var(--text)]">
         Audit log
       </h2>
-      {counts && (
-        <p className="mono mt-0.5 text-[12px] text-[color:var(--text-dim)]">
-          {counts.EXECUTED ?? 0} filled · {counts.REFUSED ?? 0} refused ·{" "}
-          {counts.ABSTAINED ?? 0} abstained
-        </p>
-      )}
-      <p className="mb-3 mt-1.5 text-[13px] leading-snug text-[color:var(--text-dim)]">
+      <p className="mt-0.5 text-[13px] leading-snug text-[color:var(--text-dim)]">
         Every decision is traceable — click any entry.
       </p>
+      <div className="mb-3 mt-2.5 flex flex-wrap gap-1.5" role="group" aria-label="Filter decisions">
+        {chips.map((chip) => {
+          const active = filter === chip.key;
+          return (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={() => setFilter(chip.key)}
+              aria-pressed={active}
+              className="t-fast rounded-full border px-2.5 py-1 text-[12px] font-semibold"
+              style={{
+                borderColor: active ? "var(--accent)" : "var(--line)",
+                background: active
+                  ? "color-mix(in srgb, var(--accent) 14%, transparent)"
+                  : "transparent",
+                color: active ? "var(--text)" : "var(--text-dim)",
+              }}
+            >
+              {chip.label}
+              {chip.count !== undefined && (
+                <span className="mono ml-1 text-[11px] text-[color:var(--text-faint)]">
+                  {chip.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
       {groups.length === 0 ? (
-        <p className="text-xs text-[color:var(--text-dim)]">
-          No decisions yet. The desk logs every refusal and abstention here, not
-          only the trades it takes.
+        <p className="text-[13px] text-[color:var(--text-dim)]">
+          {filter === "ALL"
+            ? "No decisions yet. The desk logs every refusal and abstention here, not only the trades it takes."
+            : "Nothing with this outcome in the loaded window."}
         </p>
       ) : (
         // The list must LOOK scrollable: a persistent scrollbar plus a fade at

@@ -50,6 +50,25 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
+function Segment({
+  label,
+  children,
+  title,
+}: {
+  label: string;
+  children: React.ReactNode;
+  title?: string;
+}) {
+  return (
+    <span className="flex items-baseline gap-2.5" title={title}>
+      <span className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+        {label}
+      </span>
+      {children}
+    </span>
+  );
+}
+
 export function SessionStrip() {
   const { data: status } = useStatus();
   const { data: session } = useSession();
@@ -58,57 +77,54 @@ export function SessionStrip() {
   const closed = status ? !status.market_open : false;
   const counts = session.counts;
 
+  // ONE strip, three labelled segments — market state, the last cycle, the
+  // session — with the most recent fill as the right-hand proof. The old
+  // three stacked bars carried the same facts in triple the chrome.
   return (
-    <section aria-label="Session summary">
-      {/* The closed-market header line. Never looks broken or empty. */}
-      {closed && (
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-[color:var(--line)] bg-[color:var(--panel)] px-4 py-1.5">
-          <span className="mono text-[12px] uppercase tracking-wider text-[color:var(--text)]">
-            market closed
-          </span>
-          <span className="mono text-[12px] text-[color:var(--text-dim)]">
-            showing the session of {sessionLabel(session.session_date)}
-            {session.as_of && ` · data as of ${clockTime(session.as_of)}`}
-          </span>
-        </div>
-      )}
-
-      {/* Two windows, two labels, no mixing. */}
-      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-b border-[color:var(--line)] px-4 py-1.5">
-        <span className="mono text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
-          last cycle
+    <section
+      aria-label="Session summary"
+      className="flex flex-wrap items-center gap-x-7 gap-y-1.5 border-b border-[color:var(--line)] bg-[color:var(--panel)] px-5 py-2.5"
+    >
+      <Segment label={closed ? "Closed" : "Open"}>
+        <span className="text-[13px] text-[color:var(--text-dim)]">
+          {closed
+            ? `${sessionLabel(session.session_date)} session${
+                session.as_of ? ` · as of ${clockTime(session.as_of)}` : ""
+              }`
+            : "live session"}
         </span>
+      </Segment>
+
+      <Segment label="Cycle">
         <Stat label="scanned" value={session.cycle.scanned} />
         <Stat label="candidates" value={session.cycle.candidates_built} />
         <Stat label="survived" value={session.cycle.survivors} />
+      </Segment>
 
-        <span
-          className="mono border-l border-[color:var(--line)] pl-5 text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]"
-          title={`decisions since ${new Date(session.counts_since).toLocaleString()}`}
-        >
-          session
-        </span>
+      <Segment
+        label="Session"
+        title={`decisions since ${new Date(session.counts_since).toLocaleString()}`}
+      >
+        <Stat label="filled" value={counts.EXECUTED ?? 0} />
         <Stat label="refused" value={counts.REFUSED ?? 0} />
         <Stat label="abstained" value={counts.ABSTAINED ?? 0} />
-        <Stat label="filled" value={counts.EXECUTED ?? 0} />
+      </Segment>
 
-        {/* The proof: the most recent fill, whenever it happened. */}
-        {session.last_fill && (
-          <span className="flex min-w-0 items-baseline gap-1.5">
-            <span
-              className="inline-block h-[7px] w-[7px] shrink-0 self-center"
-              style={{ background: "var(--verdigris)", borderRadius: "1px" }}
-              aria-hidden
-            />
-            <span className="mono truncate text-[12px] text-[color:var(--text)]">
-              last fill · {session.last_fill.symbol} · {session.last_fill.reason}
-            </span>
-            <span className="mono shrink-0 text-[12px] text-[color:var(--text-dim)]">
-              {timeAgo(session.last_fill.ts)}
-            </span>
+      {session.last_fill && (
+        <span className="ml-auto flex min-w-0 items-baseline gap-2">
+          <span
+            className="inline-block h-[7px] w-[7px] shrink-0 self-center rounded-full"
+            style={{ background: "var(--positive)" }}
+            aria-hidden
+          />
+          <span className="mono truncate text-[12px] text-[color:var(--text)]">
+            {session.last_fill.symbol} · {session.last_fill.reason}
           </span>
-        )}
-      </div>
+          <span className="mono shrink-0 text-[12px] text-[color:var(--text-dim)]">
+            {timeAgo(session.last_fill.ts)}
+          </span>
+        </span>
+      )}
     </section>
   );
 }
