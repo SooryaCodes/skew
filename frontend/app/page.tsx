@@ -28,7 +28,7 @@ import { Reveal } from "@/components/Reveal";
 import { Texture } from "@/components/Texture";
 import { fieldProvenance, useSnapshot } from "@/lib/snapshot";
 
-const GITHUB = "https://github.com/USER/skew";
+const GITHUB = "https://github.com/SooryaCodes/skew";
 
 /** Vertical rhythm on the 96 / 144 / 192 scale — nothing in between. */
 const RHYTHM = { minor: "96px", major: "144px", grand: "192px" };

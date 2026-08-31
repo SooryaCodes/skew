@@ -35,7 +35,7 @@ placeholder page that renders the palette. `npm run build` is clean. CI runs ruf
 ## Phase 01 — Data layer and volatility engine
 
 **Works:** Live against the real paper account — Options Level 3 confirmed
-active, $100k equity, account PA33HVMQGA5O. `python -m skew.cli scan` prints the
+active, $100k equity, account PA••••GA5O. `python -m skew.cli scan` prints the
 whole universe: SPY IV 11.8 / RV 10.4, NVDA IV 32.9 / RV 46.5, AAPL VRP +5.3.
 IV and Greeks come off the Alpaca snapshot as the spec promised. Realized vol is
 tested against a hand-worked series to 1e-9. Fixtures are real captures (3,898
