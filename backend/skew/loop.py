@@ -88,6 +88,9 @@ ACCOUNT: dict[str, str | float | None] = {
     # Full account number, SERVER-SIDE ONLY: stamped onto decision rows and
     # checked against the audit DB's owner. The API exposes the suffix only.
     "number": None,
+    # Read from the Alpaca account object at boot — never hardcoded.
+    "options_level": None,
+    "starting_equity": None,
 }
 
 

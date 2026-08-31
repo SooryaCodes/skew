@@ -252,6 +252,11 @@ export interface SystemStatus {
   instance_conflict?: string | null;
   /** Entries halted by the drawdown circuit breaker; monitoring continues. */
   drawdown_paused?: boolean;
+  /** Provenance, read from the broker at boot; null = unavailable, never a default. */
+  equity?: number | null;
+  starting_equity?: number | null;
+  options_approval_level?: number | string | null;
+  endpoint_is_paper?: boolean;
   exit_rules?: ExitRules;
   /** The most recent trading session — what the closed-market header names. */
   last_session: string;

@@ -35,6 +35,7 @@ function exitConditions(position: Position, status?: SystemStatus): string {
     parts.push(`tp ${Math.round(rules.profit_target_pct * 100)}% of max profit`);
   }
   parts.push(`dte ≤ ${rules.exit_dte_threshold}`);
+  parts.push("short-ITM defence");
   if (rules.deadline_utc) parts.push("deadline flatten");
   return parts.join(" · ");
 }
@@ -72,9 +73,16 @@ export default function PositionsPage() {
         </div>
 
         {/* Present, but not the headline. Performance over a few days is noise. */}
-        <p className="mono mt-1 text-[13px] text-[color:var(--text-dim)]">
-          unrealised {money(totalPnl)} — over a handful of paper-trading days this
-          number is noise, and the desk does not lead with it
+        <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[color:var(--text-dim)]">
+          A few days of paper results are not evidence of edge. This is the
+          record of what the desk actually did.
+        </p>
+        <p className="mono mt-2 text-[13px] text-[color:var(--text-dim)]">
+          session · {rows.length} open · {closedRows.length} closed · unrealised{" "}
+          {money(totalPnl)} · realised {money(realizedTotal)}
+          {status?.equity != null &&
+            status?.starting_equity != null &&
+            ` · equity $${status.equity.toLocaleString("en-US", { minimumFractionDigits: 2 })} against $${status.starting_equity.toLocaleString("en-US", { minimumFractionDigits: 2 })} starting`}
         </p>
 
         {rows.length === 0 ? (

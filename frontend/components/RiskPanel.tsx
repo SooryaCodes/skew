@@ -12,7 +12,41 @@
  */
 
 import { dollars, pct } from "@/lib/format";
+import { useStatus } from "@/lib/api";
 import type { RiskAuthority } from "@/lib/types";
+
+/** The provenance block: denominator and eligibility, never a scoreboard.
+ *  Same scale as every other row; no green, no red, no rounding. */
+function AccountStrip() {
+  const { data: status } = useStatus();
+  if (!status) return null;
+  const suffix = status.account_id_suffix;
+  const equity = status.equity;
+  const starting = status.starting_equity;
+  const level = status.options_approval_level;
+  const money = (v: number) =>
+    `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return (
+    <div className="mb-3 border-b border-[color:var(--line)] pb-3">
+      <Row
+        label="account"
+        value={suffix ? `PA••••${suffix}` : "unavailable"}
+        hint={suffix ? "paper" : undefined}
+      />
+      <Row
+        label="equity"
+        value={equity != null ? money(equity) : "unavailable"}
+        hint={starting != null ? `started ${money(starting)}` : undefined}
+      />
+      <Row
+        label="options level"
+        value={level != null ? String(level) : "unavailable"}
+        hint={level != null ? "spreads, multi-leg" : undefined}
+      />
+      <Row label="endpoint" value="PAPER" hint="no live path exists" />
+    </div>
+  );
+}
 
 const MAX_TIER = 2;
 
@@ -71,6 +105,8 @@ export function RiskPanel({ risk }: { risk: RiskAuthority | undefined }) {
         risk authority
       </p>
 
+      <AccountStrip />
+
       <div className="flex items-baseline gap-2">
         <span className="font-display text-[length:var(--fs-md)]">Tier {risk.tier}</span>
         <TierPips tier={risk.tier} />
@@ -100,8 +136,12 @@ export function RiskPanel({ risk }: { risk: RiskAuthority | undefined }) {
         <Row label="breaches" value={String(risk.breaches)} />
       </div>
 
-      {/* Finished copy from the backend: what it takes to size up. */}
       <p className="mt-3 border-t border-[color:var(--line)] pt-2 text-[13px] leading-relaxed text-[color:var(--text-dim)]">
+        Tier limits are a percentage of equity. Tier 0 is 0.5% per position,
+        1.5% deployed.
+      </p>
+      {/* Finished copy from the backend: what it takes to size up. */}
+      <p className="mt-1.5 text-[13px] leading-relaxed text-[color:var(--text-dim)]">
         {risk.next_promotion}
       </p>
     </section>

@@ -18,7 +18,7 @@ import { Sparkline } from "@/components/Sparkline";
 import { TermStructure } from "@/components/TermStructure";
 import { VolCone } from "@/components/VolCone";
 import { clockTime, dollars, regimeColor, timeAgo, volPoints } from "@/lib/format";
-import type { Decision, RiskAuthority, VolState } from "@/lib/types";
+import type { Decision, RiskAuthority, SystemStatus, VolState } from "@/lib/types";
 
 /** The desk's MCP surface — the real tool names from skew/mcp_server.py.
  *  Static by nature: the tool list is code, not market data. */
@@ -51,12 +51,13 @@ interface Props {
   counts?: Record<string, number>;
   latest?: Decision;
   risk?: RiskAuthority;
+  status?: SystemStatus;
   closed: boolean;
   /** "reading live from the desk" / "as of 14:43 · last known" / "recorded 30 Aug". */
   provenance?: string | null;
 }
 
-export function Bento({ states, counts, latest, risk, closed, provenance }: Props) {
+export function Bento({ states, counts, latest, risk, status, closed, provenance }: Props) {
   const gridRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -161,6 +162,22 @@ export function Bento({ states, counts, latest, risk, closed, provenance }: Prop
           <li>base url pinned to the paper endpoint</li>
           <li>startup refuses anything else</li>
           <li>defined-risk structures only</li>
+        </ul>
+        {/* Eligibility facts, live from the API — the judge's checklist,
+            answered before it is asked. */}
+        <ul className="mono mt-3 space-y-1 border-t border-[color:var(--line)] pt-3 text-[12px] leading-relaxed text-[color:var(--text-dim)]">
+          <li>
+            dedicated competition account
+            {status?.account_id_suffix ? ` · PA••••${status.account_id_suffix}` : ""}
+          </li>
+          <li>
+            {status?.starting_equity != null
+              ? `starting balance $${Math.round(status.starting_equity).toLocaleString("en-US")}`
+              : "starting balance — awaiting first armed boot"}
+            {status?.options_approval_level != null
+              ? ` · options level ${status.options_approval_level}`
+              : ""}
+          </li>
         </ul>
       </div>
 

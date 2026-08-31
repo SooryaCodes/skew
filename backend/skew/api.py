@@ -96,6 +96,9 @@ async def lifespan(_app: FastAPI):
             loop.ACCOUNT["suffix"] = check.get("account_id_suffix")
             loop.ACCOUNT["number"] = check.get("account_number")
             loop.ACCOUNT["equity"] = check.get("equity")
+            loop.ACCOUNT["options_level"] = check.get("options_approved") or check.get(
+                "options_level"
+            )
             loop.ACCOUNT["error"] = check.get("competition_error")
             if loop.ACCOUNT["error"] is None:
                 loop.ACCOUNT["error"] = _claim_audit_db(str(check.get("account_number") or ""))
@@ -264,10 +267,28 @@ def _claim_audit_db(connected: str) -> str | None:
     with session_scope() as session:
         row = session.get(KVRow, key)
         if row is None:
-            session.add(KVRow(key=key, value={"account": connected}))
+            # The claim also freezes the STARTING equity: the denominator every
+            # later drawdown figure is honest against.
+            starting = loop.ACCOUNT.get("equity")
+            session.add(KVRow(key=key, value={"account": connected, "starting_equity": starting}))
+            loop.ACCOUNT["starting_equity"] = starting
             log.info("audit DB claimed by account …%s", connected[-4:])
             return None
         owner = str((row.value or {}).get("account") or "")
+        recorded_start = (row.value or {}).get("starting_equity")
+        if recorded_start is None and owner == connected:
+            # Claims written before starting_equity existed: backfill from the
+            # risk state's peak, which the first-ever equity record set.
+            try:
+                from skew.risk.authority import _state_row
+
+                recorded_start = float(_state_row(session).peak_equity or 0) or None
+            except Exception:  # noqa: BLE001
+                recorded_start = None
+            if recorded_start is not None:
+                row.value = {**(row.value or {}), "starting_equity": recorded_start}
+        if recorded_start is not None:
+            loop.ACCOUNT["starting_equity"] = recorded_start
         if owner and owner != connected:
             return (
                 f"This audit DB belongs to account …{owner[-4:]} but the connected "
@@ -276,6 +297,17 @@ def _claim_audit_db(connected: str) -> str | None:
                 f"or restore the original credentials."
             )
     return None
+
+
+def _live_equity() -> float | None:
+    """Current account equity, from the broker via the desk's per-cycle cache."""
+    try:
+        desk = loop.get_desk()
+        if not desk.broker.available:
+            return None
+        return round(desk.equity(), 2)
+    except Exception:  # noqa: BLE001 — status must never 500
+        return None
 
 
 def _drawdown_paused() -> bool:
@@ -352,6 +384,13 @@ def get_status() -> dict[str, Any]:
         # deployed status page, never the full id.
         "account_id_suffix": loop.ACCOUNT["suffix"],
         "account_error": loop.ACCOUNT["error"],
+        # Provenance, all read from the broker at boot — none hardcoded, and
+        # an unknown value stays null so the UI says "unavailable" rather than
+        # substituting a default.
+        "equity": _live_equity(),
+        "starting_equity": loop.ACCOUNT.get("starting_equity"),
+        "options_approval_level": loop.ACCOUNT.get("options_level"),
+        "endpoint_is_paper": True,
         "instance_conflict": loop.CONFLICT["message"],
         "drawdown_paused": _drawdown_paused(),
         # The standing exit rules, so the positions view can print each

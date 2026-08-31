@@ -141,7 +141,12 @@ class Broker:
 
         # The loud startup line: which account, how much money. The id goes to
         # the server log only — the API exposes just its last four characters.
-        log.info("CONNECTED ACCOUNT %s — equity $%,.2f", number or "<unknown>", equity)
+        # Masked everywhere, logs included — the full id never leaves the DB.
+        log.info(
+            "CONNECTED ACCOUNT …%s — equity $%,.2f",
+            number[-4:] if number else "????",
+            equity,
+        )
 
         expected = self.settings.alpaca_account_number
         if expected and number != expected:

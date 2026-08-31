@@ -46,10 +46,12 @@ export default function McpPage() {
           The desk as tools
         </h1>
         <p className="mt-6 text-[17px] leading-[1.7] text-[color:var(--text-dim)]">
-          SKEW ships a Model Context Protocol server, so any MCP client — Claude
-          Desktop, Claude Code — can drive the desk conversationally: scan for
-          mispriced volatility, read a stress grid, inspect the risk tier,
-          replay any decision. Reads are always available.{" "}
+          SKEW ships a Model Context Protocol server. MCP is the open standard
+          that lets an AI client call a program&rsquo;s functions as typed
+          tools: you register the server once, and Claude can then scan for
+          mispriced volatility, read a stress grid, inspect the risk tier or
+          replay any decision — by asking, in plain language. Reads are always
+          available.{" "}
           <strong className="font-semibold text-[color:var(--text)]">
             The two mutating tools are not even registered unless explicitly
             enabled
@@ -57,6 +59,46 @@ export default function McpPage() {
           , and both re-run the full gate chain and require an explicit
           confirmation argument. The model gets a desk, never a blank cheque.
         </p>
+
+        <h2 className="mt-16 text-[15px] font-semibold uppercase tracking-[0.14em] text-[color:var(--text-dim)]">
+          Setup — three commands, copy-paste
+        </h2>
+        <ol className="mt-5 space-y-6">
+          <li>
+            <p className="text-[15px] font-semibold text-[color:var(--text)]">
+              1 · Clone and install
+            </p>
+            <div className="mt-2">
+              <Code>{`git clone https://github.com/SooryaCodes/skew.git ~/skew
+cd ~/skew/backend
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`}</Code>
+            </div>
+          </li>
+          <li>
+            <p className="text-[15px] font-semibold text-[color:var(--text)]">
+              2 · Add your Alpaca paper keys
+            </p>
+            <div className="mt-2">
+              <Code>{`cp ~/skew/.env.example ~/skew/.env
+# edit ~/skew/.env: ALPACA_API_KEY, ALPACA_API_SECRET (paper keys, free at alpaca.markets)
+~/skew/backend/.venv/bin/python -m skew.cli account   # confirms the account + options level`}</Code>
+            </div>
+            <p className="mt-2 text-[14px] text-[color:var(--text-dim)]">
+              The server refuses to start against anything but the paper
+              endpoint, so there is nothing dangerous to misconfigure.
+            </p>
+          </li>
+          <li>
+            <p className="text-[15px] font-semibold text-[color:var(--text)]">
+              3 · Register it with your client
+            </p>
+            <p className="mt-2 text-[14px] text-[color:var(--text-dim)]">
+              The exact blocks for Claude Code and Claude Desktop are below —
+              with <span className="mono">~/skew</span> paths that match step 1,
+              so they work as pasted.
+            </p>
+          </li>
+        </ol>
 
         <h2 className="mt-16 text-[15px] font-semibold uppercase tracking-[0.14em] text-[color:var(--text-dim)]">
           Read tools — always on
@@ -86,7 +128,7 @@ export default function McpPage() {
           Claude Code — one line
         </h2>
         <div className="mt-4">
-          <Code>{`claude mcp add skew -- /absolute/path/to/skew/backend/.venv/bin/python -m skew.mcp_server`}</Code>
+          <Code>{`claude mcp add skew -- ~/skew/backend/.venv/bin/python -m skew.mcp_server`}</Code>
         </div>
         <p className="mt-3 text-[14px] text-[color:var(--text-dim)]">
           Then <span className="mono">/mcp</span> inside a session to confirm it
@@ -107,16 +149,19 @@ export default function McpPage() {
           <Code>{`{
   "mcpServers": {
     "skew": {
-      "command": "/absolute/path/to/skew/backend/.venv/bin/python",
+      "command": "/Users/YOUR_USERNAME/skew/backend/.venv/bin/python",
       "args": ["-m", "skew.mcp_server"],
-      "cwd": "/absolute/path/to/skew/backend"
+      "cwd": "/Users/YOUR_USERNAME/skew/backend"
     }
   }
 }`}</Code>
         </div>
         <p className="mt-3 text-[14px] text-[color:var(--text-dim)]">
-          Absolute paths, and the command must be the virtualenv&rsquo;s Python —
-          a bare <span className="mono">python</span> will not have{" "}
+          Claude Desktop needs absolute paths (it does not expand{" "}
+          <span className="mono">~</span>) — replace{" "}
+          <span className="mono">YOUR_USERNAME</span>, and keep the command
+          pointing at the virtualenv&rsquo;s Python: a bare{" "}
+          <span className="mono">python</span> will not have{" "}
           <span className="mono">alpaca-py</span> installed. Restart Claude
           Desktop and SKEW appears in the tools menu.
         </p>
@@ -153,13 +198,13 @@ export default function McpPage() {
           >
             Enter the desk
           </Link>
-          <Link
-            href="/"
+          <a
+            href="https://github.com/SooryaCodes/skew"
             className="btn-3d-ghost t-fast border border-[color:var(--line)] bg-[color:var(--panel)] px-6 py-3 text-[15px] font-semibold text-[color:var(--text)]"
             style={{ borderRadius: "12px" }}
           >
-            Back to the landing
-          </Link>
+            View the source on GitHub
+          </a>
         </div>
       </main>
     </div>

@@ -144,6 +144,7 @@ export default function Landing() {
           counts={counts}
           latest={latest}
           risk={risk}
+          status={status}
           closed={closed}
           provenance={snapshot ? fieldProvenance(snapshot, "universe") : null}
         />

@@ -567,3 +567,14 @@ body {
   mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 25%, transparent 78%);
   -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 25%, transparent 78%);
 }
+
+/* Charts: a click focuses the SVG in some browsers, which dragged the global
+   focus ring around the whole payoff plot and its markers. Keyboard focus on
+   real controls keeps its ring; the chart surface itself never needs one. */
+.recharts-wrapper,
+.recharts-wrapper *:focus,
+.recharts-wrapper:focus,
+.recharts-surface:focus,
+svg[role="img"]:focus {
+  outline: none !important;
+}
