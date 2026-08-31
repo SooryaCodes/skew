@@ -12,9 +12,10 @@ import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const LINKS = [
-  { href: "#how-it-works", label: "How it works" },
-  { href: "#architecture", label: "Architecture" },
-  { href: "#faq", label: "FAQ" },
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/#architecture", label: "Architecture" },
+  { href: "/mcp", label: "MCP" },
+  { href: "/#faq", label: "FAQ" },
 ];
 
 export function Nav() {
@@ -29,9 +30,9 @@ export function Nav() {
           WebkitBackdropFilter: "blur(12px)",
         }}
       >
-        <a href="#" aria-label="SKEW — top of page">
+        <Link href="/" aria-label="SKEW — home">
           <Logo size={26} />
-        </a>
+        </Link>
         <nav className="hidden gap-6 text-[14px] font-medium sm:flex" aria-label="Page">
           {LINKS.map((link) => (
             <a

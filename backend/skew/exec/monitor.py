@@ -185,6 +185,7 @@ def record_open(structure: Structure, order_id: str) -> None:
         session.add(
             PositionRow(
                 id=structure.id,
+                account=_connected_account(),
                 symbol=structure.symbol,
                 kind=structure.kind,
                 opened_at=datetime.now(UTC),
@@ -262,6 +263,12 @@ def fetch_mids(broker: Any, symbols: list[str]) -> dict[str, float]:
         if bid > 0 and ask > 0:
             out[symbol] = (bid + ask) / 2.0
     return out
+
+
+def _connected_account() -> str:
+    from skew.audit.log import connected_account
+
+    return connected_account()
 
 
 def monitor_positions(broker: Any, settings: Settings | None = None) -> list[dict[str, Any]]:

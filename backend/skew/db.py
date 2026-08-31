@@ -49,6 +49,22 @@ def init_db() -> None:
     from skew.audit import models as _models  # noqa: F401 — registers the tables
 
     Base.metadata.create_all(engine)
+    _migrate_add_account_columns()
+
+
+def _migrate_add_account_columns() -> None:
+    """Additive SQLite migration: the account column arrived after launch.
+
+    create_all() does not alter existing tables, and this history cannot be
+    recreated, so the columns are added in place.
+    """
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        for table in ("decisions", "positions"):
+            cols = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))}
+            if cols and "account" not in cols:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN account VARCHAR(24) DEFAULT ''"))
 
 
 @contextmanager

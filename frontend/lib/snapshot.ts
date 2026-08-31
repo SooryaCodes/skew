@@ -68,5 +68,5 @@ export function provenanceLabel(state: SnapshotState, asOf: string): string {
   if (state === "last_known") {
     return `as of ${when.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })} · last known`;
   }
-  return `recorded ${when.toLocaleDateString("en-US", { day: "numeric", month: "short" })} · from the audit history`;
+  return `recorded ${when.toLocaleDateString("en-US", { day: "numeric", month: "short" })} · development desk history`;
 }

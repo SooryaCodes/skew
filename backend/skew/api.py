@@ -94,8 +94,11 @@ async def lifespan(_app: FastAPI):
         try:
             check = desk.broker.verify_account()
             loop.ACCOUNT["suffix"] = check.get("account_id_suffix")
+            loop.ACCOUNT["number"] = check.get("account_number")
             loop.ACCOUNT["equity"] = check.get("equity")
             loop.ACCOUNT["error"] = check.get("competition_error")
+            if loop.ACCOUNT["error"] is None:
+                loop.ACCOUNT["error"] = _claim_audit_db(str(check.get("account_number") or ""))
         except Exception as exc:  # boot must survive to report itself
             log.exception("account verification failed at boot")
             if settings.competition_account_id:
@@ -242,6 +245,37 @@ def _risk() -> RiskAuthority:
 
 
 START_TIME = datetime.now(UTC)
+
+
+def _claim_audit_db(connected: str) -> str | None:
+    """One audit DB, one account — refuse to mix decision histories.
+
+    The first armed boot writes the connected account's id into the DB. Every
+    later boot must match it; a mismatch refuses to arm and says exactly how
+    to proceed (fresh DATABASE_URL, or archive the file). The dev account's
+    history must never bleed into the competition account's log.
+    """
+    if not connected:
+        return None
+    from skew.audit.models import KVRow
+    from skew.db import session_scope
+
+    key = "audit_db_account"
+    with session_scope() as session:
+        row = session.get(KVRow, key)
+        if row is None:
+            session.add(KVRow(key=key, value={"account": connected}))
+            log.info("audit DB claimed by account …%s", connected[-4:])
+            return None
+        owner = str((row.value or {}).get("account") or "")
+        if owner and owner != connected:
+            return (
+                f"This audit DB belongs to account …{owner[-4:]} but the connected "
+                f"account is …{connected[-4:]}. Refusing to mix decision histories — "
+                f"point DATABASE_URL at a fresh file (the old one stays as the archive) "
+                f"or restore the original credentials."
+            )
+    return None
 
 
 def _drawdown_paused() -> bool:

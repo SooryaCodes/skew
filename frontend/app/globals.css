@@ -69,6 +69,12 @@
 }
 
 :root[data-theme="light"] {
+  --grain-opacity: 0.04;
+  --edge-hi: rgba(255, 255, 255, 0.95);
+  --edge-hi-soft: rgba(255, 255, 255, 0.6);
+  --edge-lo: rgba(16, 16, 20, 0.08);
+  --edge-lo-soft: rgba(16, 16, 20, 0.05);
+  --edge-shade: rgba(16, 16, 20, 0.07);
   --ground: #ffffff;
   --panel: #fafafb;
   --panel-alt: #f1f1f4;
@@ -128,6 +134,13 @@
 
   --radius: 10px;
   --radius-lg: 16px;
+  --grain-opacity: 0.055;
+  /* Edge lighting: a light source above-left. Neutral — depth without hue. */
+  --edge-hi: rgba(255, 255, 255, 0.07);
+  --edge-hi-soft: rgba(255, 255, 255, 0.04);
+  --edge-lo: rgba(0, 0, 0, 0.38);
+  --edge-lo-soft: rgba(0, 0, 0, 0.22);
+  --edge-shade: rgba(0, 0, 0, 0.15);
   --dur-fast: 120ms;
   --dur-curve: 400ms;
 }
@@ -409,9 +422,18 @@ body {
    and warms the border to --brass — 150ms, no shadows, no gradients. */
 .bento-cell {
   border-radius: var(--radius-lg);
+  /* Edge lighting: brighter top/left, dimmer bottom/right, plus a soft inner
+     shade pooling in the far corner — a light source above-left, no hue. */
+  box-shadow:
+    inset 0 1px 0 var(--edge-hi),
+    inset 1px 0 0 var(--edge-hi-soft),
+    inset 0 -1px 0 var(--edge-lo-soft),
+    inset -1px 0 0 var(--edge-lo-soft),
+    inset -14px -14px 28px -22px var(--edge-lo);
   transition:
     transform 150ms ease,
-    border-color 150ms ease;
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 @media (hover: hover) {
   .bento-cell:hover {
@@ -501,12 +523,41 @@ body {
 /* Hero backdrop: one soft accent glow plus a fine grid that fades out —
    depth without noise, now that the system allows it deliberately. */
 .hero-backdrop {
+  /* One ambient light source, brass and quiet — never an aurora. */
   background:
     radial-gradient(
       900px 480px at 72% -10%,
-      color-mix(in srgb, var(--accent) 16%, transparent),
+      color-mix(in srgb, var(--brass) 7%, transparent),
       transparent 70%
     );
+}
+
+/* One ambient radial per major section: soft metal light, off-centre, behind
+   content. Single source per section — two would compete. */
+.section-glow-brass::before,
+.section-glow-steel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    700px 420px at var(--glow-x, 80%) 8%,
+    color-mix(in srgb, var(--glow-color) 5%, transparent),
+    transparent 72%
+  );
+}
+.section-glow-brass {
+  --glow-color: var(--brass);
+}
+.section-glow-steel {
+  --glow-color: var(--steel);
+}
+
+/* Section hairline: a 1px --line that breathes out toward the edges. */
+.hairline {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(90deg, transparent, var(--line) 18%, var(--line) 82%, transparent);
 }
 .hero-grid {
   background-image:

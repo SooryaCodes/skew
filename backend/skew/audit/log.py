@@ -47,6 +47,15 @@ def _to_model(row: DecisionRow) -> Decision:
     )
 
 
+def connected_account() -> str:
+    """The account this process is writing decisions for. Empty until the boot
+    check has identified it — decision histories are never mixed across
+    accounts (see the boot-time guard in api.py)."""
+    from skew import loop
+
+    return str(loop.ACCOUNT.get("number") or "")
+
+
 def record(
     action: DecisionAction,
     reason: str,
@@ -84,6 +93,7 @@ def record(
                 risk_tier=decision.risk_tier,
                 order_id=decision.order_id,
                 detail=decision.detail,
+                account=connected_account(),
             )
         )
 

@@ -83,8 +83,8 @@ export default function Landing() {
       {/* 4 — THE PROBLEM / THE APPROACH */}
       <section
         aria-label="The argument"
-        className="relative z-10 mx-auto w-full max-w-5xl px-6"
-        style={{ paddingBlock: RHYTHM.minor }}
+        className="section-glow-steel relative z-10 mx-auto w-full max-w-5xl px-6"
+        style={{ paddingBlock: RHYTHM.minor, "--glow-x": "12%" } as React.CSSProperties}
       >
         <div className="grid gap-10 md:grid-cols-2">
           <div className="text-[16px] leading-relaxed text-[color:var(--text-dim)]">
@@ -125,8 +125,8 @@ export default function Landing() {
       <section
         id="how-it-works"
         aria-label="How it works"
-        className="relative z-10 mx-auto w-full max-w-6xl scroll-mt-20 px-6"
-        style={{ paddingBlock: RHYTHM.major }}
+        className="section-glow-brass relative z-10 mx-auto w-full max-w-6xl scroll-mt-20 px-6"
+        style={{ paddingBlock: RHYTHM.major, "--glow-x": "88%" } as React.CSSProperties}
       >
         <SectionCaption>how it works — three steps, no forecast</SectionCaption>
         <HowItWorks states={states} exhibit={exhibit} />
@@ -174,10 +174,11 @@ export default function Landing() {
       </section>
 
       {/* 9 — BY THE NUMBERS */}
+      <hr className="hairline mx-auto w-full max-w-5xl" />
       <section
         aria-label="By the numbers"
-        className="relative z-10 mx-auto w-full max-w-5xl px-6"
-        style={{ paddingBlock: RHYTHM.major }}
+        className="section-glow-brass relative z-10 mx-auto w-full max-w-5xl px-6"
+        style={{ paddingBlock: RHYTHM.major, "--glow-x": "85%" } as React.CSSProperties}
       >
         <SectionCaption>by the numbers</SectionCaption>
         <Numbers
@@ -187,6 +188,7 @@ export default function Landing() {
       </section>
 
       {/* 10 — FAQ */}
+      <hr className="hairline mx-auto w-full max-w-5xl" />
       <section
         id="faq"
         aria-label="FAQ"
@@ -246,12 +248,12 @@ export default function Landing() {
             >
               github
             </a>
-            <a
+            <Link
               className="t-fast text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
-              href={`${GITHUB}/blob/main/docs/MCP-SETUP.md`}
+              href="/mcp"
             >
               mcp setup
-            </a>
+            </Link>
             <span
               className="cursor-default text-[color:var(--text-faint)]"
               title="Ships with the submission"

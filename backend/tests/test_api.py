@@ -391,3 +391,32 @@ def test_health_reports_last_cycle_and_uptime(client):
     assert body["status"] == "ok"
     assert "last_cycle_at" in body
     assert body["uptime_seconds"] >= 0
+
+
+def test_audit_db_claim_refuses_a_second_account(client, monkeypatch):
+    """One audit DB, one account: the first armed boot claims it; a different
+    connected account is refused with instructions, never mixed in."""
+    from skew.api import _claim_audit_db
+
+    assert _claim_audit_db("") is None  # unknown account: no claim, no block
+    assert _claim_audit_db("PA11112222") is None  # first claim
+    assert _claim_audit_db("PA11112222") is None  # same account, fine
+    error = _claim_audit_db("PA99998888")
+    assert error is not None
+    assert "…2222" in error and "…8888" in error and "Refusing to mix" in error
+
+
+def test_decisions_are_stamped_with_the_connected_account(monkeypatch):
+    from skew import loop
+    from skew.audit import log as audit_log
+
+    monkeypatch.setitem(loop.ACCOUNT, "number", "PA33TEST99")
+    decision = audit_log.record_abstention(
+        symbol="SPY", reason="test stamp — account travels with the row", risk_tier=0
+    )
+    from skew.audit.models import DecisionRow
+    from skew.db import session_scope
+
+    with session_scope() as session:
+        row = session.get(DecisionRow, decision.id)
+        assert row.account == "PA33TEST99"

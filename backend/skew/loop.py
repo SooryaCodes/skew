@@ -81,7 +81,28 @@ _SELECTOR: BoundedSelector | None = None
 # Set once by the API lifespan after the boot-time account check. suffix is the
 # last four characters of the connected account id (all the API ever exposes);
 # error is a competition-account mismatch, and an armed desk requires it None.
-ACCOUNT: dict[str, str | float | None] = {"suffix": None, "error": None, "equity": None}
+ACCOUNT: dict[str, str | float | None] = {
+    "suffix": None,
+    "error": None,
+    "equity": None,
+    # Full account number, SERVER-SIDE ONLY: stamped onto decision rows and
+    # checked against the audit DB's owner. The API exposes the suffix only.
+    "number": None,
+}
+
+
+def _past_deadline(settings: Settings) -> bool:
+    """After DEADLINE_UTC the monitor flattens the book — entries must not
+    quietly rebuild it on the next cycle."""
+    if not settings.deadline_utc:
+        return False
+    try:
+        deadline = datetime.fromisoformat(settings.deadline_utc)
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=UTC)
+    except ValueError:
+        return False
+    return datetime.now(UTC) >= deadline
 
 
 def breaker_engaged(risk, settings: Settings) -> bool:
@@ -356,6 +377,37 @@ def _evaluate_and_act(
                     "structure_id": chosen.id,
                     "offered": [c.id for c in survivors],
                 },
+                trace=trace,
+            )
+        )
+        return decisions
+
+    if _past_deadline(settings):
+        decisions.append(
+            audit.record_abstention(
+                symbol=symbol,
+                reason=(
+                    "Competition deadline passed — the desk is flat by design. "
+                    "No new entries; the monitor has flattened the book."
+                ),
+                risk_tier=tier,
+                detail={"deadline": settings.deadline_utc},
+                trace=trace,
+            )
+        )
+        return decisions
+
+    if ACCOUNT["error"]:
+        decisions.append(
+            audit.record_abstention(
+                symbol=symbol,
+                reason=(
+                    f"Entries halted — account guard: {ACCOUNT['error']} "
+                    f"Open positions remain monitored."
+                ),
+                risk_tier=tier,
+                model_rationale=selection.rationale,
+                detail={"account_guard": True},
                 trace=trace,
             )
         )

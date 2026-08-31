@@ -42,6 +42,11 @@ class DecisionRow(Base):
 
     __tablename__ = "decisions"
 
+    # Which brokerage account this decision belongs to. Decision histories are
+    # never mixed across accounts; boot refuses to write into another
+    # account's log. Server-side only — the API never exposes the full id.
+    account: Mapped[str] = mapped_column(String(24), default="", index=True)
+
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, index=True)
     action: Mapped[str] = mapped_column(String(16), index=True)  # EXECUTED/REFUSED/ABSTAINED
@@ -121,6 +126,8 @@ class PositionRow(Base):
     """
 
     __tablename__ = "positions"
+
+    account: Mapped[str] = mapped_column(String(24), default="")
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     symbol: Mapped[str] = mapped_column(String(16), index=True)
