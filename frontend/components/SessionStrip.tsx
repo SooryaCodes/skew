@@ -24,10 +24,12 @@ function sessionLabel(iso: string): string {
 
 export function KillBanner() {
   const { data: status } = useStatus();
-  if (!status?.kill_switch && !status?.drawdown_paused) return null;
+  if (!status?.kill_switch && !status?.drawdown_paused && !status?.past_deadline) return null;
   const message = status.kill_switch
     ? "Entries halted by the kill switch. Open positions still monitored."
-    : "Entries paused — drawdown circuit breaker at 5%. Open positions still monitored; entries resume when equity recovers.";
+    : status.drawdown_paused
+      ? "Entries paused — drawdown circuit breaker at 5%. Open positions still monitored; entries resume when equity recovers."
+      : "Competition window closed on 4 September. The desk continues to scan and log decisions; it no longer opens positions.";
   return (
     <div
       className="flex items-center gap-2.5 border-b border-[color:var(--line)] bg-[color:var(--panel-alt)] px-5 py-2"

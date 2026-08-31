@@ -390,8 +390,9 @@ def _evaluate_and_act(
             audit.record_abstention(
                 symbol=symbol,
                 reason=(
-                    "Competition deadline passed — the desk is flat by design. "
-                    "No new entries; the monitor has flattened the book."
+                    f"Competition window closed on 4 September — "
+                    f"{len(survivors)} candidate(s) cleared every gate, but the desk no "
+                    f"longer opens positions. It continues to scan, measure and log."
                 ),
                 risk_tier=tier,
                 detail={"deadline": settings.deadline_utc},

@@ -258,7 +258,7 @@ export function AuditStream({ decisions, counts }: Props) {
   ];
 
   return (
-    <section className="flex h-full min-h-0 flex-1 flex-col p-4" aria-label="Decision stream">
+    <section className="flex flex-col p-4 lg:h-full lg:min-h-0 lg:flex-1" aria-label="Decision stream">
       <h2 className="whitespace-nowrap text-[16px] font-bold tracking-tight text-[color:var(--text)]">
         Audit log
       </h2>
@@ -305,8 +305,8 @@ export function AuditStream({ decisions, counts }: Props) {
         // The list must LOOK scrollable: a persistent scrollbar plus a fade at
         // the bottom edge saying "there is more below" — nobody should have to
         // guess that the log continues.
-        <div className="relative min-h-0 flex-1">
-          <ul className="h-full overflow-y-auto pr-2">
+        <div className="relative lg:min-h-0 lg:flex-1">
+          <ul className="pr-2 lg:h-full lg:overflow-y-auto">
             {groups.map((group, i) =>
               group.kind === "single" ? (
                 <FullEntry key={group.entry.id} decision={group.entry} isNewest={i === 0} />
@@ -320,7 +320,7 @@ export function AuditStream({ decisions, counts }: Props) {
           </ul>
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-14"
+            className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-14 lg:block"
             style={{ background: "linear-gradient(to bottom, transparent, var(--ground))" }}
           />
         </div>
