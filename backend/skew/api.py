@@ -112,7 +112,7 @@ async def lifespan(_app: FastAPI):
         from skew.exec.guard import foreign_option_symbols, our_leg_symbols
 
         try:
-            foreign = foreign_option_symbols(desk.broker.get_all_positions(), our_leg_symbols())
+            foreign = foreign_option_symbols(desk.broker.list_positions(), our_leg_symbols())
         except Exception:  # status must reflect the failure, not hide it
             log.exception("two-instance guard could not read broker positions at boot")
             foreign = []

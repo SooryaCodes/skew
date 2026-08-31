@@ -24,8 +24,25 @@ from skew.models import Candidate, GateResult
 GATE = "liquidity"
 
 
+def scaled_floors(dte: int, min_open_interest: int, max_spread_pct: float) -> tuple[int, float]:
+    """Liquidity floors scaled to tenor.
+
+    The absolute floors are tuned for ~30-DTE monthlies. Weeklies carry
+    structurally less open interest and slightly wider markets — holding a
+    10-DTE chain to a monthly's floor blanks the entire front, which is a
+    calibration artefact, not an edge. Open interest scales linearly with DTE
+    down to a hard minimum; the spread cap widens modestly under 21 DTE.
+    """
+    scale = min(1.0, max(dte, 1) / 30.0)
+    oi_floor = max(10, round(min_open_interest * scale))
+    spread_cap = max_spread_pct * (1.35 if dte <= 21 else 1.0)
+    return oi_floor, spread_cap
+
+
 def liquidity_gate(candidate: Candidate, ctx: GateContext) -> GateResult:
     structure = candidate.structure
+    dte = structure.dte
+    oi_floor, spread_cap = scaled_floors(dte, ctx.min_open_interest, ctx.max_spread_pct)
     worst_oi = min((leg.open_interest for leg in structure.legs), default=0)
     worst_spread_leg = max(structure.legs, key=lambda leg: leg.spread_pct)
     worst_spread = worst_spread_leg.spread_pct
@@ -43,36 +60,40 @@ def liquidity_gate(candidate: Candidate, ctx: GateContext) -> GateResult:
             detail={"unquoted": [leg.symbol for leg in unquoted]},
         )
 
-    if worst_oi < ctx.min_open_interest:
+    if worst_oi < oi_floor:
         thin = min(structure.legs, key=lambda leg: leg.open_interest)
         return GateResult(
             gate=GATE,
             passed=False,
             reason=(
                 f"Open interest {worst_oi:,} on {thin.symbol} is below the "
-                f"{ctx.min_open_interest:,} floor. Thin contracts fill badly and their "
-                f"quoted IV is not a reliable measurement."
+                f"{oi_floor:,} floor ({ctx.min_open_interest:,} at 30+ DTE, scaled for "
+                f"{dte} DTE). Thin contracts fill badly and their quoted IV is not a "
+                f"reliable measurement."
             ),
             detail={
                 "worst_open_interest": worst_oi,
-                "threshold": ctx.min_open_interest,
+                "threshold": oi_floor,
+                "base_threshold": ctx.min_open_interest,
+                "dte": dte,
                 "contract": thin.symbol,
             },
         )
 
-    if worst_spread > ctx.max_spread_pct:
+    if worst_spread > spread_cap:
         return GateResult(
             gate=GATE,
             passed=False,
             reason=(
                 f"Bid-ask spread {worst_spread:.1%} of mid on {worst_spread_leg.symbol} "
-                f"exceeds the {ctx.max_spread_pct:.0%} limit "
+                f"exceeds the {spread_cap:.0%} cap for {dte} DTE "
                 f"(${worst_spread_leg.bid:.2f} / ${worst_spread_leg.ask:.2f}). "
                 f"Crossing that twice costs more than the edge."
             ),
             detail={
                 "worst_spread_pct": round(worst_spread, 4),
-                "threshold": ctx.max_spread_pct,
+                "threshold": round(spread_cap, 4),
+                "dte": dte,
                 "contract": worst_spread_leg.symbol,
                 "bid": worst_spread_leg.bid,
                 "ask": worst_spread_leg.ask,

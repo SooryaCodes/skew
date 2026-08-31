@@ -71,12 +71,15 @@ def term_structure_gate(candidate: Candidate, ctx: GateContext) -> GateResult:
             reason=(
                 f"Backwardation — {term.near_dte}d implied vol {term.near_iv * 100:.1f} sits "
                 f"above {term.far_dte}d {term.far_iv * 100:.1f}, an inversion of "
-                f"{abs(term.slope) * 100:.1f} vol points. The market is pricing near-term "
-                f"stress; selling volatility into it is how options accounts are lost."
+                f"{abs(term.slope) * 100:.1f} vol points, beyond the "
+                f"{term.backwardation_floor * 100:.1f}-point tolerance. The market is "
+                f"pricing near-term stress; selling volatility into it is how options "
+                f"accounts are lost."
             ),
             detail={
                 "shape": "backwardation",
                 "slope": round(term.slope, 6),
+                "threshold": term.backwardation_floor,
                 "near_dte": term.near_dte,
                 "near_iv": round(term.near_iv, 6),
                 "far_dte": term.far_dte,
@@ -88,11 +91,9 @@ def term_structure_gate(candidate: Candidate, ctx: GateContext) -> GateResult:
     return GateResult(
         gate=GATE,
         passed=True,
-        reason=(
-            f"Curve in {shape} — {term.near_dte}d IV {term.near_iv * 100:.1f} versus "
-            f"{term.far_dte}d {term.far_iv * 100:.1f} ({term.slope * 100:+.1f} vol points). "
-            f"No near-term stress priced in."
-        ),
+        # A shallow inversion PASSES and says so: "inverted by 0.7 points,
+        # inside the 1.5-point tolerance" is honest calibration on display.
+        reason=f"Term curve: {term.describe()}. No material near-term stress priced in.",
         detail={
             "shape": shape,
             "slope": round(term.slope, 6),

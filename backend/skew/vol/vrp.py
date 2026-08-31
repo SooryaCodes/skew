@@ -104,9 +104,11 @@ def classify_regime(
             vrp=vrp,
             reason=(
                 f"Backwardation — {term.near_dte}d IV {term.near_iv * 100:.1f} above "
-                f"{term.far_dte}d IV {term.far_iv * 100:.1f}. The market is pricing "
-                f"near-term stress; VRP of {vrp_pts:+.1f} points is not a reason to sell "
-                f"volatility into it."
+                f"{term.far_dte}d IV {term.far_iv * 100:.1f}, inverted by "
+                f"{abs(term.slope) * 100:.1f} points, beyond the "
+                f"{term.backwardation_floor * 100:.1f}-point tolerance. The market is "
+                f"pricing near-term stress; VRP of {vrp_pts:+.1f} points is not a reason "
+                f"to sell volatility into it."
             ),
         )
 
@@ -240,7 +242,14 @@ def build_vol_state(
         raise ValueError(f"Cannot compute realized volatility for {chain.symbol}: {exc}") from exc
 
     vrp = variance_risk_premium(atm.iv, rv_20)
-    term = term_structure_slope(chain, as_of=ref)
+    cfg_for_term = cfg
+    term = term_structure_slope(
+        chain,
+        as_of=ref,
+        near_target_dte=(cfg_for_term.target_dte_min + cfg_for_term.target_dte_max) // 2,
+        far_target_dte=cfg_for_term.term_far_target_dte,
+        backwardation_floor=cfg_for_term.term_backwardation_floor,
+    )
     rv_pct = rv_percentile(bars.closes, window=20, lookback=252)
     call = classify_regime(vrp, term, rv_pct, settings=cfg)
 

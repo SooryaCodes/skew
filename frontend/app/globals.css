@@ -39,10 +39,10 @@
   --negative: #f2555a;
   --positive: #46c288;
 
-  --brass: var(--accent);
-  --brass-dim: var(--accent-dim);
-  --steel: var(--cheap);
-  --steel-dim: var(--cheap-dim);
+  --brass: #d9a441;
+  --brass-dim: #6b5220;
+  --steel: #7fa5c9;
+  --steel-dim: #35506b;
   --oxide: var(--negative);
   --verdigris: var(--positive);
 }
@@ -62,6 +62,10 @@
   --cheap-dim: #1d4b57;
   --negative: #f2555a;
   --positive: #46c288;
+  --brass: #d9a441;
+  --brass-dim: #6b5220;
+  --steel: #7fa5c9;
+  --steel-dim: #35506b;
 }
 
 :root[data-theme="light"] {
@@ -79,6 +83,10 @@
   --cheap-dim: #b3dde7;
   --negative: #cf3339;
   --positive: #157a56;
+  --brass: #8a6410;
+  --brass-dim: #e3ce9e;
+  --steel: #33608c;
+  --steel-dim: #aec6dd;
 }
 
 @theme inline {

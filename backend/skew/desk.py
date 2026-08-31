@@ -127,7 +127,9 @@ class Desk:
         """The volatility picture for one symbol. Raises rather than returning zeros."""
         cfg = self.settings
         chain = chain or self.chains.get_chain(
-            symbol, dte_min=cfg.target_dte_min, dte_max=cfg.target_dte_max + 60
+            symbol,
+            dte_min=cfg.target_dte_min,
+            dte_max=max(cfg.target_dte_max + 60, cfg.term_far_target_dte + 20),
         )
         series = self.bars.get_bars(symbol)
         return build_vol_state(
@@ -166,8 +168,12 @@ class Desk:
 
         try:
             stage("scanning")
+            # Fetch past the far term-reference (60-90d) so the curve has a
+            # real long end to compare against, not just the front.
             chain = self.chains.get_chain(
-                symbol, dte_min=cfg.target_dte_min, dte_max=cfg.target_dte_max + 60
+                symbol,
+                dte_min=cfg.target_dte_min,
+                dte_max=max(cfg.target_dte_max + 60, cfg.term_far_target_dte + 20),
             )
             result.chain_contracts = len(chain.contracts)
             series = self.bars.get_bars(symbol)
@@ -203,17 +209,20 @@ class Desk:
             log.info("abstaining on %s: %s", symbol, exc)
             return result
         if not structures:
-            result.error = (
-                f"No structure could be built from the {symbol} chain inside "
-                f"{cfg.target_dte_min}–{cfg.target_dte_max} DTE that meets the liquidity floor."
-            )
+            result.error = self._build_shortfall(chain, ref)
             return result
 
         context = GateContext(
             vol_state=vol_state,
             risk=result.risk,
             realized_vol=vol_state.rv_20,
-            term=term_structure_slope(chain, as_of=ref),
+            term=term_structure_slope(
+                chain,
+                as_of=ref,
+                near_target_dte=(cfg.target_dte_min + cfg.target_dte_max) // 2,
+                far_target_dte=cfg.term_far_target_dte,
+                backwardation_floor=cfg.term_backwardation_floor,
+            ),
             earnings=self.earnings,
             as_of=ref,
             min_open_interest=cfg.min_open_interest,
@@ -238,6 +247,49 @@ class Desk:
 
     # ------------------------------------------------------------------
 
+    def _build_shortfall(self, chain: OptionChain, ref: date) -> str:
+        """Say WHICH floor blocked the window, and by how much.
+
+        "No structure met the liquidity floor" told the operator nothing. This
+        inspects the in-window chain and names the binding constraint.
+        """
+        from skew.gates.liquidity import scaled_floors
+
+        cfg = self.settings
+        mid_dte = (cfg.target_dte_min + cfg.target_dte_max) // 2
+        oi_floor, spread_cap = scaled_floors(mid_dte, cfg.min_open_interest, cfg.max_spread_pct)
+        window = [
+            c
+            for c in chain.contracts
+            if cfg.target_dte_min <= (min(e for e in [c.expiry]) - ref).days <= cfg.target_dte_max
+        ]
+        head = (
+            f"No structure could be built from the {chain.symbol} chain inside "
+            f"{cfg.target_dte_min}–{cfg.target_dte_max} DTE."
+        )
+        if not window:
+            return f"{head} No expiries list in that window at all."
+        quoted = [c for c in window if c.is_tradeable]
+        if not quoted:
+            return f"{head} {len(window)} contracts in-window, none with a two-sided quote."
+        best_oi = max(c.open_interest for c in quoted)
+        tightest = min(c.spread_pct for c in quoted)
+        parts = []
+        if best_oi < oi_floor:
+            parts.append(
+                f"best open interest {best_oi:,} against the {oi_floor:,} floor "
+                f"(scaled for ~{mid_dte} DTE)"
+            )
+        if tightest > spread_cap:
+            parts.append(f"tightest spread {tightest:.0%} against the {spread_cap:.0%} cap")
+        if not parts:
+            parts.append(
+                f"quotes clear the floors (best OI {best_oi:,}, tightest spread "
+                f"{tightest:.0%}) but no strike pair matched the delta target inside "
+                f"the budget"
+            )
+        return f"{head} Binding constraint: {'; '.join(parts)}."
+
     def _build_structures(
         self, chain: OptionChain, vol_state: VolState, ref: date, risk: RiskAuthority
     ):
@@ -253,15 +305,21 @@ class Desk:
         budget gate stays as the safety net; when it fires now it means a
         genuine constraint moved between build and gate, not builder noise.
         """
+        from skew.gates.liquidity import scaled_floors
+
         cfg = self.settings
         budget = min(risk.budget_dollars, risk.available_dollars)
+        # Builder prefilters use the floors scaled to the middle of the entry
+        # window; the liquidity gate re-scales by each structure's actual DTE.
+        mid_dte = (cfg.target_dte_min + cfg.target_dte_max) // 2
+        oi_floor, spread_cap = scaled_floors(mid_dte, cfg.min_open_interest, cfg.max_spread_pct)
         common = {
             "qty": 1,
             "dte_min": cfg.target_dte_min,
             "dte_max": cfg.target_dte_max,
             "width_pct": cfg.target_width_pct,
-            "min_open_interest": cfg.min_open_interest,
-            "max_spread_pct": cfg.max_spread_pct,
+            "min_open_interest": oi_floor,
+            "max_spread_pct": spread_cap,
             "as_of": ref,
             "budget": budget,
         }

@@ -390,13 +390,21 @@ def _gate_context(desk: Desk, result, settings: Settings) -> GateContext:
     """Rebuild the gate context for the pre-flight recheck, on fresh quotes."""
     cfg = settings
     chain = desk.chains.get_chain(
-        result.symbol, dte_min=cfg.target_dte_min, dte_max=cfg.target_dte_max + 60, use_cache=False
+        result.symbol,
+        dte_min=cfg.target_dte_min,
+        dte_max=max(cfg.target_dte_max + 60, cfg.term_far_target_dte + 20),
+        use_cache=False,
     )
     return GateContext(
         vol_state=result.vol_state,
         risk=result.risk,
         realized_vol=result.vol_state.rv_20,
-        term=term_structure_slope(chain),
+        term=term_structure_slope(
+            chain,
+            near_target_dte=(cfg.target_dte_min + cfg.target_dte_max) // 2,
+            far_target_dte=cfg.term_far_target_dte,
+            backwardation_floor=cfg.term_backwardation_floor,
+        ),
         earnings=desk.earnings,
         as_of=datetime.now(UTC).date(),
         min_open_interest=cfg.min_open_interest,

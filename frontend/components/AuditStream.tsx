@@ -263,7 +263,8 @@ export function AuditStream({ decisions, counts }: Props) {
         Audit log
       </h2>
       <p className="mt-0.5 text-[13px] leading-snug text-[color:var(--text-dim)]">
-        Every decision is traceable — click any entry.
+        Every decision is traceable — click any entry. Counts are all-time; the
+        strip above counts this session only.
       </p>
       <div className="mb-3 mt-2.5 flex flex-wrap gap-1.5" role="group" aria-label="Filter decisions">
         {chips.map((chip) => {

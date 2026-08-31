@@ -114,10 +114,18 @@ class Settings(BaseSettings):
         default=14, validation_alias=AliasChoices("dte_max", "target_dte_max")
     )
     short_leg_delta_target: float = 0.25
-    # Structural liquidity floors.
+    # Structural liquidity floors, tuned at ~30 DTE. Short-dated chains carry
+    # structurally less open interest, so the gate scales these by tenor —
+    # see skew/gates/liquidity.py scaled_floors().
     min_open_interest: int = 100
     max_spread_pct: float = 0.15
     min_volume: int = 0
+    # Term structure: block premium selling only on a MATERIAL inversion. The
+    # front of the curve inverts routinely for idiosyncratic reasons; a
+    # 0.3-point dip is noise, not stress. Measured trade-tenor vs a 60-90d
+    # reference. Env: TERM_BACKWARDATION_FLOOR (vol points as a decimal).
+    term_backwardation_floor: float = 0.015
+    term_far_target_dte: int = 75
     # Earnings blackout, in calendar days either side of the report.
     earnings_blackout_days: int = 7
     # Alpaca serves no earnings calendar. When a single name has no confirmed

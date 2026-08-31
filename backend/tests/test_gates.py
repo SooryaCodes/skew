@@ -611,3 +611,42 @@ def test_a_debit_spread_whose_breakeven_needs_a_tail_event_is_refused():
     assert r.detail["failed_check"] == "breakeven_too_far"
     assert "lottery ticket" in r.reason
     assert r.detail["breakeven_sigma"] > 1.25
+
+
+def test_shallow_inversion_is_noise_not_stress():
+    """A 0.7-point front inversion must PASS the term gate; 2.0 must block.
+
+    The DTE shortening moved measurement to the front of the curve, which
+    inverts routinely — the gate now requires a MATERIAL inversion.
+    """
+    from skew.vol.term import TermStructure
+
+    shallow = TermStructure(
+        symbol="AAPL", near_iv=0.251, far_iv=0.244, near_dte=10, far_dte=75,
+        slope=-0.007, backwardation_floor=0.015,
+        points=[],
+    )
+    assert not shallow.is_backwardation
+    deep = shallow.model_copy(update={"slope": -0.020})
+    assert deep.is_backwardation
+    # The describe copy names both points and the tolerance.
+    from skew.models import TermPoint
+
+    text = shallow.model_copy(
+        update={"points": [TermPoint(expiry=date(2026, 9, 10), dte=10, iv_atm=0.251)]}
+    ).describe()
+    assert "10d IV 25.1" in text and "75d IV 24.4" in text
+    assert "inside the 1.5-point tolerance" in text
+
+
+def test_liquidity_floors_scale_with_tenor():
+    """A 10-DTE chain is not held to a 30-DTE monthly's open-interest floor."""
+    from skew.gates.liquidity import scaled_floors
+
+    oi30, spread30 = scaled_floors(30, 100, 0.15)
+    assert oi30 == 100 and spread30 == 0.15
+    oi10, spread10 = scaled_floors(10, 100, 0.15)
+    assert oi10 == 33
+    assert spread10 == pytest.approx(0.15 * 1.35)
+    # Hard minimum: the floor never collapses to nothing.
+    assert scaled_floors(1, 100, 0.15)[0] == 10
