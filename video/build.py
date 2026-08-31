@@ -181,6 +181,101 @@ def build_srt() -> None:
     print(f"wrote out/skew.srt — {len(cues)} cues, ends {fmt_ts(clock)}")
 
 
+# ----------------------------------------------------------------- segments
+def build_segments() -> None:
+    """Trim each capture to its exact scripted duration, freeze-pad if short,
+    and mux the narration — every segment becomes a uniform 1080p30 mp4."""
+    spec = json.loads(SCRIPT.read_text())
+    for seg in spec["segments"]:
+        sid = seg["id"]
+        total = seg["total_s"]
+        raw = ROOT / "frames" / f"{sid}.webm"
+        vo = ROOT / "vo" / "final" / f"{sid}.wav"
+        dest = ROOT / "frames" / f"{sid}.mp4"
+        if not raw.exists():
+            raise SystemExit(f"missing capture: {raw}")
+        sh("ffmpeg", "-y", "-v", "error",
+           "-i", str(raw), "-i", str(vo),
+           "-filter_complex",
+           f"[0:v]scale=1920:1080:flags=lanczos,fps=30,"
+           f"tpad=stop_mode=clone:stop_duration=5,trim=duration={total},"
+           f"setpts=PTS-STARTPTS[v];"
+           f"[1:a]apad=whole_dur={total},atrim=duration={total},asetpts=PTS-STARTPTS[a]",
+           "-map", "[v]", "-map", "[a]",
+           "-c:v", "libx264", "-profile:v", "high", "-crf", "18", "-pix_fmt", "yuv420p",
+           "-c:a", "aac", "-ar", "48000", "-ac", "2",
+           str(dest))
+        print(f"{sid}: {dest.name} @ {total:.2f}s")
+
+
+# ------------------------------------------------------------- caption burn
+def cue_list() -> list[tuple[float, float, str]]:
+    """The same cue timing build_srt writes, as data."""
+    spec = json.loads(SCRIPT.read_text())
+    cues, clock = [], 0.0
+    for seg in spec["segments"]:
+        duration = seg["total_s"]
+        text = seg.get("vo") or " ".join(p.get("text", "") for p in seg.get("vo_parts", []))
+        speech = seg["duration_s"] - HEAD_PAD_S - TAIL_PAD_S
+        lines = wrap_caption(text)
+        pairs = [lines[i : i + 2] for i in range(0, len(lines), 2)]
+        chars = [sum(len(l) for l in pair) for pair in pairs]
+        total_chars = sum(chars) or 1
+        t = clock + HEAD_PAD_S
+        for pair, c in zip(pairs, chars):
+            span = speech * c / total_chars
+            cues.append((t, min(t + span, clock + duration), "\n".join(pair)))
+            t += span
+        clock += duration
+    return cues
+
+
+def burn_captions(master: Path, dest: Path) -> None:
+    """This ffmpeg build ships without libass or drawtext, so cues are rendered
+    as transparent PNG strips in the site's own type and overlaid with time
+    windows — sharper than libass would have been anyway."""
+    from playwright.sync_api import sync_playwright
+
+    cues = cue_list()
+    strip_dir = ROOT / "out" / "cues"
+    strip_dir.mkdir(exist_ok=True)
+    html = """<!doctype html><meta charset='utf-8'><style>
+      body{margin:0;width:1920px;height:150px;background:transparent;display:flex;
+           align-items:flex-end;justify-content:center;font-family:-apple-system,'Manrope',sans-serif}
+      .cap{background:rgba(16,16,19,.82);color:#f4f4f6;font-size:34px;line-height:1.35;
+           padding:12px 28px;border-radius:12px;text-align:center;white-space:pre-line;
+           margin-bottom:0}</style><body><div class='cap' id='c'></div></body>"""
+    page_file = strip_dir / "cap.html"
+    page_file.write_text(html)
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(
+            viewport={"width": 1920, "height": 150}, device_scale_factor=1
+        )
+        page.goto(f"file://{page_file}")
+        for i, (_, _, text) in enumerate(cues):
+            page.evaluate("t => document.getElementById('c').textContent = t", text)
+            page.screenshot(path=str(strip_dir / f"c{i:02}.png"), omit_background=True)
+        browser.close()
+
+    inputs, chain = ["-i", str(master)], []
+    for i, _ in enumerate(cues):
+        inputs += ["-i", str(strip_dir / f"c{i:02}.png")]
+    prev = "0:v"
+    for i, (a, b, _) in enumerate(cues):
+        label = f"v{i}"
+        chain.append(
+            f"[{prev}][{i + 1}:v]overlay=x=(W-w)/2:y=H-h-90:"
+            f"enable='between(t,{a:.3f},{b:.3f})'[{label}]"
+        )
+        prev = label
+    sh("ffmpeg", "-y", "-v", "error", *inputs,
+       "-filter_complex", ";".join(chain), "-map", f"[{prev}]", "-map", "0:a",
+       "-c:v", "libx264", "-profile:v", "high", "-crf", "18", "-pix_fmt", "yuv420p",
+       "-c:a", "copy", "-movflags", "+faststart", str(dest))
+    print(f"burned-in captions master: {dest.name} ({len(cues)} cues)")
+
+
 # ----------------------------------------------------------------- assembly
 def assemble() -> None:
     """Concat per-segment renders (frames/<id>.mp4, already muxed with VO) via
@@ -194,14 +289,16 @@ def assemble() -> None:
         raise SystemExit(f"missing segment renders: {missing}")
     listfile.write_text("".join(f"file '{p.resolve()}'\n" for p in segs))
     master = out / "skew-demo.mp4"
+    # Segments are already uniform h264/aac — concat demuxer with stream copy,
+    # no re-encode drift.
     sh("ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(listfile),
-       "-c:v", "libx264", "-profile:v", "high", "-crf", "18", "-pix_fmt", "yuv420p",
-       "-r", "30", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-movflags", "+faststart",
-       str(master))
+       "-c", "copy", "-movflags", "+faststart", str(master))
     duration = probe_duration(master)
-    print(f"master: {master} — {duration:.1f}s")
+    print(f"clean master: {master} — {duration:.1f}s")
     if duration > spec["meta"]["hard_ceiling_s"]:
         raise SystemExit(f"FAIL: {duration:.1f}s exceeds the ceiling")
+    if (out / "skew.srt").exists():
+        burn_captions(master, out / "skew-demo-captions.mp4")
     sh("ffmpeg", "-y", "-v", "error", "-i", str(master),
        "-c:v", "libvpx-vp9", "-crf", "34", "-b:v", "0", "-c:a", "libopus",
        str(out / "skew-demo.webm"))
@@ -210,4 +307,4 @@ def assemble() -> None:
 
 if __name__ == "__main__":
     phase = sys.argv[1] if len(sys.argv) > 1 else "vo"
-    {"vo": build_vo, "srt": build_srt, "assemble": assemble}[phase]()
+    {"vo": build_vo, "srt": build_srt, "segments": build_segments, "assemble": assemble}[phase]()

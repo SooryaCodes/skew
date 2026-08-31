@@ -12,6 +12,9 @@ import { useEffect } from "react";
 export function SmoothScroll() {
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Capture mode: the video pipeline drives scroll position directly with
+    // its own eased tween — Lenis fighting it stutters under recording.
+    if (window.location.search.includes("capture=1")) return;
 
     let cleanup: (() => void) | undefined;
     let cancelled = false;
