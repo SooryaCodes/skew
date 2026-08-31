@@ -1,29 +1,21 @@
 /**
- * The SKEW mark: the volatility smile itself — left wing high (downside
- * protection is bid), dipping at the money, recovering lower on the right.
- * The product's name drawn as its own instrument. Pure SVG: crisp at 16px in
- * a favicon and at 128px in a hero.
+ * The SKEW mark: a bold S whose middle stroke is a long diagonal — literally a
+ * skewed S. Generated with Higgsfield, cut out, and rebaked over a vector-
+ * crisp tile. PNG at 4x display density; the tile color is the brand iris and
+ * stays constant across themes, as an app icon should.
  */
 
 export function LogoMark({ size = 28 }: { size?: number }) {
   return (
-    <svg
+    /* eslint-disable-next-line @next/next/no-img-element -- exact baked pixels */
+    <img
+      src={size > 64 ? "/brand/skew-logo-512.png" : "/brand/skew-logo-180.png"}
+      alt=""
       width={size}
       height={size}
-      viewBox="0 0 32 32"
-      fill="none"
       aria-hidden
-      style={{ borderRadius: Math.max(6, size * 0.28) }}
-    >
-      <rect width="32" height="32" rx="9" fill="var(--accent)" />
-      <path
-        d="M6 10.5 C 10 21, 15 23.5, 19 21 C 22.5 18.8, 24.5 16.5, 26 14.5"
-        stroke="#fff"
-        strokeWidth="3"
-        strokeLinecap="round"
-        fill="none"
-      />
-    </svg>
+      style={{ display: "block" }}
+    />
   );
 }
 
