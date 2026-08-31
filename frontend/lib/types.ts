@@ -250,6 +250,8 @@ export interface SystemStatus {
   account_id_suffix?: string | null;
   account_error?: string | null;
   instance_conflict?: string | null;
+  /** Entries halted by the drawdown circuit breaker; monitoring continues. */
+  drawdown_paused?: boolean;
   exit_rules?: ExitRules;
   /** The most recent trading session — what the closed-market header names. */
   last_session: string;

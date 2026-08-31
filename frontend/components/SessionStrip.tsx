@@ -24,20 +24,21 @@ function sessionLabel(iso: string): string {
 
 export function KillBanner() {
   const { data: status } = useStatus();
-  if (!status?.kill_switch) return null;
+  if (!status?.kill_switch && !status?.drawdown_paused) return null;
+  const message = status.kill_switch
+    ? "Entries halted by the kill switch. Open positions still monitored."
+    : "Entries paused — drawdown circuit breaker at 5%. Open positions still monitored; entries resume when equity recovers.";
   return (
     <div
-      className="flex items-center gap-2 border-b border-[color:var(--line)] bg-[color:var(--panel-alt)] px-4 py-1.5"
+      className="flex items-center gap-2.5 border-b border-[color:var(--line)] bg-[color:var(--panel-alt)] px-5 py-2"
       role="status"
     >
       <span
-        className="inline-block h-[7px] w-[7px]"
-        style={{ background: "var(--brass)", borderRadius: "1px" }}
+        className="inline-block h-[8px] w-[8px] shrink-0 rounded-full"
+        style={{ background: "var(--brass)" }}
         aria-hidden
       />
-      <span className="mono text-[12px] uppercase tracking-wider text-[color:var(--text)]">
-        Entries halted. Open positions still monitored.
-      </span>
+      <span className="text-[13px] font-semibold text-[color:var(--text)]">{message}</span>
     </div>
   );
 }

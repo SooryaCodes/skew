@@ -88,7 +88,7 @@ export function RiskPanel({ risk }: { risk: RiskAuthority | undefined }) {
           hint={`(${pct(deployed)})`}
         />
         <Row label="headroom" value={dollars(risk.available_dollars)} />
-        <Row label="drawdown" value={`${risk.drawdown_pct.toFixed(2)}%`} />
+        <Row label="drawdown" value={`${(risk.drawdown_pct * 100).toFixed(2)}%`} />
       </div>
 
       <div className="mt-2 border-t border-[color:var(--line)] pt-2">

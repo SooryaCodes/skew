@@ -1,47 +1,28 @@
 "use client";
 
 /**
- * The hero: type left, PRODUCT SHOT right. Not type floating on a graphic —
- * the composition every SaaS template fakes with an invented dashboard, we do
- * with the real one. Live iframe of /desk when the backend is armed; otherwise
- * the committed screenshot of the real desk, labelled with when it was
- * recorded. The skew surface renders behind at low opacity — ambient texture,
- * never a competing element. The hero is never empty.
+ * The hero: type left, PRODUCT SHOT right.
+ *
+ * The shot is a committed, real screenshot of the desk — deliberately NOT a
+ * live embed. The project rule is "no P&L in the headline": a live view would
+ * surface whatever the book happens to look like the moment a judge loads the
+ * page. A real capture, taken when the desk tells its story well and honestly
+ * dated, is stable evidence. Theme-aware: each theme shows its own capture.
  */
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
 
 import type { Surface, SystemStatus } from "@/lib/types";
 
 interface Props {
   status?: SystemStatus;
-  /** Unused since the reset — the hero is type + product shot, nothing behind. */
+  /** Unused since the reset — kept so the page's call signature is stable. */
   surface?: Surface;
   isLive: boolean;
   recordedAt?: string;
 }
 
-const SHOT_RECORDED = "Aug 30";
-
-export function Hero({ status, isLive, recordedAt }: Props) {
-  // The live desk only earns the frame when it would actually show data.
-  const showLiveDesk = isLive && Boolean(status?.broker_connected);
-  const [iframeDead, setIframeDead] = useState(false);
-  const live = showLiveDesk && !iframeDead;
-
-  // Scale the 1440px-wide live desk to whatever width the frame actually has.
-  const frameRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const el = frameRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => {
-      el.style.setProperty("--shot-scale", String(el.clientWidth / 1440));
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [live]);
-
+export function Hero(_props: Props) {
   return (
     <section aria-label="Hero" className="relative overflow-hidden pt-16">
       {/* backdrop: one soft accent glow + a fine grid fading out */}
@@ -80,74 +61,52 @@ export function Hero({ status, isLive, recordedAt }: Props) {
           </div>
         </div>
 
-        {/* product shot — the real desk in a browser frame, tilted 2.5deg */}
-        <figure
-          className="relative"
-          style={{ perspective: "1400px" }}
-        >
+        {/* product shot — the real desk, minimal frame, no fake chrome */}
+        <figure className="relative">
+          {/* ambient occlusion: a soft neutral shadow so the frame sits ON the
+              page instead of floating. Colourless by design. */}
           <div
-            className="overflow-hidden border border-[color:var(--line)]"
+            aria-hidden
+            className="absolute inset-x-6 -bottom-4 h-10"
+            style={{
+              background: "rgba(0, 0, 0, 0.5)",
+              filter: "blur(28px)",
+              borderRadius: "50%",
+            }}
+          />
+          <div
+            className="relative overflow-hidden border border-[color:var(--line)] bg-[color:var(--panel)]"
             style={{
               borderRadius: "14px",
               transform: "rotateY(-2.5deg) rotateX(1deg)",
               transformOrigin: "center",
-              background: "var(--panel)",
             }}
           >
-            {/* browser chrome */}
-            <div className="flex items-center gap-2 border-b border-[color:var(--line)] bg-[color:var(--panel)] px-3 py-2">
-              <span className="flex gap-1.5" aria-hidden>
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="inline-block h-[8px] w-[8px] rounded-full border border-[color:var(--line)]"
-                  />
-                ))}
-              </span>
-              <span className="mono flex-1 text-center text-[12px] text-[color:var(--text-dim)]">
-                skew — the desk
-              </span>
+            <div className="flex items-center gap-1.5 border-b border-[color:var(--line)] px-3.5 py-2.5" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="inline-block h-[9px] w-[9px] rounded-full border border-[color:var(--line)] bg-[color:var(--panel-alt)]"
+                />
+              ))}
             </div>
-            {live ? (
-              // The real thing, live, scaled into the frame. pointer-events off:
-              // it is a product shot, not an embedded app.
-              <div ref={frameRef} className="pointer-events-none relative aspect-[1440/860] overflow-hidden">
-                <iframe
-                  src="/desk?shot=1"
-                  title="The live desk"
-                  className="absolute left-0 top-0 origin-top-left"
-                  style={{ width: 1440, height: 860, transform: "scale(var(--shot-scale, 0.42))" }}
-                  onError={() => setIframeDead(true)}
-                  tabIndex={-1}
-                  aria-hidden
-                />
-              </div>
-            ) : (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element -- static shot, exact pixels */}
-                <img
-                  src="/shots/desk-dark.png"
-                  alt="The SKEW desk: universe rail, volatility instruments, risk authority and the audit stream"
-                  className="shot-dark block w-full"
-                  width={1440}
-                  height={860}
-                />
-                {/* eslint-disable-next-line @next/next/no-img-element -- static shot, exact pixels */}
-                <img
-                  src="/shots/desk-light.png"
-                  alt="The SKEW desk in the light theme"
-                  className="shot-light block w-full"
-                  width={1440}
-                  height={860}
-                />
-              </>
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element -- exact pixels */}
+            <img
+              src="/shots/desk-dark.png"
+              alt="The SKEW desk: universe rail, volatility instruments, risk authority and the audit stream"
+              className="shot-dark block w-full"
+              width={1440}
+              height={860}
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element -- exact pixels */}
+            <img
+              src="/shots/desk-light.png"
+              alt="The SKEW desk in the light theme"
+              className="shot-light block w-full"
+              width={1440}
+              height={860}
+            />
           </div>
-          <figcaption className="mt-3 text-right text-[13px] text-[color:var(--text-dim)]">
-            {live
-              ? "The desk — live right now"
-              : `The desk — recorded ${recordedAt ? new Date(recordedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : SHOT_RECORDED}`}
-          </figcaption>
         </figure>
       </div>
     </section>

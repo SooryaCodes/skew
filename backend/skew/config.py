@@ -147,6 +147,10 @@ class Settings(BaseSettings):
     # Long premium: the breakeven must sit within this many sigma of spot, or the
     # structure needs a tail event rather than ordinary movement to come good.
     max_breakeven_sigma: float = 1.25
+    # Unattended-judging circuit breaker: past this account drawdown the desk
+    # stops OPENING positions (monitoring continues) until equity recovers.
+    # An agent that stands itself down is the thesis, not a failure mode.
+    drawdown_breaker_pct: float = 0.05
     # Exit rules. The profit target sits mid 40-50% so short-DTE credit trades
     # can realistically close inside the competition week.
     profit_target_pct: float = 0.45

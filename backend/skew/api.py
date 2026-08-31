@@ -241,6 +241,32 @@ def _risk() -> RiskAuthority:
 # ------------------------------------------------------------------ endpoints
 
 
+START_TIME = datetime.now(UTC)
+
+
+def _drawdown_paused() -> bool:
+    """Whether the drawdown circuit breaker currently halts entries."""
+    try:
+        from skew.loop import breaker_engaged
+
+        desk = loop.get_desk()
+        return breaker_engaged(desk.risk_authority(), settings)
+    except Exception:  # noqa: BLE001 — status must never 500
+        return False
+
+
+@api.get("/health", summary="Liveness: last cycle and uptime")
+def get_health() -> dict[str, Any]:
+    """The unattended-judging heartbeat: alive, when it last thought, for how
+    long it has been up. Cheap enough for a platform healthcheck."""
+    report = loop.last_cycle()
+    return {
+        "status": "ok",
+        "last_cycle_at": report.ts.isoformat() if report else None,
+        "uptime_seconds": round((datetime.now(UTC) - START_TIME).total_seconds()),
+    }
+
+
 @api.get("/status", summary="System status and the paper-only guarantee")
 def get_status() -> dict[str, Any]:
     desk = loop.get_desk()
@@ -293,6 +319,7 @@ def get_status() -> dict[str, Any]:
         "account_id_suffix": loop.ACCOUNT["suffix"],
         "account_error": loop.ACCOUNT["error"],
         "instance_conflict": loop.CONFLICT["message"],
+        "drawdown_paused": _drawdown_paused(),
         # The standing exit rules, so the positions view can print each
         # position's own exit conditions instead of a vague promise.
         "exit_rules": {
@@ -814,5 +841,5 @@ def root() -> JSONResponse:
 
 
 @app.get("/health", include_in_schema=False)
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, Any]:
+    return get_health()

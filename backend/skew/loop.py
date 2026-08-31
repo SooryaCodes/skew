@@ -83,6 +83,17 @@ _SELECTOR: BoundedSelector | None = None
 # error is a competition-account mismatch, and an armed desk requires it None.
 ACCOUNT: dict[str, str | float | None] = {"suffix": None, "error": None, "equity": None}
 
+
+def breaker_engaged(risk, settings: Settings) -> bool:
+    """The drawdown circuit breaker, pure and testable.
+
+    Engaged when account drawdown from peak equity meets or exceeds the
+    configured threshold. A stood-down desk is the thesis working, not an
+    error state.
+    """
+    return risk is not None and risk.drawdown_pct >= settings.drawdown_breaker_pct
+
+
 # The two-instance guard, set at boot: when the broker holds option positions
 # this instance's book never created, another writer owns the account. Entries
 # stop; monitoring of OUR OWN positions continues.
@@ -156,7 +167,10 @@ def run_cycle(
     # Monitoring first, and unconditionally. Freeing capacity before looking for
     # new positions is also what lets a full book take a better trade.
     try:
-        report.decisions.extend(_monitor(desk, dry_run=dry_run, settings=cfg))
+        try:
+            report.decisions.extend(_monitor(desk, dry_run=dry_run, settings=cfg))
+        except Exception:  # one bad monitoring pass must never stop the cycle
+            log.exception("position monitoring raised — continuing with entry evaluation")
     except Exception as exc:
         log.exception("position monitoring failed")
         report.errors.append(f"monitor: {exc}")
@@ -274,6 +288,30 @@ def _evaluate_and_act(
                 ),
                 risk_tier=tier,
                 detail={"refused": len(result.candidates)},
+                trace=trace,
+            )
+        )
+        return decisions
+
+    # Drawdown circuit breaker: past the threshold the desk stops OPENING
+    # positions — monitoring continues elsewhere — and says so as a decision.
+    # Checked before the selector so a stood-down desk spends no model calls.
+    if breaker_engaged(result.risk, settings):
+        decisions.append(
+            audit.record_abstention(
+                symbol=symbol,
+                reason=(
+                    f"Entries paused — drawdown circuit breaker at "
+                    f"{settings.drawdown_breaker_pct:.0%}. Account drawdown "
+                    f"{result.risk.drawdown_pct:.1%} from peak equity. Open positions "
+                    f"remain monitored; entries resume when equity recovers."
+                ),
+                risk_tier=tier,
+                detail={
+                    "drawdown_breaker": True,
+                    "drawdown_pct": round(result.risk.drawdown_pct, 4),
+                    "threshold": settings.drawdown_breaker_pct,
+                },
                 trace=trace,
             )
         )

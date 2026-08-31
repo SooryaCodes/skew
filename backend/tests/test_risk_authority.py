@@ -216,3 +216,13 @@ def test_state_survives_a_fresh_read():
     evaluate_tier(EQUITY)
     assert get_authority(EQUITY).tier == 1
     assert get_authority(EQUITY).closed_trades == 3
+
+
+def test_drawdown_pct_field_is_a_decimal_like_every_other_pct():
+    """current_drawdown speaks percent internally; the RiskAuthority field is a
+    decimal. A 0.12% dip must never read as 12% — that false reading tripped
+    the drawdown circuit breaker on a healthy account."""
+    record_equity(100_000.0)
+    authority = get_authority(99_880.0, used_dollars=0.0, open_positions=0)
+    assert authority.drawdown_pct == pytest.approx(0.0012, abs=1e-4)
+    assert authority.drawdown_pct < 0.05  # breaker must NOT engage

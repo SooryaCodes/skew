@@ -43,7 +43,9 @@ def test_status_states_the_paper_only_guarantee(client):
 
 def test_root_and_health(client):
     assert client.get("/").json()["paper_only"] is True
-    assert client.get("/health").json() == {"status": "ok"}
+    health = client.get("/health").json()
+    assert health["status"] == "ok"
+    assert "last_cycle_at" in health and "uptime_seconds" in health
 
 
 def test_read_endpoints_return_empty_collections_before_a_cycle(client):
@@ -378,3 +380,14 @@ def test_refusals_carry_their_trace(client):
     body = client.get(f"/api/decision/{d.id}").json()
     assert body["detail"]["trace"]["classify"]["regime"] == "SELL_VOL"
     assert len(body["detail"]["gates"]) == 5
+
+
+def test_health_reports_last_cycle_and_uptime(client):
+    """The unattended-judging heartbeat: /health carries when the desk last
+    thought and how long the process has been alive."""
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert "last_cycle_at" in body
+    assert body["uptime_seconds"] >= 0

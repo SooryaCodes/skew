@@ -493,3 +493,58 @@ def test_closing_a_credit_position_is_a_debit_with_a_positive_limit(credit_sprea
     assert closing.limit_price > 0
     # And the buy-back costs roughly half the entry credit, from the halved mids.
     assert closing.limit_price < abs(credit_spread.limit_price)
+
+
+# ------------------------------------------------------- unattended judging
+
+
+def test_short_leg_in_the_money_forces_a_defensive_exit(credit_spread):
+    """Assignment risk: a short put with spot below its strike closes the
+    whole structure immediately, whatever the P&L or DTE."""
+    short = next(leg for leg in credit_spread.legs if leg.side == "SELL")
+    long_leg = next(leg for leg in credit_spread.legs if leg.side == "BUY")
+    mids = {short.symbol: 1.90, long_leg.symbol: 1.15}
+
+    safe = evaluate_exit(credit_spread, mids, as_of=EXPIRY - timedelta(days=10),
+                         spot=short.strike + 5)
+    assert safe.rule != "short_itm"
+
+    breached = evaluate_exit(credit_spread, mids, as_of=EXPIRY - timedelta(days=10),
+                             spot=short.strike - 0.5)
+    assert breached.should_exit
+    assert breached.rule == "short_itm"
+    assert "in the money" in breached.reason and "Assignment" in breached.reason
+
+
+def test_two_dte_close_is_unconditional(credit_spread):
+    """The hard rule for judging season: nothing rides into expiry week's end."""
+    short = next(leg for leg in credit_spread.legs if leg.side == "SELL")
+    long_leg = next(leg for leg in credit_spread.legs if leg.side == "BUY")
+    # A mildly losing position (buy-back above entry, under the loss limit)
+    # still closes on DTE — the rule is unconditional, not profit-gated.
+    mids = {short.symbol: 2.20, long_leg.symbol: 1.20}
+    signal = evaluate_exit(credit_spread, mids, as_of=EXPIRY - timedelta(days=2))
+    assert signal.should_exit and signal.rule == "dte"
+
+
+def test_drawdown_breaker_engages_at_the_threshold():
+    from skew.config import Settings
+    from skew.loop import breaker_engaged
+
+    cfg = Settings(_env_file=None)
+    risk_ok = make_risk_authority(drawdown_pct=0.04)
+    risk_hit = make_risk_authority(drawdown_pct=0.05)
+    assert not breaker_engaged(risk_ok, cfg)
+    assert breaker_engaged(risk_hit, cfg)
+    assert not breaker_engaged(None, cfg)
+
+
+def make_risk_authority(drawdown_pct: float):
+    from skew.models import RiskAuthority
+
+    return RiskAuthority(
+        tier=0, max_loss_pct=0.005, budget_dollars=500.0, portfolio_pct=0.015,
+        portfolio_cap_dollars=1500.0, used_dollars=0.0, closed_trades=0, breaches=0,
+        drawdown_pct=drawdown_pct, equity=95000.0, open_positions=0,
+        max_concurrent_positions=3, next_promotion="",
+    )

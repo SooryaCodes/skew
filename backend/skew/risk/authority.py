@@ -211,7 +211,11 @@ def get_authority(
         used_dollars=round(used_dollars, 2),
         closed_trades=closed,
         breaches=breaches,
-        drawdown_pct=round(drawdown, 4),
+        # current_drawdown() speaks in PERCENT for the tier logic; the model's
+        # *_pct fields are decimals everywhere else. Convert at the boundary —
+        # leaving this in percent made a 0.12% dip read as 12% and falsely
+        # tripped the drawdown circuit breaker.
+        drawdown_pct=round(drawdown / 100.0, 6),
         equity=round(equity, 2),
         open_positions=open_positions,
         max_concurrent_positions=settings.max_concurrent_positions,
