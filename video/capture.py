@@ -22,7 +22,7 @@ FRAMES = ROOT / "frames"
 FRAMES.mkdir(exist_ok=True)
 
 LOWER_THIRD_CSS = """
-.vd-lower{position:fixed;left:0;bottom:96px;z-index:99999;background:rgba(16,16,19,.92);
+.vd-lower{position:fixed;left:0;bottom:210px;z-index:99999;background:rgba(16,16,19,.92);
 border:1px solid #232329;border-left:none;border-radius:0 12px 12px 0;padding:18px 30px;
 font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-size:26px;color:#f4f4f6;
 transform:translateX(-105%);animation:vdin .3s cubic-bezier(.2,.8,.2,1) .4s forwards}
@@ -116,6 +116,7 @@ def capture_segment(p, seg, trace_id: str | None):
     ctx = browser.new_context(
         viewport={"width": 1920, "height": 1080},
         device_scale_factor=2,
+        color_scheme="dark",
         record_video_dir=str(FRAMES / "raw"),
         record_video_size={"width": 1920, "height": 1080},
         reduced_motion="no-preference",
@@ -132,9 +133,18 @@ def capture_segment(p, seg, trace_id: str | None):
         page.goto(f"file://{ROOT / 'motion' / 'title.html'}")
         page.wait_for_timeout(int(hold * 1000))
     elif sid == "s2":
-        page.goto(f"{TARGET}/desk?shot=1", wait_until="networkidle")
+        page.goto(f"{TARGET}/desk?shot=1&theme=dark", wait_until="networkidle")
         page.wait_for_selector("text=VRP", timeout=30000)
         page.wait_for_timeout(2500)
+        # The VO says implied is running ABOVE realized — film the most
+        # vol-rich name, never whatever the default selection happens to be.
+        page.evaluate(
+            """() => { const rows=[...document.querySelectorAll('nav[aria-label="Universe"] button')];
+              const best = rows.map(b=>({b, v:parseFloat((b.textContent.match(/[+\u2212-]\d+\.\d/)||['0'])[0].replace('\u2212','-'))}))
+                 .sort((x,y)=>y.v-x.v)[0];
+              if (best && best.v > 0) best.b.click(); }"""
+        )
+        page.wait_for_timeout(2000)
         inject(page)
         vrp = page.evaluate(
             """() => { const el=[...document.querySelectorAll('p,span')]
@@ -145,7 +155,7 @@ def capture_segment(p, seg, trace_id: str | None):
         callout_text(page, "VRP", vrp)
         page.wait_for_timeout(int(hold * 1000))
     elif sid == "s3":
-        page.goto(f"{TARGET}/desk?shot=1", wait_until="networkidle")
+        page.goto(f"{TARGET}/desk?shot=1&theme=dark", wait_until="networkidle")
         page.wait_for_selector("text=CANDIDATES", timeout=30000)
         page.wait_for_timeout(2000)
         smooth_scroll(page, 500, 1400)
@@ -154,7 +164,7 @@ def capture_segment(p, seg, trace_id: str | None):
         callout_text(page, "MAX LOSS")
         page.wait_for_timeout(int(hold * 1000))
     elif sid == "s4":
-        page.goto(TARGET, wait_until="networkidle")
+        page.goto(f"{TARGET}/?theme=dark&capture=1", wait_until="networkidle")
         page.wait_for_timeout(2500)
         target_y = page.evaluate(
             "() => { const el=[...document.querySelectorAll('section')]"
@@ -166,20 +176,20 @@ def capture_segment(p, seg, trace_id: str | None):
         smooth_scroll(page, int(target_y) + 700, 3500)  # scrub the pin
         page.wait_for_timeout(int(hold * 1000))
     elif sid == "s5":
-        page.goto(f"{TARGET}/positions", wait_until="networkidle")
+        page.goto(f"{TARGET}/positions?theme=dark", wait_until="networkidle")
         page.wait_for_timeout(2500)
         inject(page)
         lower_third(page, "one atomic multi-leg order · both legs together")
         page.wait_for_timeout(int(hold * 1000))
     elif sid == "s6":
-        page.goto(f"{TARGET}/desk?shot=1", wait_until="networkidle")
+        page.goto(f"{TARGET}/desk?shot=1&theme=dark", wait_until="networkidle")
         page.wait_for_selector("text=RISK AUTHORITY", timeout=30000)
         page.wait_for_timeout(2000)
         inject(page)
         callout_text(page, "RISK AUTHORITY")
         page.wait_for_timeout(int(hold * 1000))
     elif sid == "s7":
-        page.goto(f"{TARGET}/mcp", wait_until="networkidle")
+        page.goto(f"{TARGET}/mcp?theme=dark", wait_until="networkidle")
         page.wait_for_timeout(1500)
         inject(page)
         lower_third(page, "skew.zevora.io/mcp")
@@ -188,7 +198,7 @@ def capture_segment(p, seg, trace_id: str | None):
         smooth_scroll(page, 1400, 3200)
         page.wait_for_timeout(int(hold * 1000))
     elif sid == "s8":
-        page.goto(f"{TARGET}/trace/{trace_id}", wait_until="networkidle")
+        page.goto(f"{TARGET}/trace/{trace_id}?theme=dark", wait_until="networkidle")
         page.wait_for_timeout(2500)
         smooth_scroll(page, 700, 3000)
         page.wait_for_timeout(int(hold * 1000))
