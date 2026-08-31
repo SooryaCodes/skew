@@ -17,7 +17,7 @@ interface Props {
 export function Numbers({ traced, tracedProvenance }: Props) {
   const figures = [
     { value: 84, label: "scenarios per candidate" },
-    { value: 7, label: "deterministic gates" },
+    { value: 5, label: "deterministic gates" },
     { value: 0, label: "live code paths" },
     { value: traced, label: "decisions traced", note: tracedProvenance },
   ];

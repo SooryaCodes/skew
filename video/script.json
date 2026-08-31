@@ -1,0 +1,170 @@
+{
+  "meta": {
+    "target_url": "https://skew.zevora.io",
+    "repo_url": "https://github.com/SooryaCodes/skew",
+    "fps": 30,
+    "resolution": [
+      1920,
+      1080
+    ],
+    "hard_ceiling_s": 180
+  },
+  "segments": [
+    {
+      "id": "s1",
+      "title": "OPEN",
+      "overlay": "title_card",
+      "actions": [
+        {
+          "kind": "motion",
+          "page": "motion/title.html"
+        }
+      ],
+      "vo": "Every other agent in this hackathon is guessing which way the market goes. This one never does.",
+      "duration_s": 6.047
+    },
+    {
+      "id": "s2",
+      "title": "THE THESIS",
+      "overlay": "number_callout_vrp",
+      "actions": [
+        {
+          "kind": "goto",
+          "path": "/desk"
+        },
+        {
+          "kind": "wait",
+          "selector": "text=VRP"
+        },
+        {
+          "kind": "callout",
+          "target": "vrp"
+        }
+      ],
+      "vo": "An option's price is driven by how much movement the market expects. That expectation runs persistently above what actually happens, because people pay for protection. Right now implied volatility on this name is running well above realized. That gap is the entire signal. Direction is not an input.",
+      "duration_s": 18.226
+    },
+    {
+      "id": "s3",
+      "title": "CONSTRUCTION",
+      "overlay": "number_callout_maxloss",
+      "actions": [
+        {
+          "kind": "click",
+          "selector": "[role=tab]"
+        },
+        {
+          "kind": "scroll_to",
+          "selector": "text=payoff"
+        },
+        {
+          "kind": "callout",
+          "target": "max_loss"
+        }
+      ],
+      "vo": "Volatility is rich, so the desk sells premium. A defined risk spread, sized backwards from the risk budget. Maximum loss is computed before the position exists. Not estimated. Computed.",
+      "duration_s": 12.963
+    },
+    {
+      "id": "s4",
+      "title": "THE REFUSAL",
+      "overlay": "speed_ramp",
+      "actions": [
+        {
+          "kind": "scroll_to",
+          "selector": "text=STRESS"
+        },
+        {
+          "kind": "hold",
+          "on": "breached_cell"
+        }
+      ],
+      "vo_parts": [
+        {
+          "text": "Before anything executes, that exact structure is repriced across eighty four scenarios. Price shocks to three standard deviations, implied volatility doubling, at three points in time. In this cell the position loses more than its budget allows."
+        },
+        {
+          "silence_s": 1.5
+        },
+        {
+          "text": "So it does not trade."
+        }
+      ],
+      "duration_s": 18.401
+    },
+    {
+      "id": "s5",
+      "title": "EXECUTION",
+      "overlay": null,
+      "actions": [
+        {
+          "kind": "goto",
+          "path": "/desk"
+        },
+        {
+          "kind": "show",
+          "what": "second candidate, gates green, fill line"
+        }
+      ],
+      "vo": "A second structure clears every gate and executes as a single atomic multi leg order. Both legs together, never legged in.",
+      "duration_s": 8.114
+    },
+    {
+      "id": "s6",
+      "title": "AUTHORITY",
+      "overlay": null,
+      "actions": [
+        {
+          "kind": "scroll_to",
+          "selector": "text=RISK AUTHORITY"
+        }
+      ],
+      "vo": "A hundred thousand dollar paper account. The desk starts at half a percent of equity per position and earns larger limits only by closing trades without a breach. Size is a privilege, not a default.",
+      "duration_s": 12.328
+    },
+    {
+      "id": "s7",
+      "title": "MCP",
+      "overlay": "lower_third_mcp",
+      "actions": [
+        {
+          "kind": "goto",
+          "path": "/mcp"
+        }
+      ],
+      "vo": "The whole desk is exposed over MCP, so an assistant can operate it directly. Seven read tools are always on. The two that place orders are not even registered unless explicitly enabled, and both re-run the full gate chain. The model can choose among approved structures. It cannot invent one.",
+      "duration_s": 18.23
+    },
+    {
+      "id": "s8",
+      "title": "TRACE",
+      "overlay": null,
+      "actions": [
+        {
+          "kind": "goto",
+          "path": "/trace"
+        },
+        {
+          "kind": "scroll",
+          "to": "bottom"
+        }
+      ],
+      "vo": "Every decision is reconstructible to its inputs. Including the ones it refused.",
+      "duration_s": 5.768
+    },
+    {
+      "id": "s9",
+      "title": "CLOSE",
+      "overlay": "end_card",
+      "actions": [
+        {
+          "kind": "motion",
+          "page": "motion/end.html"
+        }
+      ],
+      "vo": "Skew, by team Zevora. It does not predict the market. It prices it.",
+      "min_hold_s": 3.0,
+      "duration_s": 5.484
+    }
+  ]
+}
