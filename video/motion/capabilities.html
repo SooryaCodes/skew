@@ -1,0 +1,48 @@
+<!doctype html><meta charset="utf-8">
+<style>
+  :root{--ground:#09090b;--panel:#101013;--line:#232329;--text:#f4f4f6;--dim:#9d9da8;
+        --accent:#7c7cf2;--brass:#d9a441;--steel:#7fa5c9;--neg:#f2555a;--pos:#46c288}
+  *{margin:0;box-sizing:border-box}
+  body{width:1920px;height:1080px;background:var(--ground);color:var(--text);
+       font-family:-apple-system,"Manrope",sans-serif;overflow:hidden;
+       display:flex;align-items:center;justify-content:center;gap:32px}
+  .card{width:400px;height:520px;background:var(--panel);border:1px solid var(--line);
+        border-radius:20px;padding:36px;opacity:0;
+        animation:rise .55s cubic-bezier(.2,.8,.2,1) forwards}
+  .card:nth-child(1){animation-delay:.3s}.card:nth-child(2){animation-delay:.75s}
+  .card:nth-child(3){animation-delay:1.2s}.card:nth-child(4){animation-delay:1.65s}
+  h2{font-size:30px;font-weight:800;letter-spacing:-.01em}
+  p{margin-top:10px;font-size:20px;color:var(--dim);line-height:1.5;min-height:90px}
+  .inst{margin-top:26px;height:230px;display:flex;align-items:center;justify-content:center}
+  @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+  .grid{display:grid;grid-template-columns:repeat(7,34px);gap:5px}
+  .grid span{height:30px;border-radius:5px;background:color-mix(in srgb,var(--pos) 8%,var(--panel))}
+  .grid span.warm{background:color-mix(in srgb,var(--brass) 30%,var(--panel))}
+  .grid span.bad{background:color-mix(in srgb,var(--neg) 40%,var(--panel));outline:2px solid var(--neg)}
+  .pips{display:flex;gap:14px}
+  .pips i{width:38px;height:38px;border-radius:9px;border:2px solid var(--line)}
+  .pips i.on{background:var(--brass);border-color:var(--brass)}
+</style>
+<body>
+  <div class="card"><h2>MEASURE</h2><p>Implied against realized, eight names, every five minutes.</p>
+    <div class="inst"><svg viewBox="0 0 320 200" width="320">
+      <path d="M10 60 C 90 40, 180 70, 310 50" stroke="var(--brass)" stroke-width="4" fill="none"/>
+      <path d="M10 150 C 90 140, 180 165, 310 148" stroke="var(--steel)" stroke-width="4" fill="none"/>
+      <line x1="160" y1="57" x2="160" y2="153" stroke="var(--accent)" stroke-width="3"/>
+    </svg></div></div>
+  <div class="card"><h2>CONSTRUCT</h2><p>Defined-risk structures sized to the budget.</p>
+    <div class="inst"><svg viewBox="0 0 320 200" width="320">
+      <line x1="10" y1="100" x2="310" y2="100" stroke="var(--line)" stroke-width="2"/>
+      <path d="M10 150 L120 150 L200 55 L310 55" stroke="var(--accent)" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <text x="16" y="178" font-size="17" fill="var(--dim)">max loss — known first</text>
+    </svg></div></div>
+  <div class="card"><h2>PROVE</h2><p>Eighty-four scenarios before anything executes.</p>
+    <div class="inst"><div class="grid">
+      <span></span><span></span><span></span><span></span><span class="warm"></span><span class="warm"></span><span class="bad"></span>
+      <span></span><span></span><span></span><span class="warm"></span><span class="warm"></span><span class="bad"></span><span class="bad"></span>
+      <span></span><span></span><span></span><span></span><span class="warm"></span><span class="warm"></span><span class="bad"></span>
+      <span></span><span></span><span></span><span></span><span></span><span class="warm"></span><span class="warm"></span>
+    </div></div></div>
+  <div class="card"><h2>GOVERN</h2><p>Limits the desk has to earn, trade by trade.</p>
+    <div class="inst"><div class="pips"><i class="on"></i><i></i><i></i></div></div></div>
+</body>

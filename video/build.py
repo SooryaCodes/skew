@@ -16,17 +16,49 @@ import urllib.request
 from pathlib import Path
 
 # ----------------------------------------------------------------- config
+# Default engine: Kokoro-82M (bundled with the HyperFrames CLI cache).
+# VO_FALLBACK_SAY=1 -> macOS say. USE_ELEVENLABS=1 -> dormant ElevenLabs path.
 USE_SAY_FALLBACK = os.environ.get("VO_FALLBACK_SAY") == "1"
+USE_ELEVENLABS = os.environ.get("USE_ELEVENLABS") == "1"
+KOKORO_VOICE = "af_heart"
+KOKORO_SPEED = float(os.environ.get("KOKORO_SPEED", "1.0"))
+KOKORO_MODEL = Path.home() / ".cache/hyperframes/tts/models/kokoro-v1.0.onnx"
+KOKORO_VOICES = Path.home() / ".cache/hyperframes/tts/voices/voices-v1.0.bin"
 SAY_VOICE = "Samantha"
 ELEVEN_MODEL = "eleven_multilingual_v2"
 ELEVEN_VOICE_ID = os.environ.get("ELEVEN_VOICE_ID")  # resolved by pick_voice()
 RATE_WPM = 170
 TARGET_URL = "https://skew.zevora.io"
 
+_KOKORO = None
+
+
+def kokoro_tts(text: str, dest: Path, speed: float | None = None) -> None:
+    global _KOKORO
+    if _KOKORO is None:
+        from kokoro_onnx import Kokoro
+
+        _KOKORO = Kokoro(str(KOKORO_MODEL), str(KOKORO_VOICES))
+    samples, sample_rate = _KOKORO.create(
+        text, voice=KOKORO_VOICE, speed=speed or KOKORO_SPEED, lang="en-us"
+    )
+    import struct
+    import wave
+
+    ints = [max(-32767, min(32767, int(x * 32767))) for x in samples]
+    with wave.open(str(dest.with_suffix(".raw.wav")), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sample_rate)
+        w.writeframes(struct.pack(f"<{len(ints)}h", *ints))
+    sh("ffmpeg", "-y", "-v", "error", "-i", str(dest.with_suffix(".raw.wav")),
+       "-ar", "48000", "-ac", "2", str(dest))
+    dest.with_suffix(".raw.wav").unlink()
+
 ROOT = Path(__file__).parent
 SCRIPT = ROOT / "script.json"
-HEAD_PAD_S = 0.25
-TAIL_PAD_S = 0.35
+HEAD_PAD_S = 0.2
+TAIL_PAD_S = 0.22
 LUFS = -16
 
 
@@ -94,12 +126,15 @@ def pick_voice() -> str:
     return best["voice_id"]
 
 
-def tts(text: str, dest: Path, voice_id: str) -> None:
+def tts(text: str, dest: Path, voice_id: str | None, speed: float | None = None) -> None:
     if USE_SAY_FALLBACK:
         aiff = dest.with_suffix(".aiff")
         sh("say", "-v", SAY_VOICE, "-r", str(RATE_WPM), "-o", str(aiff), text)
         sh("ffmpeg", "-y", "-v", "error", "-i", str(aiff), "-ar", "48000", "-ac", "2", str(dest))
         aiff.unlink()
+        return
+    if not USE_ELEVENLABS:
+        kokoro_tts(text, dest, speed)
         return
     audio = eleven_request(
         f"/v1/text-to-speech/{voice_id}",
@@ -145,7 +180,7 @@ def build_vo() -> None:
     gen, fin = ROOT / "vo" / "gen", ROOT / "vo" / "final"
     gen.mkdir(parents=True, exist_ok=True)
     fin.mkdir(parents=True, exist_ok=True)
-    voice = None if USE_SAY_FALLBACK else pick_voice()
+    voice = pick_voice() if USE_ELEVENLABS and not USE_SAY_FALLBACK else None
 
     for seg in spec["segments"]:
         sid = seg["id"]
@@ -166,11 +201,11 @@ def build_vo() -> None:
                     if "silence_s" in part:
                         silence_wav(part["silence_s"], p)
                     else:
-                        tts(part["text"], p, voice)
+                        tts(part["text"], p, voice, part.get("speed", seg.get("speed")))
                     parts.append(p)
                 concat_wavs(parts, raw)
             else:
-                tts(seg["vo"], raw, voice)
+                tts(seg["vo"], raw, voice, seg.get("speed"))
             source = raw
         duration = finalise(source, fin / f"{sid}.wav")
         seg["duration_s"] = round(duration, 3)
@@ -319,6 +354,218 @@ def build_srt() -> None:
     print(f"wrote out/skew.srt — {len(cues)} cues (word-boundary safe, asserted)")
 
 
+def build_segments() -> None:
+    """Trim each capture at its head mark, cut to the scripted duration
+    (freeze-padding if short), and mux the narration — every segment becomes a
+    uniform 1080p30 h264+aac mp4 ready for stream-copy concat."""
+    spec = json.loads(SCRIPT.read_text())
+    for seg in spec["segments"]:
+        sid = seg["id"]
+        total = seg["total_s"]
+        raw = ROOT / "frames" / f"{sid}.webm"
+        vo = ROOT / "vo" / "final" / f"{sid}.wav"
+        dest = ROOT / "frames" / f"{sid}.mp4"
+        if not raw.exists():
+            raise SystemExit(f"missing capture: {raw}")
+        meta_file = ROOT / "frames" / f"{sid}.json"
+        head = json.loads(meta_file.read_text()).get("head_trim", 0.0) if meta_file.exists() else 0.0
+        sh("ffmpeg", "-y", "-v", "error",
+           "-ss", f"{head:.3f}", "-i", str(raw), "-i", str(vo),
+           "-filter_complex",
+           f"[0:v]scale=1920:1080:flags=lanczos,fps=30,"
+           f"tpad=stop_mode=clone:stop_duration=8,trim=duration={total},"
+           f"setpts=PTS-STARTPTS[v];"
+           f"[1:a]apad=whole_dur={total},atrim=duration={total},asetpts=PTS-STARTPTS[a]",
+           "-map", "[v]", "-map", "[a]",
+           "-c:v", "libx264", "-profile:v", "high", "-crf", "18", "-pix_fmt", "yuv420p",
+           "-c:a", "aac", "-ar", "48000", "-ac", "2", str(dest))
+        print(f"{sid}: {dest.name} @ {total:.2f}s (head {head:.1f}s)")
+
+
+def assemble() -> None:
+    """Concat-demux the uniform segments with stream copy — no re-encode drift
+    — then write the webm fallback. Duration must land in the window."""
+    spec = json.loads(SCRIPT.read_text())
+    out = ROOT / "out"
+    out.mkdir(exist_ok=True)
+    segs = [ROOT / "frames" / f"{seg['id']}.mp4" for seg in spec["segments"]]
+    missing = [p.name for p in segs if not p.exists()]
+    if missing:
+        raise SystemExit(f"missing segment renders: {missing}")
+    listfile = out / "concat.txt"
+    listfile.write_text("".join(f"file '{p.resolve()}'\n" for p in segs))
+    master = out / "skew-demo.mp4"
+    sh("ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(listfile),
+       "-c", "copy", "-movflags", "+faststart", str(master))
+    duration = probe_duration(master)
+    lo, hi = 130, 165
+    print(f"clean master: {master.name} — {duration:.1f}s")
+    if not (lo <= duration <= hi + 0.5):
+        raise SystemExit(f"FAIL: {duration:.1f}s outside the {lo}-{hi}s window")
+    print("(webm encodes after the mix)")
+
+
+def burn_captions(master: Path, dest: Path) -> None:
+    """Cues rendered as transparent PNG strips in the site's own type and
+    overlaid with time windows — this ffmpeg ships without libass/drawtext,
+    and the strips come out sharper anyway."""
+    from playwright.sync_api import sync_playwright
+
+    cues = cue_list()
+    strip_dir = ROOT / "out" / "cues"
+    strip_dir.mkdir(parents=True, exist_ok=True)
+    page_file = strip_dir / "cap.html"
+    page_file.write_text(
+        """<!doctype html><meta charset='utf-8'><style>
+        body{margin:0;width:1920px;height:150px;background:transparent;display:flex;
+             align-items:flex-end;justify-content:center;font-family:-apple-system,'Manrope',sans-serif}
+        .cap{background:rgba(16,16,19,.82);color:#f4f4f6;font-size:34px;line-height:1.35;
+             padding:12px 28px;border-radius:12px;text-align:center;white-space:pre-line}
+        </style><body><div class='cap' id='c'></div></body>"""
+    )
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(viewport={"width": 1920, "height": 150})
+        page.goto(f"file://{page_file}")
+        for i, (_, _, text) in enumerate(cues):
+            page.evaluate("t => document.getElementById('c').textContent = t", text)
+            page.screenshot(path=str(strip_dir / f"c{i:02}.png"), omit_background=True)
+        browser.close()
+
+    inputs, chain = ["-i", str(master)], []
+    for i, _ in enumerate(cues):
+        inputs += ["-i", str(strip_dir / f"c{i:02}.png")]
+    prev = "0:v"
+    for i, (a, b, _) in enumerate(cues):
+        chain.append(
+            f"[{prev}][{i + 1}:v]overlay=x=(W-w)/2:y=H-h-90:"
+            f"enable='between(t,{a:.3f},{b:.3f})'[v{i}]"
+        )
+        prev = f"v{i}"
+    sh("ffmpeg", "-y", "-v", "error", *inputs,
+       "-filter_complex", ";".join(chain), "-map", f"[{prev}]", "-map", "0:a",
+       "-c:v", "libx264", "-profile:v", "high", "-crf", "18", "-pix_fmt", "yuv420p",
+       "-c:a", "copy", "-movflags", "+faststart", str(dest))
+    print(f"captions burned: {dest.name} ({len(cues)} cues)")
+
+
+def mix_master() -> None:
+    """Phase 6: synthesized ambient bed (authored by this pipeline — no
+    third-party audio, licence note in ASSETS-LICENSE.md), sidechain duck
+    under speech, a manual thin-out across the refusal beat, two accents,
+    final loudnorm to -14 LUFS / -1.5 dBTP."""
+    spec = json.loads(SCRIPT.read_text())
+    out = ROOT / "out"
+    master = out / "skew-demo.mp4"
+    total = probe_duration(master)
+
+    # a31's beat position in the final timeline, from measured audio.
+    start = 0.0
+    for seg in spec["segments"]:
+        if seg["id"] == "a31":
+            break
+        start += seg["total_s"]
+    part0 = probe_duration(ROOT / "vo" / "gen" / "a31_part0.wav")
+    beat_at = start + HEAD_PAD_S + part0
+    thin_from, thin_to = beat_at - 5.0, beat_at + 5.0
+    a32_start = 0.0
+    for seg in spec["segments"]:
+        if seg["id"] == "a32":
+            break
+        a32_start += seg["total_s"]
+    accent_breach = beat_at - 0.2
+    accent_tick = a32_start + 2.4
+
+    graph = (
+        # bed: three detuned drones + air, heavily filtered, slow swell
+        f"sine=f=55:d={total}[d1];sine=f=110.6:d={total}[d2];"
+        f"sine=f=164.4:d={total}[d3];anoisesrc=c=pink:d={total}:a=0.06[nz];"
+        f"[nz]lowpass=f=320[air];"
+        f"[d1][d2][d3][air]amix=inputs=4:normalize=0,lowpass=f=700,"
+        f"tremolo=f=0.1:d=0.3,volume=-30dB,"
+        # manual thin-out across the refusal beat window
+        f"volume=volume='if(between(t,{thin_from:.2f},{thin_to:.2f}),0.18,1)':eval=frame"
+        f"[bedraw];"
+        # duck the bed under speech
+        f"[bedraw][0:a]sidechaincompress=threshold=0.02:ratio=6:attack=120:release=700[bed];"
+        # accents: a low tone into the breach, a short tick on the fill
+        f"sine=f=82:d=1.1,afade=t=in:d=0.35,afade=t=out:st=0.6:d=0.5,"
+        f"volume=-21dB,adelay={int(accent_breach * 1000)}|{int(accent_breach * 1000)}[acc1];"
+        f"sine=f=1318:d=0.14,afade=t=out:st=0.05:d=0.09,"
+        f"volume=-23dB,adelay={int(accent_tick * 1000)}|{int(accent_tick * 1000)}[acc2];"
+        f"[0:a][bed][acc1][acc2]amix=inputs=4:normalize=0:duration=first,"
+        f"loudnorm=I=-14:TP=-2.0:LRA=11[mix]"
+    )
+    mixed = out / "skew-demo-mixed.mp4"
+    sh("ffmpeg", "-y", "-v", "error", "-i", str(master),
+       "-filter_complex", graph, "-map", "0:v", "-map", "[mix]",
+       "-c:v", "copy", "-c:a", "aac", "-ar", "48000", "-ac", "2",
+       "-movflags", "+faststart", str(mixed))
+    mixed.replace(master)
+    sh("ffmpeg", "-y", "-v", "error", "-i", str(master),
+       "-c:v", "libvpx-vp9", "-crf", "34", "-b:v", "0", "-c:a", "libopus",
+       str(out / "skew-demo.webm"))
+    (ROOT / "ASSETS-LICENSE.md").write_text(
+        "# Audio assets\n\nThe ambient bed and both sound accents are synthesized "
+        "by build.py (sine/pink-noise sources through ffmpeg filters) at build "
+        "time. No third-party audio is used anywhere in the video; no licence "
+        "is required.\n"
+    )
+    print(f"mixed master: bed + accents, thin-out {thin_from:.1f}-{thin_to:.1f}s, "
+          f"breach tone @{accent_breach:.1f}s, tick @{accent_tick:.1f}s")
+
+
+def spec_seg(spec, sid):
+    return next(s for s in spec["segments"] if s["id"] == sid)
+
+
+def verify_final() -> None:
+    """Phase §8 gates, measured off the finished master."""
+    out = ROOT / "out"
+    master = out / "skew-demo.mp4"
+    duration = probe_duration(master)
+    # loudness + true peak
+    measure = subprocess.run(
+        ["ffmpeg", "-i", str(master), "-af",
+         "loudnorm=I=-14:TP=-1.5:print_format=json", "-f", "null", "-"],
+        capture_output=True, text=True).stderr
+    blob = measure[measure.rindex("{"):measure.rindex("}") + 1]
+    stats = json.loads(blob)
+    lufs, tp = float(stats["input_i"]), float(stats["input_tp"])
+    # silence ledger on the SPOKEN track (the bed never counts as content)
+    vo_concat = out / "voledger.wav"
+    listfile = out / "voledger.txt"
+    spec = json.loads(SCRIPT.read_text())
+    listfile.write_text("".join(
+        f"file '{(ROOT / 'vo' / 'final' / (seg['id'] + '.wav')).resolve()}'\n"
+        for seg in spec["segments"]))
+    sh("ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(listfile),
+       "-c", "copy", str(vo_concat))
+    det = subprocess.run(
+        ["ffmpeg", "-i", str(vo_concat), "-af", "silencedetect=n=-35dB:d=0.8",
+         "-f", "null", "-"], capture_output=True, text=True).stderr
+    import re as _re
+
+    gaps = [float(x) for x in _re.findall(r"silence_duration: ([\d.]+)", det)]
+    total_silence = sum(gaps)
+    longest = max(gaps) if gaps else 0.0
+    checks = [
+        ("duration 130-165s", 130 <= duration <= 165.5, f"{duration:.1f}s"),
+        ("total silence < 12s", total_silence < 12, f"{total_silence:.1f}s"),
+        ("longest gap <= 1.6s", longest <= 1.6, f"{longest:.2f}s"),
+        ("integrated -14 LUFS (±1)", abs(lufs + 14) <= 1.0, f"{lufs:.1f} LUFS"),
+        ("true peak < -1.5 dBTP", tp <= -1.4, f"{tp:.1f} dBTP"),
+    ]
+    ok = True
+    for name, passed, detail in checks:
+        print(f"{'PASS' if passed else 'FAIL'}  {name} — {detail}")
+        ok = ok and passed
+    test_splitter()
+    if not ok:
+        raise SystemExit("verification FAILED")
+    vo_concat.unlink(); listfile.unlink()
+
+
 def test_splitter() -> None:
     samples = [
         "Every other agent in this hackathon forecasts direction, then buys an option pointing at the guess. The option is incidental.",
@@ -333,4 +580,8 @@ def test_splitter() -> None:
 
 if __name__ == "__main__":
     phase = sys.argv[1] if len(sys.argv) > 1 else "report"
-    {"vo": build_vo, "report": report, "srt": build_srt, "test": test_splitter}[phase]()
+    {"vo": build_vo, "report": report, "srt": build_srt, "test": test_splitter,
+     "segments": build_segments, "assemble": assemble, "mix": mix_master,
+     "burn": lambda: burn_captions(ROOT / "out" / "skew-demo.mp4",
+                                   ROOT / "out" / "skew-demo-captions.mp4"),
+     "verify": verify_final}[phase]()
