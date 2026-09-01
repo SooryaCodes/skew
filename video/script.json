@@ -7,87 +7,95 @@
       1920,
       1080
     ],
-    "hard_ceiling_s": 180
+    "duration_window_s": [
+      130,
+      165
+    ],
+    "hard_ceiling_s": 180,
+    "silence_budget_s": 12.0,
+    "max_single_silence_s": 1.6,
+    "max_static_hold_s": 4.0
   },
   "segments": [
     {
-      "id": "s1",
-      "title": "OPEN",
-      "overlay": "title_card",
-      "actions": [
-        {
-          "kind": "motion",
-          "page": "motion/title.html"
-        }
-      ],
-      "vo": "Every other agent in this hackathon is guessing which way the market goes. This one never does.",
-      "duration_s": 6.047,
-      "hold_extra_s": 0,
-      "total_s": 6.047
+      "id": "a11",
+      "act": 1,
+      "title": "TITLE",
+      "kind": "motion",
+      "page": "motion/title.html",
+      "vo": "This is Skew. An autonomous options desk that never predicts where the market is going.",
+      "duration_s": 5.382,
+      "total_s": 5.382
     },
     {
-      "id": "s2",
-      "title": "THE THESIS",
-      "overlay": "number_callout_vrp",
-      "actions": [
-        {
-          "kind": "goto",
-          "path": "/desk"
-        },
-        {
-          "kind": "wait",
-          "selector": "text=VRP"
-        },
-        {
-          "kind": "callout",
-          "target": "vrp"
-        }
-      ],
-      "vo": "An option's price is driven by how much movement the market expects. That expectation runs persistently above what actually happens, because people pay for protection. Right now implied volatility on this name is running well above realized. That gap is the entire signal. Direction is not an input.",
-      "duration_s": 18.226,
-      "hold_extra_s": 10,
-      "total_s": 28.226
+      "id": "a12",
+      "act": 1,
+      "title": "THE PROBLEM",
+      "kind": "motion",
+      "page": "motion/problem.html",
+      "vo": "The usual way to trade options is to forecast direction, then buy one pointing at the guess. That treats an option as leveraged stock. It is a bet on a forecast nobody can reliably make.",
+      "duration_s": 11.142,
+      "total_s": 11.142
     },
     {
-      "id": "s3",
+      "id": "a13",
+      "act": 1,
+      "title": "FOUR CAPABILITIES",
+      "kind": "motion",
+      "page": "motion/capabilities.html",
+      "vo": "Skew measures four things instead. What the market charges for movement. What movement actually delivers. Whether the gap survives eighty four stress scenarios. And whether the desk has earned the right to take it.",
+      "duration_s": 12.015,
+      "total_s": 12.015
+    },
+    {
+      "id": "a14",
+      "act": 1,
+      "title": "ONE LINE",
+      "kind": "motion",
+      "page": "motion/oneline.html",
+      "vo": "Direction is never an input.",
+      "hold_extra_s": 1.4,
+      "duration_s": 2.115,
+      "total_s": 3.515
+    },
+    {
+      "id": "a21",
+      "act": 2,
+      "title": "THE SIGNAL",
+      "kind": "ui",
+      "scene": "desk_signal",
+      "vo_template": "Eight names, scanned every five minutes against live Alpaca chains. On this name implied volatility is running at {iv_words} while realized sits at {rv_words}. The market is overcharging by {vrp_words} points, and that gap is the entire signal.",
+      "deferred": true
+    },
+    {
+      "id": "a22",
+      "act": 2,
       "title": "CONSTRUCTION",
-      "overlay": "number_callout_maxloss",
-      "actions": [
-        {
-          "kind": "click",
-          "selector": "[role=tab]"
-        },
-        {
-          "kind": "scroll_to",
-          "selector": "text=payoff"
-        },
-        {
-          "kind": "callout",
-          "target": "max_loss"
-        }
-      ],
-      "vo": "Volatility is rich, so the desk sells premium. A defined risk spread, sized backwards from the risk budget. Maximum loss is computed before the position exists. Not estimated. Computed.",
-      "duration_s": 12.963,
-      "hold_extra_s": 8,
-      "total_s": 20.963
+      "kind": "ui",
+      "scene": "desk_construction",
+      "vo": "Volatility is rich, so the desk sells premium. It builds defined risk structures sized backwards from the budget, so it never proposes a trade it is not permitted to take. Maximum loss is computed before the position exists.",
+      "duration_s": 13.898,
+      "total_s": 13.898
     },
     {
-      "id": "s4",
+      "id": "a23",
+      "act": 2,
+      "title": "THE GATES",
+      "kind": "ui",
+      "scene": "desk_gates",
+      "vo": "Five deterministic gates run before the model is asked anything. Liquidity, earnings, term structure, stress, and budget. Every result is recorded, pass or fail.",
+      "duration_s": 10.969,
+      "total_s": 10.969
+    },
+    {
+      "id": "a31",
+      "act": 3,
       "title": "THE REFUSAL",
-      "overlay": "speed_ramp",
-      "actions": [
-        {
-          "kind": "scroll_to",
-          "selector": "text=STRESS"
-        },
-        {
-          "kind": "hold",
-          "on": "breached_cell"
-        }
-      ],
+      "kind": "ui",
+      "scene": "refusal",
       "vo_parts": [
         {
-          "text": "Before anything executes, that exact structure is repriced across eighty four scenarios. Price shocks to three standard deviations, implied volatility doubling, at three points in time. In this cell the position loses more than its budget allows."
+          "text": "Here is the one that matters. The exact structure is repriced across eighty four scenarios. Price shocks to three standard deviations, implied volatility doubling, at three points in time. In this cell the position loses more than its budget allows."
         },
         {
           "silence_s": 1.5
@@ -96,93 +104,59 @@
           "text": "So it does not trade."
         }
       ],
-      "duration_s": 18.401,
-      "hold_extra_s": 15,
-      "total_s": 33.401
+      "duration_s": 17.807,
+      "total_s": 17.807
     },
     {
-      "id": "s5",
+      "id": "a32",
+      "act": 3,
       "title": "EXECUTION",
-      "overlay": null,
-      "actions": [
-        {
-          "kind": "goto",
-          "path": "/desk"
-        },
-        {
-          "kind": "show",
-          "what": "second candidate, gates green, fill line"
-        }
-      ],
-      "vo": "A second structure clears every gate and executes as a single atomic multi leg order. Both legs together, never legged in.",
-      "duration_s": 8.114,
-      "hold_extra_s": 10,
-      "total_s": 18.114
+      "kind": "ui",
+      "scene": "execution",
+      "vo": "A structure that clears every gate executes as a single atomic multi leg order. Four legs, one order, straight into a hundred thousand dollar paper account.",
+      "duration_s": 9.873,
+      "total_s": 9.873
     },
     {
-      "id": "s6",
+      "id": "a33",
+      "act": 3,
       "title": "AUTHORITY",
-      "overlay": null,
-      "actions": [
-        {
-          "kind": "scroll_to",
-          "selector": "text=RISK AUTHORITY"
-        }
-      ],
-      "vo": "A hundred thousand dollar paper account. The desk starts at half a percent of equity per position and earns larger limits only by closing trades without a breach. Size is a privilege, not a default.",
-      "duration_s": 12.328,
-      "hold_extra_s": 8,
-      "total_s": 20.328
+      "kind": "ui",
+      "scene": "authority",
+      "vo": "The desk starts at half a percent of equity per position and earns larger limits only by closing trades without a breach. Size is a privilege, not a default.",
+      "duration_s": 9.447,
+      "total_s": 9.447
     },
     {
-      "id": "s7",
+      "id": "a34",
+      "act": 3,
       "title": "MCP",
-      "overlay": "lower_third_mcp",
-      "actions": [
-        {
-          "kind": "goto",
-          "path": "/mcp"
-        }
-      ],
-      "vo": "The whole desk is exposed over MCP, so an assistant can operate it directly. Seven read tools are always on. The two that place orders are not even registered unless explicitly enabled, and both re-run the full gate chain. The model can choose among approved structures. It cannot invent one.",
-      "duration_s": 18.23,
-      "hold_extra_s": 8,
-      "total_s": 26.23
+      "kind": "ui",
+      "scene": "mcp",
+      "vo": "The whole desk is exposed over MCP. Seven read tools always on, two write tools that are not even registered unless explicitly enabled. The model can choose among approved structures. It cannot invent one.",
+      "duration_s": 12.826,
+      "total_s": 12.826
     },
     {
-      "id": "s8",
+      "id": "a35",
+      "act": 3,
       "title": "TRACE",
-      "overlay": null,
-      "actions": [
-        {
-          "kind": "goto",
-          "path": "/trace"
-        },
-        {
-          "kind": "scroll",
-          "to": "bottom"
-        }
-      ],
+      "kind": "ui",
+      "scene": "trace",
       "vo": "Every decision is reconstructible to its inputs. Including the ones it refused.",
-      "duration_s": 5.768,
-      "hold_extra_s": 5,
-      "total_s": 10.768
+      "duration_s": 5.368,
+      "total_s": 5.368
     },
     {
-      "id": "s9",
+      "id": "a36",
+      "act": 3,
       "title": "CLOSE",
-      "overlay": "end_card",
-      "actions": [
-        {
-          "kind": "motion",
-          "page": "motion/end.html"
-        }
-      ],
+      "kind": "motion",
+      "page": "motion/end.html",
       "vo": "Skew, by team Zevora. It does not predict the market. It prices it.",
       "min_hold_s": 3.0,
-      "duration_s": 5.484,
-      "hold_extra_s": 0,
-      "total_s": 5.484
+      "duration_s": 5.083,
+      "total_s": 5.083
     }
   ]
 }

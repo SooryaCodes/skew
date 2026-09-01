@@ -90,15 +90,14 @@ export default function Landing() {
           <div className="text-[16px] leading-relaxed text-[color:var(--text-dim)]">
             <Reveal>
               <p className="mb-5 text-[14px] font-semibold uppercase tracking-[0.14em]">
-                What every other agent does
+                The usual approach
               </p>
             </Reveal>
             <Reveal delay={40}>
               <p>
-                Predict direction. Read the headlines, or a moving average, or a
-                model&rsquo;s intuition, and buy an option pointing the way it
-                guesses. The option is incidental — a leveraged bet on a forecast
-                that neither the model nor anyone else can reliably make.
+                Forecast direction, then buy an option pointing at the guess.
+                That treats an option as leveraged stock — a bet on a forecast
+                that nobody can reliably make.
               </p>
             </Reveal>
           </div>
