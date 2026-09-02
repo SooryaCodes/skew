@@ -97,7 +97,10 @@ def failing_gates(row_detail: dict[str, Any] | None) -> list[str]:
 def load_rows(query: AuditQuery) -> list[DecisionRow]:
     """SQL narrows what it can; the text-shaped filters run in Python below.
     The whole log is ~2k rows — correctness and testability beat cleverness."""
-    stmt = select(DecisionRow)
+    # CONFIG markers are era dividers, not decisions: they are loaded
+    # separately (load_config_rows) and merged in regardless of the outcome
+    # filter, so a filtered view still shows where the configuration changed.
+    stmt = select(DecisionRow).where(DecisionRow.action != "CONFIG")
     if query.action:
         stmt = stmt.where(DecisionRow.action == query.action)
     if query.symbols:
@@ -114,6 +117,30 @@ def load_rows(query: AuditQuery) -> list[DecisionRow]:
         for row in rows:
             session.expunge(row)
     return rows
+
+
+def load_config_rows(query: AuditQuery) -> list[DecisionRow]:
+    stmt = select(DecisionRow).where(DecisionRow.action == "CONFIG")
+    if query.date_from:
+        stmt = stmt.where(DecisionRow.ts >= query.date_from)
+    if query.date_to:
+        stmt = stmt.where(DecisionRow.ts <= query.date_to)
+    with session_scope() as session:
+        rows = list(session.scalars(stmt).all())
+        for row in rows:
+            session.expunge(row)
+    return rows
+
+
+def merge_by_time(
+    rows: list[DecisionRow], config_rows: list[DecisionRow], sort: str
+) -> list[DecisionRow]:
+    reverse = sort != "asc"
+    return sorted(
+        rows + config_rows,
+        key=lambda r: ((r.ts if r.ts.tzinfo else r.ts.replace(tzinfo=UTC)), r.id),
+        reverse=reverse,
+    )
 
 
 def apply_text_filters(rows: list[DecisionRow], query: AuditQuery) -> list[DecisionRow]:
@@ -161,6 +188,13 @@ def group_rows(rows: list[DecisionRow]) -> list[dict[str, Any]]:
     open_runs: dict[str, dict[str, Any]] = {}
 
     for row in rows:
+        if row.action == "CONFIG":
+            # An era divider: the configuration changed here, so nothing
+            # groups across it — reasoning on the two sides cites different
+            # standing parameters.
+            open_runs.clear()
+            items.append({"type": "config", "id": row.id, "ts": _ts(row), "reason": row.reason})
+            continue
         if row.action == "EXECUTED":
             open_runs.clear()  # a fill is a barrier: nothing groups across it
             items.append({"type": "decision", **to_lite(row)})
@@ -240,7 +274,20 @@ def run_query(
 ) -> dict[str, Any]:
     rows = apply_text_filters(load_rows(query), query)
     summary = summarise(rows)
-    items = group_rows(rows) if grouped else [{"type": "decision", **to_lite(r)} for r in rows]
+    # Era dividers join the stream after the summary is computed — they are
+    # not decisions and never count. A template expansion is the one view
+    # that excludes them: it renders inside a single run.
+    merged = rows if query.template else merge_by_time(rows, load_config_rows(query), query.sort)
+    items = (
+        group_rows(merged)
+        if grouped
+        else [
+            {"type": "config", "id": r.id, "ts": _ts(r), "reason": r.reason}
+            if r.action == "CONFIG"
+            else {"type": "decision", **to_lite(r)}
+            for r in merged
+        ]
+    )
     total_items = len(items)
     page = items[offset : offset + limit]
 
@@ -258,6 +305,8 @@ def run_query(
 def export_csv_rows(query: AuditQuery) -> list[list[str]]:
     """Header + one row per decision for the current filter, ungrouped."""
     rows = apply_text_filters(load_rows(query), query)
+    if not query.action:  # the full record keeps its era markers
+        rows = merge_by_time(rows, load_config_rows(query), query.sort)
     out = [["ts", "action", "symbol", "structure", "failing_gates", "reason",
             "model_rationale", "order_id", "risk_tier", "id"]]
     for r in rows:

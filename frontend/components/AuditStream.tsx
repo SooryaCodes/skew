@@ -50,6 +50,7 @@ const ACTION_STYLE: Record<DecisionAction, { color: string; label: string }> = {
   EXECUTED: { color: "var(--positive)", label: "Filled" },
   REFUSED: { color: "var(--negative)", label: "Refused" },
   ABSTAINED: { color: "var(--text-faint)", label: "Abstained" },
+  CONFIG: { color: "var(--accent)", label: "Config" },
 };
 
 /** Outcome as a small tinted badge — scannable at a glance, readable ink. */
@@ -70,6 +71,7 @@ function Badge({ action }: { action: DecisionAction }) {
 
 type Group =
   | { kind: "single"; entry: Decision }
+  | { kind: "config"; entry: Decision }
   | { kind: "run"; first: Decision; rest: Decision[]; key: string };
 
 /**
@@ -103,6 +105,13 @@ function groupDecisions(decisions: Decision[]): Group[] {
   const open = new Map<string, Extract<Group, { kind: "run" }>>();
 
   for (const decision of decisions) {
+    if (decision.action === "CONFIG") {
+      // An era divider: the configuration changed here, and reasoning on the
+      // two sides cites different standing parameters. Nothing groups across.
+      open.clear();
+      groups.push({ kind: "config", entry: decision });
+      continue;
+    }
     if (decision.action === "EXECUTED") {
       open.clear(); // barrier: a fill ends every open run
       groups.push({ kind: "single", entry: decision });
@@ -191,6 +200,32 @@ function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boole
           </p>
         )}
       </Link>
+    </li>
+  );
+}
+
+function ConfigDivider({ decision }: { decision: Decision }) {
+  return (
+    <li className="py-2" aria-label="Configuration change">
+      <div className="flex items-center gap-2">
+        <span className="h-px flex-1 bg-[color:var(--accent)] opacity-40" aria-hidden />
+        <span
+          className="mono shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.06em]"
+          style={{
+            color: "var(--accent)",
+            background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+          }}
+        >
+          config
+        </span>
+        <time className="mono shrink-0 text-[12px] text-[color:var(--text-faint)]" dateTime={decision.ts}>
+          {clockTime(decision.ts)}
+        </time>
+        <span className="h-px flex-1 bg-[color:var(--accent)] opacity-40" aria-hidden />
+      </div>
+      <p className="mt-1 text-center text-[12px] leading-snug text-[color:var(--text-dim)]">
+        {decision.reason}
+      </p>
     </li>
   );
 }
@@ -327,6 +362,8 @@ export function AuditStream({ decisions, counts }: Props) {
             {groups.map((group, i) =>
               group.kind === "single" ? (
                 <FullEntry key={group.entry.id} decision={group.entry} isNewest={i === 0} />
+              ) : group.kind === "config" ? (
+                <ConfigDivider key={group.entry.id} decision={group.entry} />
               ) : (
                 <Run key={group.key} first={group.first} rest={group.rest} isNewest={i === 0} />
               ),

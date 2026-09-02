@@ -159,3 +159,38 @@ def test_summary_counts_gates_days_and_top_refused():
     assert s["by_gate"][0] == {"gate": "budget", "count": 2}
     assert s["top_refused"] == {"symbol": "AAPL", "count": 2}
     assert s["per_day"][0]["count"] == 5
+
+
+# ------------------------------------------------------------------ config markers
+
+
+def test_config_marker_is_a_divider_and_a_barrier():
+    from skew.audit.query import merge_by_time
+
+    cfg = row(3, "CONFIG", None, "Position limit raised from 3 to 6.")
+    cfg.symbol = None
+    decisions = [
+        row(1, "REFUSED", "AAPL", CAPACITY),
+        row(2, "REFUSED", "IWM", CAPACITY),
+        row(4, "REFUSED", "MSFT", CAPACITY),
+        row(5, "REFUSED", "NVDA", CAPACITY),
+    ]
+    merged = merge_by_time(decisions, [cfg], "asc")
+    assert [r.id for r in merged] == ["d0001", "d0002", "d0003", "d0004", "d0005"]
+
+    items = group_rows(merged)
+    # run of 2 · divider · run of 2 — nothing groups across the era boundary
+    assert [item["type"] for item in items] == ["run", "config", "run"]
+    assert items[0]["count"] == 2 and items[2]["count"] == 2
+    assert "Position limit" in items[1]["reason"]
+
+
+def test_config_wording_for_the_watched_params():
+    from skew.audit.log import _describe_change
+
+    text = _describe_change("max_concurrent_positions", 3, 6)
+    assert "raised from 3 to 6" in text
+    assert "portfolio cap is unchanged" in text
+    assert "prior limit" in text
+    assert "45% to 25%" in _describe_change("profit_target_pct", 0.45, 0.25)
+    assert "2x to 1x" in _describe_change("loss_limit_multiple", 2.0, 1.0)

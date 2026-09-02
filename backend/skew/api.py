@@ -139,6 +139,19 @@ async def lifespan(_app: FastAPI):
                 foreign,
             )
 
+    # Configuration era marker: if a watched risk parameter changed since the
+    # last boot, one CONFIG entry marks the boundary in the audit log — the
+    # historical entries citing the old value stay exactly as written. Skipped
+    # when the boot could not verify the account, so a misconfigured process
+    # never writes markers into another account's record.
+    if loop.ACCOUNT.get("error") is None:
+        try:
+            marker = audit.record_config_changes_at_boot(settings)
+            if marker is not None:
+                log.info("config change recorded: %s", marker.reason)
+        except Exception:  # the marker is a courtesy; boot must survive it
+            log.exception("could not record config changes at boot")
+
     scheduler = None
     if settings.run_scheduler:
         from datetime import timedelta

@@ -33,7 +33,10 @@ PositionIntent = Literal["BTO", "STO", "BTC", "STC"]
 Side = Literal["BUY", "SELL"]
 Right = Literal["CALL", "PUT"]
 TimePoint = Literal["NOW", "MID", "EXPIRY"]
-DecisionAction = Literal["EXECUTED", "REFUSED", "ABSTAINED"]
+# CONFIG is not a trading decision: it marks a change to the desk's standing
+# parameters, so the record never reads as contradicting itself when a limit
+# moves. Config entries are excluded from decision counts and outcome filters.
+DecisionAction = Literal["EXECUTED", "REFUSED", "ABSTAINED", "CONFIG"]
 
 CONTRACT_MULTIPLIER = 100
 

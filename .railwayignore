@@ -1,0 +1,10 @@
+# Keep the deploy tarball small — the api service only needs backend/.
+video/
+frontend/
+docs/
+.git/
+backend/.venv/
+**/__pycache__/
+**/*.mp4
+**/*.webm
+**/*.wav

@@ -203,6 +203,100 @@ def record_execution(
     )
 
 
+# ------------------------------------------------------------ config markers
+
+# The parameters whose changes are recorded in the audit log. When one moves,
+# historical entries citing the old value stay exactly as written — a true
+# record of the prior configuration — and a CONFIG entry marks the boundary
+# so the two eras never read as a contradiction.
+WATCHED_PARAMS = (
+    "max_concurrent_positions",
+    "profit_target_pct",
+    "loss_limit_multiple",
+    "exit_dte_threshold",
+    "drawdown_breaker_pct",
+)
+
+# Values as they stood before config tracking existed, so the first diff on a
+# pre-existing history is detected rather than silently baselined away.
+_PRE_TRACKING_BASELINE = {
+    "max_concurrent_positions": 3,
+    "profit_target_pct": 0.45,
+    "loss_limit_multiple": 2.0,
+    "exit_dte_threshold": 2,
+    "drawdown_breaker_pct": 0.05,
+}
+
+_CONFIG_SNAPSHOT_KEY = "config_snapshot"
+
+
+def _describe_change(param: str, old: Any, new: Any) -> str:
+    if param == "max_concurrent_positions":
+        verb = "raised" if new > old else "lowered"
+        return (
+            f"Position limit {verb} from {old} to {new}. The portfolio cap is "
+            f"unchanged and remains the binding exposure limit. Refusals recorded "
+            f"before this timestamp cite the prior limit."
+        )
+    if param == "profit_target_pct":
+        return (
+            f"Profit target moved from {old:.0%} to {new:.0%} of credit — the "
+            f"competition window is days rather than weeks, so the desk takes "
+            f"profit earlier than it would on a normal horizon."
+        )
+    if param == "loss_limit_multiple":
+        return f"Loss limit moved from {old:g}x to {new:g}x the opening premium."
+    return f"{param} changed from {old} to {new}."
+
+
+def record_config_change(reason: str, changes: list[dict[str, Any]]) -> Decision:
+    """One system-level CONFIG entry. Rendered as an era divider in the UI,
+    never counted or filtered as a trading decision."""
+    return record(
+        action="CONFIG",
+        reason=reason,
+        risk_tier=0,
+        detail={"config_change": True, "changes": changes},
+    )
+
+
+def record_config_changes_at_boot(settings: Any) -> Decision | None:
+    """Compare the running configuration to the stored snapshot; write one
+    CONFIG entry naming every watched parameter that moved, then store the new
+    snapshot. A fresh database is baselined silently — there is no prior era
+    to divide from."""
+    from sqlalchemy import func as sa_func
+
+    from skew.audit.models import KVRow
+
+    current = {p: getattr(settings, p) for p in WATCHED_PARAMS}
+    with session_scope() as session:
+        row = session.get(KVRow, _CONFIG_SNAPSHOT_KEY)
+        if row is not None:
+            prior = dict(row.value)
+        else:
+            decisions_exist = (
+                session.execute(select(sa_func.count(DecisionRow.id))).scalar_one() > 0
+            )
+            prior = dict(_PRE_TRACKING_BASELINE) if decisions_exist else None
+        if row is None:
+            session.add(KVRow(key=_CONFIG_SNAPSHOT_KEY, value=current))
+        else:
+            row.value = current
+
+    if prior is None:
+        return None
+    changes = [
+        {"param": p, "old": prior.get(p), "new": current[p]}
+        for p in WATCHED_PARAMS
+        if p in prior and prior.get(p) != current[p]
+    ]
+    if not changes:
+        return None
+    reason = " ".join(_describe_change(c["param"], c["old"], c["new"]) for c in changes)
+    return record_config_change(reason, changes)
+
+
 # ------------------------------------------------------------------ readers
 
 
@@ -242,7 +336,8 @@ def counts_since(moment: datetime) -> dict[str, int]:
         ).all()
     out = {"EXECUTED": 0, "REFUSED": 0, "ABSTAINED": 0}
     for action, count in rows:
-        out[action] = int(count)
+        if action in out:  # CONFIG markers are not decisions and never count
+            out[action] = int(count)
     out["TOTAL"] = sum(v for k, v in out.items() if k != "TOTAL")
     return out
 
@@ -261,6 +356,7 @@ def counts(since_hours: int | None = None) -> dict[str, int]:
 
     out = {"EXECUTED": 0, "REFUSED": 0, "ABSTAINED": 0}
     for action, count in rows:
-        out[action] = int(count)
+        if action in out:  # CONFIG markers are not decisions and never count
+            out[action] = int(count)
     out["TOTAL"] = sum(v for k, v in out.items() if k != "TOTAL")
     return out

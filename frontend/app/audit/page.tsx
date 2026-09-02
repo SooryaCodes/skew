@@ -29,6 +29,7 @@ const ACTION_STYLE: Record<DecisionAction, { color: string; label: string }> = {
   EXECUTED: { color: "var(--positive)", label: "Filled" },
   REFUSED: { color: "var(--negative)", label: "Refused" },
   ABSTAINED: { color: "var(--text-faint)", label: "Abstained" },
+  CONFIG: { color: "var(--accent)", label: "Config" },
 };
 
 function Badge({ action }: { action: DecisionAction }) {
@@ -384,6 +385,36 @@ function RunRow({ run, filters }: { run: AuditRun; filters: Filters }) {
   );
 }
 
+/** An era divider: the configuration changed at this timestamp. Historical
+ *  entries on the far side cite the prior parameters — by design. */
+function ConfigDividerRow({ ts, reason }: { ts: string; reason: string }) {
+  return (
+    <tr aria-label="Configuration change">
+      <td colSpan={7} className="px-3 py-3">
+        <div className="flex items-center gap-2">
+          <span className="h-px flex-1 bg-[color:var(--accent)] opacity-40" aria-hidden />
+          <span
+            className="mono shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.06em]"
+            style={{
+              color: "var(--accent)",
+              background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+            }}
+          >
+            config
+          </span>
+          <span className="mono shrink-0 text-[12px] text-[color:var(--text-faint)]">
+            {dayTime(ts)}
+          </span>
+          <span className="h-px flex-1 bg-[color:var(--accent)] opacity-40" aria-hidden />
+        </div>
+        <p className="mt-1.5 text-center text-[13px] leading-snug text-[color:var(--text-dim)]">
+          {reason}
+        </p>
+      </td>
+    </tr>
+  );
+}
+
 // ------------------------------------------------------------------ the page
 
 function AuditPageInner() {
@@ -638,6 +669,8 @@ function AuditPageInner() {
                 {(data?.items ?? []).map((item: AuditItem) =>
                   item.type === "run" ? (
                     <RunRow key={`${item.template}-${item.first_ts}`} run={item} filters={filters} />
+                  ) : item.type === "config" ? (
+                    <ConfigDividerRow key={item.id} ts={item.ts} reason={item.reason} />
                   ) : (
                     <DecisionRow key={item.id} lite={item} />
                   ),

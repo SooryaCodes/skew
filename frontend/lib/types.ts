@@ -19,7 +19,9 @@ export type PositionIntent = "BTO" | "STO" | "BTC" | "STC";
 export type Side = "BUY" | "SELL";
 export type Right = "CALL" | "PUT";
 export type TimePoint = "NOW" | "MID" | "EXPIRY";
-export type DecisionAction = "EXECUTED" | "REFUSED" | "ABSTAINED";
+// CONFIG marks a change to the desk's standing parameters — an era divider
+// in the record, never counted or filtered as a trading decision.
+export type DecisionAction = "EXECUTED" | "REFUSED" | "ABSTAINED" | "CONFIG";
 
 /** One point on the IV-vs-strike curve — the app's signature visual. */
 export interface SkewPoint {
@@ -384,7 +386,15 @@ export interface AuditRun {
   sample: AuditLite;
 }
 
-export type AuditItem = ({ type: "decision" } & AuditLite) | AuditRun;
+/** An era divider: the configuration changed at this timestamp. */
+export interface AuditConfigMarker {
+  type: "config";
+  id: string;
+  ts: string;
+  reason: string;
+}
+
+export type AuditItem = ({ type: "decision" } & AuditLite) | AuditRun | AuditConfigMarker;
 
 export interface AuditSummary {
   count: number;
