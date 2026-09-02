@@ -73,6 +73,28 @@ def _true_entry(structure: Structure, legs_at_broker: dict[str, tuple[float, flo
     return round(-total, 2)
 
 
+
+
+def structural_max_loss(structure: Structure, net_credit_per_spread: float) -> float:
+    """Worst expiry P&L of one spread at the given entry, from the legs alone.
+
+    Payoff is piecewise linear in spot, so probing zero, every strike, and a
+    point beyond the highest strike covers every regime for the defined-risk
+    verticals and condors this desk trades.
+    """
+    strikes = sorted({leg.strike for leg in structure.legs})
+    probes = [0.0, *strikes, strikes[-1] * 2 + 100.0]
+    worst = 0.0
+    for spot in probes:
+        value = sum(
+            leg.signed_ratio
+            * (max(spot - leg.strike, 0.0) if leg.right == "CALL" else max(leg.strike - spot, 0.0))
+            for leg in structure.legs
+        ) * CONTRACT_MULTIPLIER
+        worst = min(worst, net_credit_per_spread + value)
+    return round(-worst, 2)
+
+
 def reconcile(broker: Any) -> dict[str, Any]:
     """One reconciliation pass. Returns a report of what was corrected."""
     report: dict[str, Any] = {"corrected": [], "verified": [], "warnings": []}
@@ -158,17 +180,18 @@ def reconcile(broker: Any) -> dict[str, Any]:
             report["warnings"].append(f"{row.id}: no structure JSON; cannot verify entry")
             continue
         true_entry = _true_entry(structure, legs_at_broker, true_qty)
-        # Max loss moves with the entry: for a vertical or condor,
-        # max_loss = width - credit (or = debit), so per spread it shifts by
-        # exactly the difference between intended and actual entry.
-        old_entry_per_spread = row.entry_credit / row.qty if row.qty else row.entry_credit
         new_entry_per_spread = true_entry / true_qty if true_qty else true_entry
-        old_max_loss_per_spread = row.max_loss / row.qty if row.qty else row.max_loss
-        per_spread_max_loss = round(
-            old_max_loss_per_spread + (old_entry_per_spread - new_entry_per_spread), 2
-        )
+        # Max loss from first principles — expiry payoff over the strike grid
+        # at the ACTUAL entry. No anchors on stored fields, so a previously
+        # corrected (or previously wrong) row cannot compound an error.
+        per_spread_max_loss = structural_max_loss(structure, new_entry_per_spread)
+        expected_total_ml = round(per_spread_max_loss * true_qty, 2)
 
-        if true_qty != row.qty or abs(true_entry - row.entry_credit) > 1.0:
+        if (
+            true_qty != row.qty
+            or abs(true_entry - row.entry_credit) > 1.0
+            or abs(expected_total_ml - row.max_loss) > 1.0
+        ):
             new_legs = []
             for leg in structure.legs:
                 held = legs_at_broker.get(leg.symbol)

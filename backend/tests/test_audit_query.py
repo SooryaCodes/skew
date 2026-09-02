@@ -209,3 +209,17 @@ def test_reconcile_entry_sign_and_max_loss_scaling():
     entry = _true_entry(structure, legs, 2)
     # BUY leg 14.5, SELL leg 9.5 -> value +5.00/share -> net_credit -1000 for 2
     assert entry == -1000.0
+
+
+def test_structural_max_loss_from_the_legs_alone():
+    from skew.exec.reconcile import structural_max_loss
+    from tests.test_gates import make_candidate
+
+    structure = make_candidate().structure
+    strikes = sorted({leg.strike for leg in structure.legs})
+    width = (strikes[-1] - strikes[0]) * 100
+    # A debit spread's max loss is the debit paid...
+    if not structure.is_credit:
+        assert structural_max_loss(structure, -500.0) == 500.0
+    # ...and a credit spread's is width minus credit, whatever kind this is.
+    assert structural_max_loss(structure, 80.0) == width - 80.0 or not structure.is_credit
