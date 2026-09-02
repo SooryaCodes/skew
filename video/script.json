@@ -29,7 +29,8 @@
           "silence_s": 2.0
         }
       ],
-      "total_s": 2.45
+      "total_s": 2.42,
+      "duration_s": 2.42
     },
     {
       "id": "a11",
