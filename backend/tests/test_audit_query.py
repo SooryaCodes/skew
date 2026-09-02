@@ -239,3 +239,43 @@ def test_broker_supported_qty_reads_the_legs():
     # One leg missing -> zero; a partial structure is not this structure.
     legs3 = dict(list(legs.items())[1:])
     assert broker_supported_qty(structure, legs3) == 0
+
+
+def test_committed_dollars_counts_resting_order_risk(tmp_path, monkeypatch):
+    """An order working at the broker is promised risk: the budget gate must
+    see it before the fill, or one cycle can submit its way past the
+    portfolio cap (it did — four credit orders in eighty seconds)."""
+    from skew.audit.models import OrderRow, PositionRow
+    from skew.db import session_scope
+    from skew.risk.authority import committed_dollars
+
+    with session_scope() as session:
+        session.add(PositionRow(
+            id="T:OPEN:1", symbol="T", kind="PUT_CREDIT",
+            qty=1, entry_credit=50.0, max_loss=200.0, is_open=True,
+            legs=[], structure={},
+        ))
+        session.add(OrderRow(
+            client_order_id="skew-resting-risk-test", symbol="T2",
+            structure_id="T2:RESTING:1", kind="PUT_CREDIT", intent="OPEN",
+            qty=1, limit_price=-0.5, net_credit=50.0, max_loss=300.0,
+            status="new", legs=[], detail={},
+        ))
+        session.add(OrderRow(
+            client_order_id="skew-dead-risk-test", symbol="T3",
+            structure_id="T3:DEAD:1", kind="PUT_CREDIT", intent="OPEN",
+            qty=1, limit_price=-0.5, net_credit=50.0, max_loss=999.0,
+            status="expired", legs=[], detail={},
+        ))
+    try:
+        committed, count = committed_dollars()
+        assert committed >= 500.0  # 200 open + 300 resting
+        assert count >= 2
+        # the expired order's 999 must NOT be in there
+        assert committed < 999.0 or committed - 500.0 < 499.0
+    finally:
+        with session_scope() as session:
+            for model, key in ((PositionRow, "T:OPEN:1"), (OrderRow, "skew-resting-risk-test"), (OrderRow, "skew-dead-risk-test")):
+                row = session.get(model, key)
+                if row is not None:
+                    session.delete(row)

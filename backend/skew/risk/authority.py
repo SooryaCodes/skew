@@ -224,10 +224,34 @@ def get_authority(
 
 
 def committed_dollars() -> tuple[float, int]:
-    """Max loss already committed to open positions, and how many there are."""
+    """Max loss already committed, and the position count against the cap.
+
+    Committed risk = open positions PLUS resting opening orders. Since the
+    book records positions only on fill, an order working at the broker is
+    invisible to it — but its risk is already promised. One cycle submitted
+    four credit orders in eighty seconds against a book that showed only the
+    positions already filled; had they all filled, deployed risk would have
+    breached the portfolio cap. Resting risk counts from the moment the
+    order goes out.
+    """
+    from skew.audit.models import OrderRow
+    from skew.exec.submit import RESTING_OR_FILLED
+
     with session_scope() as session:
         rows = session.scalars(select(PositionRow).where(PositionRow.is_open.is_(True))).all()
-    return round(sum(float(r.max_loss or 0.0) for r in rows), 2), len(rows)
+        open_structures = {r.id for r in rows}
+        committed = sum(float(r.max_loss or 0.0) for r in rows)
+        count = len(rows)
+        orders = session.scalars(select(OrderRow).where(OrderRow.intent == "OPEN")).all()
+        for order in orders:
+            status = (order.status or "").lower()
+            # A filled order normally IS a position row (never count both) —
+            # but one that filled after the submit-poll and before the next
+            # reconcile pass has no row yet, and its risk is just as real.
+            if status in RESTING_OR_FILLED and order.structure_id not in open_structures:
+                committed += float(order.max_loss or 0.0)
+                count += 1
+    return round(committed, 2), count
 
 
 def reset_state() -> None:
