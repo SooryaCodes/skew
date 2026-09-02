@@ -343,7 +343,7 @@ class RiskAuthority(BaseModel):
 
     equity: float = 0.0
     open_positions: int = 0
-    max_concurrent_positions: int = 3
+    max_concurrent_positions: int = 6
     next_promotion: str = ""  # human copy: what it takes to size up
 
     @computed_field  # serialised, because the dashboard and the MCP surface

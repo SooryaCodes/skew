@@ -63,7 +63,7 @@ class GateContext:
     # Long premium: how far the breakeven may sit, in sigma of a routine move.
     max_breakeven_sigma: float = 1.25
     open_positions: int = 0
-    max_concurrent_positions: int = 3
+    max_concurrent_positions: int = 6
 
 
 Gate = Callable[[Candidate, GateContext], GateResult]

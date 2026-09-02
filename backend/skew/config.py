@@ -66,7 +66,11 @@ class Settings(BaseSettings):
 
     # ---- Risk authority ----
     risk_tier_start: int = Field(default=0, ge=0, le=2)
-    max_concurrent_positions: int = Field(default=3, ge=1)
+    # 6, not 3: the portfolio cap (a % of equity) is the real exposure limit and
+    # per-trade sizing is unchanged. At 3 the count bound long before the dollar
+    # budget did — the desk sat frozen on capacity refusals with headroom to
+    # spare. The count is now a backstop; the budget gate does the governing.
+    max_concurrent_positions: int = Field(default=6, ge=1)
     kill_switch: bool = False
 
     # ---- API ----
@@ -151,9 +155,17 @@ class Settings(BaseSettings):
     # stops OPENING positions (monitoring continues) until equity recovers.
     # An agent that stands itself down is the thesis, not a failure mode.
     drawdown_breaker_pct: float = 0.05
-    # Exit rules. The profit target sits mid 40-50% so short-DTE credit trades
-    # can realistically close inside the competition week.
-    profit_target_pct: float = 0.45
+    # Exit rules. The profit target is 25% of credit, not the conventional
+    # 45-50%: the competition window is days rather than weeks, and at 7-14 DTE
+    # there is not enough theta in two days to reach a mid-40s capture. On a
+    # normal horizon this would be 45%.
+    profit_target_pct: float = 0.25
+    # Loss limit at 2x credit is a stated design choice, not drift: short
+    # premium runs a wide stop against a modest target because the win rate
+    # carries the expectancy, and on defined-risk spreads the structural max
+    # loss (width - credit, ~2.4x credit on the current book) already floors
+    # the downside just past the stop. Tightening toward 1:2 against a 25%
+    # target would mean stopping out on ordinary mark noise.
     loss_limit_multiple: float = 2.0
     # At 7-14 DTE entries this must sit BELOW dte_min, or every new position
     # would qualify for the time-exit on day one. Two days keeps us out of the
