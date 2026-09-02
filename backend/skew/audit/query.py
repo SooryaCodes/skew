@@ -164,13 +164,17 @@ def _ts(row: DecisionRow) -> str:
     return ts.isoformat()
 
 
-def to_lite(row: DecisionRow) -> dict[str, Any]:
+def to_lite(row: DecisionRow, filled_ids: set[str] | None = None) -> dict[str, Any]:
     """The table row: enough to scan, with the trace one click deeper."""
     detail = row.detail or {}
+    order_filled = None
+    if row.action == "EXECUTED" and filled_ids is not None:
+        order_filled = bool(row.order_id and row.order_id in filled_ids)
     return {
         "id": row.id,
         "ts": _ts(row),
         "action": row.action,
+        "order_filled": order_filled,
         "symbol": row.symbol,
         "kind": detail.get("kind"),
         "gates": failing_gates(detail),
@@ -180,7 +184,7 @@ def to_lite(row: DecisionRow) -> dict[str, Any]:
     }
 
 
-def group_rows(rows: list[DecisionRow]) -> list[dict[str, Any]]:
+def group_rows(rows: list[DecisionRow], filled_ids: set[str] | None = None) -> list[dict[str, Any]]:
     """Fill-bounded run grouping; see the module docstring for why not
     strictly consecutive. Rows arrive in display order; each run sits at the
     position of its first-seen member."""
@@ -197,7 +201,7 @@ def group_rows(rows: list[DecisionRow]) -> list[dict[str, Any]]:
             continue
         if row.action == "EXECUTED":
             open_runs.clear()  # a fill is a barrier: nothing groups across it
-            items.append({"type": "decision", **to_lite(row)})
+            items.append({"type": "decision", **to_lite(row, filled_ids)})
             continue
         key = f"{row.action}|{template_hash(row.reason)}"
         run = open_runs.get(key)
@@ -212,7 +216,7 @@ def group_rows(rows: list[DecisionRow]) -> list[dict[str, Any]]:
                 "symbols": [],
                 "kinds": [],
                 "gates": failing_gates(row.detail),
-                "sample": to_lite(row),
+                "sample": to_lite(row, filled_ids),
             }
             open_runs[key] = run
             items.append(run)
@@ -234,15 +238,20 @@ def group_rows(rows: list[DecisionRow]) -> list[dict[str, Any]]:
     ]
 
 
-def summarise(rows: list[DecisionRow]) -> dict[str, Any]:
-    """The summary panel, computed from the current filter."""
+def summarise(rows: list[DecisionRow], filled_ids: set[str] | None = None) -> dict[str, Any]:
+    """The summary panel, computed from the current filter. ``executed``
+    counts broker-confirmed fills; a submission that died is not a fill."""
     counts = {"EXECUTED": 0, "REFUSED": 0, "ABSTAINED": 0}
     by_gate: dict[str, int] = {}
     per_day: dict[str, int] = {}
     refused_symbols: dict[str, int] = {}
 
     for row in rows:
-        counts[row.action] = counts.get(row.action, 0) + 1
+        if row.action == "EXECUTED" and filled_ids is not None:
+            if row.order_id and row.order_id in filled_ids:
+                counts["EXECUTED"] += 1
+        else:
+            counts[row.action] = counts.get(row.action, 0) + 1
         per_day[_ts(row)[:10]] = per_day.get(_ts(row)[:10], 0) + 1
         if row.action == "REFUSED":
             for gate in failing_gates(row.detail):
@@ -273,18 +282,22 @@ def run_query(
     query: AuditQuery, *, grouped: bool = True, offset: int = 0, limit: int = 100
 ) -> dict[str, Any]:
     rows = apply_text_filters(load_rows(query), query)
-    summary = summarise(rows)
+    from skew.audit.log import filled_order_ids
+
+    with session_scope() as session:
+        filled_ids = filled_order_ids(session)
+    summary = summarise(rows, filled_ids)
     # Era dividers join the stream after the summary is computed — they are
     # not decisions and never count. A template expansion is the one view
     # that excludes them: it renders inside a single run.
     merged = rows if query.template else merge_by_time(rows, load_config_rows(query), query.sort)
     items = (
-        group_rows(merged)
+        group_rows(merged, filled_ids)
         if grouped
         else [
             {"type": "config", "id": r.id, "ts": _ts(r), "reason": r.reason}
             if r.action == "CONFIG"
-            else {"type": "decision", **to_lite(r)}
+            else {"type": "decision", **to_lite(r, filled_ids)}
             for r in merged
         ]
     )

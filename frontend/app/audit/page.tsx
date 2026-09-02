@@ -30,17 +30,22 @@ const ACTION_STYLE: Record<DecisionAction, { color: string; label: string }> = {
   REFUSED: { color: "var(--negative)", label: "Refused" },
   ABSTAINED: { color: "var(--text-faint)", label: "Abstained" },
   CONFIG: { color: "var(--accent)", label: "Config" },
+  CORRECTION: { color: "var(--brass)", label: "Correction" },
 };
 
-function Badge({ action }: { action: DecisionAction }) {
-  const style = ACTION_STYLE[action] ?? ACTION_STYLE.ABSTAINED;
+function Badge({ action, orderFilled }: { action: DecisionAction; orderFilled?: boolean | null }) {
+  const unfilled = action === "EXECUTED" && orderFilled === false;
+  const style = unfilled
+    ? { color: "var(--text-faint)", label: "Submitted" }
+    : (ACTION_STYLE[action] ?? ACTION_STYLE.ABSTAINED);
   return (
     <span
       className="whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.06em]"
       style={{
-        color: action === "ABSTAINED" ? "var(--text-dim)" : style.color,
+        color: action === "ABSTAINED" || unfilled ? "var(--text-dim)" : style.color,
         background: `color-mix(in srgb, ${style.color} 12%, transparent)`,
       }}
+      title={unfilled ? "Order submitted but never filled — corrected in the log" : undefined}
     >
       {style.label}
     </span>
@@ -232,7 +237,7 @@ function DecisionCells({ lite }: { lite: AuditLite }) {
         {dayTime(lite.ts)}
       </td>
       <td className="px-3 py-2">
-        <Badge action={lite.action} />
+        <Badge action={lite.action} orderFilled={lite.order_filled} />
       </td>
       <td className="mono px-3 py-2 text-[13px] font-bold">{lite.symbol ?? "—"}</td>
       <td className="whitespace-nowrap px-3 py-2 text-[13px]">
@@ -497,7 +502,8 @@ function AuditPageInner() {
         </p>
         <p className="mt-1 text-[13px] text-[color:var(--text-dim)]">
           Every decision this account&apos;s desk ever made — refusals and abstentions as
-          prominent as fills. Counts are all-time; any filtered view is linkable by URL.
+          prominent as fills. Counts are all-time; the filled count is broker-confirmed
+          fills, not submissions. Any filtered view is linkable by URL.
         </p>
 
         {/* controls */}

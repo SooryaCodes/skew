@@ -39,17 +39,60 @@ class PreflightFailed(SubmissionRefused):
 
 
 def client_order_id(structure: Structure, when: datetime | None = None) -> str:
-    """A unique, idempotent client order id.
+    """A deterministic, idempotent client order id for OPENING orders.
 
-    Alpaca deduplicates on this, so a retry after a network timeout cannot
-    double-fill. Includes a minute-resolution timestamp so the same structure
-    can legitimately be traded again on a later cycle, and a short random tail
-    so two processes cannot collide.
+    Same structure, same day -> same id, so Alpaca itself rejects a duplicate
+    submission. The old scheme embedded the minute, which was not idempotency:
+    two cycles five minutes apart submitted the same AMD spread twice and both
+    filled. Closing orders use closing_order_id below — a close may
+    legitimately be retried after an unfilled attempt.
     """
+    import hashlib
+
+    day = (when or datetime.now(UTC)).strftime("%y%m%d")
+    digest = hashlib.sha256(f"{structure.id}|{structure.qty}|{day}".encode()).hexdigest()[:10]
+    kind = structure.kind.replace("_", "")[:8]
+    return f"skew-{structure.symbol}-{kind}-{day}-{digest}"[:64]
+
+
+def closing_order_id(structure: Structure, when: datetime | None = None) -> str:
+    """Client id for a CLOSING order — timestamped, because a close that
+    expired unfilled must be retriable with a fresh id."""
     stamp = (when or datetime.now(UTC)).strftime("%y%m%d%H%M")
     tail = uuid.uuid4().hex[:6]
-    kind = structure.kind.replace("_", "")[:8]
-    return f"skew-{structure.symbol}-{kind}-{stamp}-{tail}"[:64]
+    return f"skewX-{structure.symbol}-{stamp}-{tail}"[:64]
+
+
+
+
+RESTING_OR_FILLED = {"new", "accepted", "pending_new", "partially_filled", "held", "filled"}
+
+
+def _duplicate_of(structure: Structure) -> str | None:
+    """A reason string when this structure is already open or already has a
+    live opening order; None when it is genuinely new. Checked BEFORE the
+    order goes out — the client-order-id is the backstop, not the guard."""
+    from skew.audit.models import OrderRow, PositionRow
+    from skew.db import session_scope
+
+    from sqlalchemy import select
+
+    with session_scope() as session:
+        row = session.get(PositionRow, structure.id)
+        if row is not None and row.is_open:
+            return f"position {structure.id} is already open"
+        orders = session.scalars(
+            select(OrderRow).where(
+                OrderRow.structure_id == structure.id, OrderRow.intent == "OPEN"
+            )
+        ).all()
+        for order in orders:
+            if (order.status or "").lower() in RESTING_OR_FILLED:
+                return (
+                    f"opening order {order.client_order_id} for {structure.id} is "
+                    f"already {order.status} at the broker"
+                )
+    return None
 
 
 def build_mleg_request(
@@ -170,6 +213,13 @@ def submit_structure(
     if cfg.kill_switch:
         raise SubmissionRefused("Kill switch is engaged. No new positions.")
 
+    duplicate = _duplicate_of(structure)
+    if duplicate:
+        raise SubmissionRefused(
+            f"Duplicate refused — {duplicate}. One structure, one position: the "
+            f"desk never doubles into legs it already holds or has resting."
+        )
+
     if not skip_preflight:
         preflight(candidate, context)
 
@@ -208,6 +258,9 @@ def submit_structure(
             for leg in structure.legs
         ],
         "submitted_at": datetime.now(UTC).isoformat(),
+        # The full structure rides along so reconciliation can promote a
+        # late fill into a position without guessing at the legs.
+        "structure": structure.model_dump(mode="json"),
     }
     _persist_order(record)
     return record
@@ -238,7 +291,10 @@ def _persist_order(record: dict[str, Any], intent: str = "OPEN") -> None:
                 max_loss=record["max_loss"],
                 status=record["status"],
                 legs=record["legs"],
-                detail={"submitted_at": record["submitted_at"]},
+                detail={
+                    "submitted_at": record["submitted_at"],
+                    "structure": record.get("structure"),
+                },
             )
         )
 

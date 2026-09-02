@@ -21,7 +21,12 @@ export type Right = "CALL" | "PUT";
 export type TimePoint = "NOW" | "MID" | "EXPIRY";
 // CONFIG marks a change to the desk's standing parameters — an era divider
 // in the record, never counted or filtered as a trading decision.
-export type DecisionAction = "EXECUTED" | "REFUSED" | "ABSTAINED" | "CONFIG";
+export type DecisionAction =
+  | "EXECUTED"
+  | "REFUSED"
+  | "ABSTAINED"
+  | "CONFIG"
+  | "CORRECTION";
 
 /** One point on the IV-vs-strike curve — the app's signature visual. */
 export interface SkewPoint {
@@ -163,6 +168,9 @@ export interface Decision {
   action: DecisionAction;
   symbol: string | null;
   structure_id: string | null;
+  /** EXECUTED rows: true = broker confirmed the fill; false = submission
+   *  died unfilled; null/undefined = resting or unknown. */
+  order_filled?: boolean | null;
   reason: string;
   model_rationale: string | null;
   risk_tier: number;
@@ -363,6 +371,7 @@ export interface AuditLite {
   id: string;
   ts: string;
   action: DecisionAction;
+  order_filled?: boolean | null;
   symbol: string | null;
   kind: string | null;
   gates: string[];

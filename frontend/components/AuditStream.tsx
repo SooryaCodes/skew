@@ -51,18 +51,25 @@ const ACTION_STYLE: Record<DecisionAction, { color: string; label: string }> = {
   REFUSED: { color: "var(--negative)", label: "Refused" },
   ABSTAINED: { color: "var(--text-faint)", label: "Abstained" },
   CONFIG: { color: "var(--accent)", label: "Config" },
+  CORRECTION: { color: "var(--brass)", label: "Correction" },
 };
 
-/** Outcome as a small tinted badge — scannable at a glance, readable ink. */
-function Badge({ action }: { action: DecisionAction }) {
-  const style = ACTION_STYLE[action] ?? ACTION_STYLE.ABSTAINED;
+/** Outcome as a small tinted badge — scannable at a glance, readable ink.
+ *  An EXECUTED entry whose order died unfilled reads "Submitted": a
+ *  submission is not a fill, and the badge never claims otherwise. */
+function Badge({ action, orderFilled }: { action: DecisionAction; orderFilled?: boolean | null }) {
+  const unfilled = action === "EXECUTED" && orderFilled === false;
+  const style = unfilled
+    ? { color: "var(--text-faint)", label: "Submitted" }
+    : (ACTION_STYLE[action] ?? ACTION_STYLE.ABSTAINED);
   return (
     <span
       className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.06em]"
       style={{
-        color: action === "ABSTAINED" ? "var(--text-dim)" : style.color,
+        color: action === "ABSTAINED" || unfilled ? "var(--text-dim)" : style.color,
         background: `color-mix(in srgb, ${style.color} 12%, transparent)`,
       }}
+      title={unfilled ? "Order submitted but never filled — corrected in the log" : undefined}
     >
       {style.label}
     </span>
@@ -159,7 +166,7 @@ function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boole
       >
         {/* line 1 — outcome badge, symbol, time, trace affordance */}
         <div className="flex items-center gap-2.5">
-          <Badge action={decision.action} />
+          <Badge action={decision.action} orderFilled={decision.order_filled} />
           {decision.symbol && (
             <span className="shrink-0 text-[14px] font-bold tracking-tight text-[color:var(--text)]">
               {decision.symbol}

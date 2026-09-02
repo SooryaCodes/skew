@@ -186,9 +186,25 @@ def test_market_orders_carry_no_limit_price(credit_spread):
 # ====================================================================
 
 
-def test_client_order_ids_are_unique_per_submission(credit_spread):
+def test_client_order_ids_are_deterministic_per_structure_and_day(credit_spread):
+    """Same structure, same day -> SAME id, so the broker itself rejects a
+    duplicate submission. The old minute-stamped scheme let the same spread
+    fill twice five minutes apart."""
     ids = {client_order_id(credit_spread) for _ in range(50)}
-    assert len(ids) == 50
+    assert len(ids) == 1
+
+    from datetime import UTC, datetime
+
+    other_day = client_order_id(credit_spread, when=datetime(2026, 9, 3, tzinfo=UTC))
+    assert other_day not in ids  # a later session may legitimately re-enter
+
+
+def test_closing_order_ids_are_unique_per_attempt(credit_spread):
+    """A close that expired unfilled must be retriable with a fresh id."""
+    from skew.exec.submit import closing_order_id
+
+    ids = {closing_order_id(credit_spread) for _ in range(20)}
+    assert len(ids) == 20
 
 
 def test_client_order_id_is_prefixed_and_bounded(credit_spread):

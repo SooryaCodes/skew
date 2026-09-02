@@ -1,9 +1,12 @@
-# Keep the deploy tarball small — the api service only needs backend/.
+# Keep deploy tarballs small. BOTH services upload from the repo root:
+# api builds backend/Dockerfile, web builds with rootDirectory=frontend —
+# so frontend/ must NOT be excluded here, only its heavy artifacts.
 video/
-frontend/
 docs/
 .git/
 backend/.venv/
+frontend/node_modules/
+frontend/.next/
 **/__pycache__/
 **/*.mp4
 **/*.webm

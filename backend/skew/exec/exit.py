@@ -17,7 +17,7 @@ from typing import Any
 
 from skew.config import Settings
 from skew.config import settings as default_settings
-from skew.exec.submit import _persist_order, client_order_id
+from skew.exec.submit import _persist_order, closing_order_id
 from skew.models import Leg, Structure
 
 log = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ def close_structure(
 
     cfg = settings or default_settings
     closing = build_closing_structure(structure, current_mids)
-    client_id = client_order_id(closing)
+    client_id = closing_order_id(closing)
 
     # Closing a credit spread is a debit and vice versa, so the limit sign
     # inverts. build_mleg_request asserts the convention on the closing

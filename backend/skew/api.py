@@ -139,6 +139,20 @@ async def lifespan(_app: FastAPI):
                 foreign,
             )
 
+    # Reconcile the book against the broker before anything trades or reports:
+    # the broker is the truth, and every divergence becomes a dated CORRECTION
+    # entry in the audit log. See exec/reconcile.py for why this exists.
+    if desk.broker.available and loop.ACCOUNT.get("error") is None:
+        try:
+            from skew.exec.reconcile import reconcile
+
+            recon = reconcile(desk.broker)
+            if recon["corrected"]:
+                log.warning("boot reconciliation corrected %d record(s): %s",
+                            len(recon["corrected"]), recon["corrected"])
+        except Exception:
+            log.exception("boot reconciliation raised")
+
     # Configuration era marker: if a watched risk parameter changed since the
     # last boot, one CONFIG entry marks the boundary in the audit log — the
     # historical entries citing the old value stay exactly as written. Skipped
@@ -973,16 +987,23 @@ def get_session() -> dict[str, Any]:
     dependencies=[Depends(require_operator)],
 )
 @limiter.limit("10/minute")
-def post_kill(request: Request, engage: bool = Query(default=True)) -> dict[str, Any]:
+def post_kill(
+    request: Request,
+    engage: bool = Query(default=True),
+    reason: str | None = Query(default=None, max_length=300),
+) -> dict[str, Any]:
     """Halt new entries immediately. Monitoring of open positions continues.
 
     Authenticated with the operator token, compared in constant time. Also
-    settable by environment variable so the state survives a restart.
+    settable by environment variable so the state survives a restart. An
+    optional reason is logged verbatim so the record says WHY the operator
+    pulled the handbrake.
     """
     settings.kill_switch = bool(engage)
     audit.record(
         action="REFUSED" if engage else "ABSTAINED",
-        reason=(
+        reason=reason
+        or (
             "Kill switch ENGAGED — no new entries. Open positions continue to be monitored."
             if engage
             else "Kill switch released — entries resume."
@@ -992,6 +1013,116 @@ def post_kill(request: Request, engage: bool = Query(default=True)) -> dict[str,
     )
     log.warning("kill switch set to %s via API", settings.kill_switch)
     return {"kill_switch": settings.kill_switch, "at": datetime.now(UTC).isoformat()}
+
+
+@api.post(
+    "/close",
+    summary="Operator close — atomic multi-leg, broker-verified. Requires auth.",
+    dependencies=[Depends(require_operator)],
+)
+@limiter.limit("6/minute")
+def post_close(
+    request: Request,
+    structure_id: str = Query(max_length=80),
+    qty: int | None = Query(default=None, ge=1),
+    rule: str = Query(default="operator_close", max_length=40),
+    reason: str = Query(default="", max_length=400),
+) -> dict[str, Any]:
+    """Close all or part of an open position on operator instruction.
+
+    Same discipline as every close: the broker must actually hold the legs
+    before the order goes out, the order is one atomic mleg, and the book is
+    updated only when the broker confirms the fill.
+    """
+    from skew.audit.models import PositionRow
+    from skew.db import session_scope
+    from skew.exec.exit import close_structure
+    from skew.exec.reconcile import broker_holds_legs
+    from skew.loop import _await_fill
+    from skew.models import Structure
+
+    broker = loop.get_desk().broker
+    with session_scope() as session:
+        row = session.get(PositionRow, structure_id)
+        if row is None or not row.is_open:
+            raise HTTPException(status_code=404, detail=f"No open position {structure_id!r}.")
+        session.expunge(row)
+
+    structure = Structure.model_validate(row.structure)
+    close_qty = min(qty or structure.qty, structure.qty)
+    to_close = structure.model_copy(update={"qty": close_qty})
+
+    if not broker_holds_legs(broker, to_close):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Broker does not hold {close_qty} of every leg of {structure_id}; "
+            f"refusing to submit a close that cannot fill.",
+        )
+
+    mids = monitor.fetch_mids(broker, [leg.symbol for leg in to_close.legs])
+    order = close_structure(broker, to_close, current_mids=mids, reason=reason)
+    filled = _await_fill(broker, order["client_order_id"], attempts=8)
+
+    realized: float | None = None
+    if filled:
+        entry_per_spread = row.entry_credit / row.qty if row.qty else row.entry_credit
+        # Realized P&L from the broker's actual fill prices, not our limit.
+        try:
+            branch = broker.get_order_by_client_id(order["client_order_id"])
+            legs = {
+                str(leg.symbol): float(leg.filled_avg_price or 0.0)
+                for leg in (getattr(branch, "legs", None) or [])
+            }
+            close_net = sum(
+                leg.signed_ratio * legs.get(leg.symbol, leg.mid) * 100 * close_qty
+                for leg in to_close.legs
+            )
+        except Exception:  # noqa: BLE001 — fall back to the priced limit
+            close_net = order["net_credit"]
+        realized = round(entry_per_spread * close_qty + close_net, 2)
+
+        if close_qty >= row.qty:
+            monitor.record_close(structure_id, realized, reason or rule)
+        else:
+            remaining = row.qty - close_qty
+            with session_scope() as session:
+                stored = session.get(PositionRow, structure_id)
+                if stored is not None:
+                    stored.qty = remaining
+                    stored.entry_credit = round(entry_per_spread * remaining, 2)
+                    stored.max_loss = round(stored.max_loss / row.qty * remaining, 2)
+                    kept = structure.model_copy(
+                        update={
+                            "qty": remaining,
+                            "net_credit": round(entry_per_spread * remaining, 2),
+                            "max_loss": round(structure.max_loss / row.qty * remaining, 2),
+                        }
+                    )
+                    stored.structure = kept.model_dump(mode="json")
+
+    audit.record(
+        action="EXECUTED",
+        reason=(
+            f"Closed {close_qty} of {row.qty} {structure_id} on {rule}: {reason}"
+            + (f" Realized ${realized:,.2f}." if realized is not None else "")
+            if filled
+            else f"Submitted close of {close_qty} of {row.qty} {structure_id} on {rule} — "
+            f"awaiting fill: {reason}"
+        ),
+        risk_tier=_risk().tier,
+        symbol=row.symbol,
+        structure_id=structure_id,
+        order_id=order["client_order_id"],
+        detail={"rule": rule, "qty_closed": close_qty, "realized_pnl": realized,
+                "fill_confirmed": filled, "operator": True},
+    )
+    return {
+        "structure_id": structure_id,
+        "qty_closed": close_qty,
+        "client_order_id": order["client_order_id"],
+        "fill_confirmed": filled,
+        "realized_pnl": realized,
+    }
 
 
 app.include_router(api)

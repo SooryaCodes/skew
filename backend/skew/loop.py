@@ -462,7 +462,12 @@ def _evaluate_and_act(
         )
         return decisions
 
-    monitor.record_open(chosen.structure, order["client_order_id"])
+    # The position exists when the broker says it does, not when we asked.
+    # An unfilled submission stays an OrderRow; reconciliation promotes it to
+    # a position if it fills later, or writes a correction if it dies.
+    filled = _await_fill(desk.broker, order["client_order_id"])
+    if filled:
+        monitor.record_open(chosen.structure, order["client_order_id"])
     decisions.append(
         audit.record_execution(
             chosen,
@@ -471,7 +476,8 @@ def _evaluate_and_act(
             model_rationale=selection.rationale,
             detail={
                 "broker_order_id": order.get("broker_order_id"),
-                "status": order.get("status"),
+                "status": "filled" if filled else order.get("status"),
+                "fill_confirmed": filled,
                 "offered": [c.id for c in survivors],
             },
             trace=trace,
@@ -516,8 +522,22 @@ def _gate_context(desk: Desk, result, settings: Settings) -> GateContext:
 
 
 def _monitor(desk: Desk, dry_run: bool, settings: Settings):
-    """Check open positions and close the ones that have hit a rule."""
+    """Check open positions and close the ones that have hit a rule.
+
+    Reconciliation runs FIRST: the broker is the truth, and exit rules must
+    never fire on a position the broker does not hold. See exec/reconcile.py.
+    """
+    from skew.exec.reconcile import broker_holds_legs, reconcile
+
     decisions = []
+    try:
+        report = reconcile(desk.broker)
+        if report["corrected"]:
+            log.warning("reconciliation corrected %d record(s): %s",
+                        len(report["corrected"]), report["corrected"])
+    except Exception:  # a failed reconcile pass must not stop monitoring
+        log.exception("reconciliation pass raised")
+
     actions = monitor.monitor_positions(desk.broker, settings=settings)
     tier = authority.evaluate_tier(desk.equity())
 
@@ -531,6 +551,21 @@ def _monitor(desk: Desk, dry_run: bool, settings: Settings):
                     detail={"dry_run": True, "structure_id": action["structure_id"]},
                 )
             )
+            continue
+
+        # The precondition for any close: the broker actually holds the legs.
+        # 28 rejected SPY closes fired on a phantom before this check existed.
+        if not broker_holds_legs(desk.broker, action["structure"]):
+            log.warning(
+                "close skipped — broker does not hold the legs of %s; "
+                "reconciliation will correct the record next pass",
+                action["structure_id"],
+            )
+            continue
+
+        if _close_already_resting(action["structure_id"]):
+            log.info("close for %s already resting at the broker; not resubmitting",
+                     action["structure_id"])
             continue
 
         try:
@@ -554,23 +589,85 @@ def _monitor(desk: Desk, dry_run: bool, settings: Settings):
             )
             continue
 
-        monitor.record_close(action["structure_id"], action["unrealized_pnl"], action["reason"])
-        # A position closed on the loss limit is not a gate breach — the gates
-        # held and the structure stayed inside its defined risk. Only a genuine
-        # breach demotes.
-        authority.record_closed_trade(clean=action["rule"] != "breach")
+        # The book records the close only when the broker confirms the fill —
+        # a close is a submission until then, exactly like an open.
+        filled = _await_fill(desk.broker, order["client_order_id"])
+        if filled:
+            monitor.record_close(
+                action["structure_id"], action["unrealized_pnl"], action["reason"]
+            )
+            # A position closed on the loss limit is not a gate breach — the
+            # gates held and the structure stayed inside its defined risk.
+            # Only a genuine breach demotes.
+            authority.record_closed_trade(clean=action["rule"] != "breach")
         decisions.append(
             audit.record(
                 action="EXECUTED",
-                reason=f"Closed on {action['rule']}: {action['reason']}",
+                reason=(
+                    f"Closed on {action['rule']}: {action['reason']}"
+                    if filled
+                    else f"Submitted close on {action['rule']} — awaiting fill: "
+                    f"{action['reason']}"
+                ),
                 risk_tier=tier,
                 symbol=action["symbol"],
                 structure_id=action["structure_id"],
                 order_id=order["client_order_id"],
-                detail={"realized_pnl": action["unrealized_pnl"], "rule": action["rule"]},
+                detail={
+                    "realized_pnl": action["unrealized_pnl"] if filled else None,
+                    "rule": action["rule"],
+                    "fill_confirmed": filled,
+                },
             )
         )
     return decisions
+
+
+def _close_already_resting(structure_id: str) -> bool:
+    from sqlalchemy import select
+
+    from skew.audit.models import OrderRow
+    from skew.db import session_scope
+    from skew.exec.submit import RESTING_OR_FILLED
+
+    with session_scope() as session:
+        orders = session.scalars(
+            select(OrderRow).where(
+                OrderRow.structure_id == f"{structure_id}:CLOSE", OrderRow.intent == "CLOSE"
+            )
+        ).all()
+        return any((o.status or "").lower() in RESTING_OR_FILLED - {"filled"} for o in orders)
+
+
+def _await_fill(broker, client_order_id: str, attempts: int = 4, wait_s: float = 4.0) -> bool:
+    """Poll briefly for a fill. Closes are priced at the live mid, so most fill
+    in seconds; one that does not is finished by reconciliation next cycle."""
+    import time as _time
+
+    for _ in range(attempts):
+        try:
+            order = broker.get_order_by_client_id(client_order_id)
+            status = str(getattr(order, "status", "")).lower()
+            if "filled" in status and "partially" not in status:
+                _update_order_status(client_order_id, "filled")
+                return True
+            if any(dead in status for dead in ("canceled", "expired", "rejected")):
+                _update_order_status(client_order_id, status.replace("orderstatus.", ""))
+                return False
+        except Exception:  # noqa: BLE001 — polling is best-effort
+            pass
+        _time.sleep(wait_s)
+    return False
+
+
+def _update_order_status(client_order_id: str, status: str) -> None:
+    from skew.audit.models import OrderRow
+    from skew.db import session_scope
+
+    with session_scope() as session:
+        row = session.get(OrderRow, client_order_id)
+        if row is not None:
+            row.status = status
 
 
 # ------------------------------------------------------------------ scheduler

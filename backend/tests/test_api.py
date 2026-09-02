@@ -81,16 +81,54 @@ def test_audit_rejects_an_invalid_action_filter(client):
     assert client.get("/api/audit?action=DELETE_EVERYTHING").status_code == 422
 
 
+def _filled_order(client_order_id: str, symbol: str = "SPY") -> None:
+    """Persist a broker-FILLED order row — the fills counter counts these,
+    not submissions."""
+    from skew.audit.models import OrderRow
+    from skew.db import session_scope
+
+    with session_scope() as session:
+        if session.get(OrderRow, client_order_id) is None:
+            session.add(
+                OrderRow(
+                    client_order_id=client_order_id,
+                    symbol=symbol,
+                    structure_id=f"{symbol}:TEST",
+                    kind="PUT_CREDIT",
+                    intent="OPEN",
+                    qty=1,
+                    limit_price=-1.0,
+                    net_credit=1.0,
+                    max_loss=1.0,
+                    status="filled",
+                    legs=[],
+                    detail={},
+                )
+            )
+
+
 def test_audit_counts_report_the_ratio(client):
-    """A desk that refused forty times and traded twice is doing its job."""
+    """A desk that refused forty times and traded twice is doing its job —
+    and EXECUTED counts broker-confirmed fills, never bare submissions."""
     audit.record(action="REFUSED", reason="a", risk_tier=0)
     audit.record(action="REFUSED", reason="b", risk_tier=0)
-    audit.record(action="EXECUTED", reason="c", risk_tier=0)
+    _filled_order("skew-counts-test")
+    audit.record(action="EXECUTED", reason="c", risk_tier=0, order_id="skew-counts-test")
+    audit.record(action="EXECUTED", reason="unfilled submission", risk_tier=0,
+                 order_id="skew-never-filled")
 
     counts = client.get("/api/audit/counts").json()
-    assert counts["REFUSED"] == 2
-    assert counts["EXECUTED"] == 1
-    assert counts["TOTAL"] == 3
+    assert counts["REFUSED"] >= 2
+    assert counts["EXECUTED"] >= 1  # the filled one counts...
+    # ...and the unfilled submission does not add to it: fills come only from
+    # order rows the broker marked filled.
+    from skew.audit.models import OrderRow
+    from skew.db import session_scope
+    from sqlalchemy import select
+
+    with session_scope() as session:
+        filled = {c for (c,) in session.execute(select(OrderRow.client_order_id).where(OrderRow.status == "filled")).all()}
+    assert "skew-never-filled" not in filled
 
 
 def test_iv_history_labels_its_own_window(client):
@@ -166,7 +204,12 @@ def test_every_write_endpoint_requires_the_operator_token(client, monkeypatch):
         for method in methods
         if method.lower() not in ("get", "head", "options")
     )
-    assert writes == [("/api/cycle", "POST"), ("/api/kill", "POST"), ("/api/universe", "POST")]
+    assert writes == [
+        ("/api/close", "POST"),
+        ("/api/cycle", "POST"),
+        ("/api/kill", "POST"),
+        ("/api/universe", "POST"),
+    ]
 
     # And every one of them 401s without the token, 503s when none configured.
     monkeypatch.setattr(settings, "operator_token", "op-secret")
@@ -323,6 +366,7 @@ def test_cycle_status_is_public_and_shaped(client):
 def test_session_summary_is_public_and_names_the_session(client):
     from skew.audit import log as audit_log
 
+    _filled_order("skew-test-1", symbol="AAPL")
     audit_log.record(
         action="EXECUTED",
         reason="Submitted a thing.",

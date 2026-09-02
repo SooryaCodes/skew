@@ -31,6 +31,25 @@ def _new_id() -> str:
     return uuid.uuid4().hex[:16]
 
 
+def _order_filled(order_id: str | None) -> bool | None:
+    """Fill state of the linked order: True filled, False dead unfilled,
+    None resting/unknown/no order."""
+    if not order_id:
+        return None
+    from skew.audit.models import OrderRow
+
+    with session_scope() as session:
+        row = session.get(OrderRow, order_id)
+    if row is None:
+        return None
+    status = (row.status or "").lower()
+    if status == "filled":
+        return True
+    if status in {"expired", "canceled", "cancelled", "rejected", "replaced", "done_for_day"}:
+        return False
+    return None
+
+
 def _to_model(row: DecisionRow) -> Decision:
     ts = row.ts if row.ts.tzinfo else row.ts.replace(tzinfo=UTC)
     return Decision(
@@ -43,6 +62,7 @@ def _to_model(row: DecisionRow) -> Decision:
         model_rationale=row.model_rationale,
         risk_tier=row.risk_tier,
         order_id=row.order_id,
+        order_filled=_order_filled(row.order_id) if row.action == "EXECUTED" else None,
         detail=row.detail or {},
     )
 
@@ -249,6 +269,18 @@ def _describe_change(param: str, old: Any, new: Any) -> str:
     return f"{param} changed from {old} to {new}."
 
 
+def record_correction(
+    reason: str, symbol: str | None = None, detail: dict[str, Any] | None = None
+) -> Decision:
+    """A reconciliation correction: the record diverged from the broker and
+    this entry says exactly how. Appended, never replacing anything — the
+    original wrong entry stays visible above it. That is deliberate: a dated
+    correction is the strongest evidence the log is real."""
+    body = dict(detail or {})
+    body["correction"] = True
+    return record(action="CORRECTION", reason=reason, risk_tier=0, symbol=symbol, detail=body)
+
+
 def record_config_change(reason: str, changes: list[dict[str, Any]]) -> Decision:
     """One system-level CONFIG entry. Rendered as an era divider in the UI,
     never counted or filtered as a trading decision."""
@@ -326,6 +358,19 @@ def by_id(decision_id: str) -> Decision | None:
         return _to_model(row) if row else None
 
 
+
+def filled_order_ids(session) -> set[str]:
+    """Client order ids the broker actually FILLED (reconciled each cycle).
+    The fills counter counts these, not submissions — an EXECUTED entry whose
+    order expired unfilled is a submission record, not a fill."""
+    from skew.audit.models import OrderRow
+
+    rows = session.execute(
+        select(OrderRow.client_order_id).where(OrderRow.status == "filled")
+    ).all()
+    return {cid for (cid,) in rows}
+
+
 def counts_since(moment: datetime) -> dict[str, int]:
     """Executions, refusals and abstentions since a specific instant."""
     with session_scope() as session:
@@ -334,10 +379,20 @@ def counts_since(moment: datetime) -> dict[str, int]:
             .where(DecisionRow.ts >= moment)
             .group_by(DecisionRow.action)
         ).all()
+        filled = filled_order_ids(session)
+        executed_filled = session.execute(
+            select(func.count(DecisionRow.id)).where(
+                DecisionRow.ts >= moment,
+                DecisionRow.action == "EXECUTED",
+                DecisionRow.order_id.in_(filled) if filled else DecisionRow.order_id.is_(None),
+            )
+        ).scalar_one() if filled else 0
     out = {"EXECUTED": 0, "REFUSED": 0, "ABSTAINED": 0}
     for action, count in rows:
-        if action in out:  # CONFIG markers are not decisions and never count
+        if action in out:  # CONFIG/CORRECTION markers are not decisions
             out[action] = int(count)
+    # Fills are fills: only submissions the broker confirmed filled count.
+    out["EXECUTED"] = int(executed_filled)
     out["TOTAL"] = sum(v for k, v in out.items() if k != "TOTAL")
     return out
 
@@ -353,10 +408,22 @@ def counts(since_hours: int | None = None) -> dict[str, int]:
         if since_hours:
             query = query.where(DecisionRow.ts >= datetime.now(UTC) - timedelta(hours=since_hours))
         rows = session.execute(query).all()
+        filled = filled_order_ids(session)
+        fill_query = select(func.count(DecisionRow.id)).where(
+            DecisionRow.action == "EXECUTED",
+            DecisionRow.order_id.in_(filled) if filled else DecisionRow.order_id.is_(None),
+        )
+        if since_hours:
+            fill_query = fill_query.where(
+                DecisionRow.ts >= datetime.now(UTC) - timedelta(hours=since_hours)
+            )
+        executed_filled = session.execute(fill_query).scalar_one() if filled else 0
 
     out = {"EXECUTED": 0, "REFUSED": 0, "ABSTAINED": 0}
     for action, count in rows:
-        if action in out:  # CONFIG markers are not decisions and never count
+        if action in out:  # CONFIG/CORRECTION markers are not decisions
             out[action] = int(count)
+    # Fills are fills: only submissions the broker confirmed filled count.
+    out["EXECUTED"] = int(executed_filled)
     out["TOTAL"] = sum(v for k, v in out.items() if k != "TOTAL")
     return out

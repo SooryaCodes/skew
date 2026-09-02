@@ -35,8 +35,10 @@ Right = Literal["CALL", "PUT"]
 TimePoint = Literal["NOW", "MID", "EXPIRY"]
 # CONFIG is not a trading decision: it marks a change to the desk's standing
 # parameters, so the record never reads as contradicting itself when a limit
-# moves. Config entries are excluded from decision counts and outcome filters.
-DecisionAction = Literal["EXECUTED", "REFUSED", "ABSTAINED", "CONFIG"]
+# moves. CORRECTION marks a reconciliation against the broker — a dated,
+# append-only statement of what the record got wrong and how it was fixed.
+# Neither is counted or filtered as a trading decision.
+DecisionAction = Literal["EXECUTED", "REFUSED", "ABSTAINED", "CONFIG", "CORRECTION"]
 
 CONTRACT_MULTIPLIER = 100
 
@@ -313,6 +315,10 @@ class Decision(BaseModel):
     action: DecisionAction
     symbol: str | None = None
     structure_id: str | None = None
+    # For EXECUTED entries: True when the broker confirmed the fill, False
+    # when the submission died unfilled, None while resting or unknown.
+    # A submission is not a fill; the UI renders them differently.
+    order_filled: bool | None = None
     reason: str
     model_rationale: str | None = None
     risk_tier: int

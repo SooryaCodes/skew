@@ -73,6 +73,26 @@ const ENTRIES: Array<{ q: string; a: React.ReactNode }> = [
     ),
   },
   {
+    q: "Has the record ever been wrong?",
+    a: (
+      <>
+        Yes, once, and the correction is public. On 2 September the desk was
+        recording positions at order submission rather than at fill, which
+        produced phantom positions in the record. It now reconciles against the
+        broker every cycle, and the corrections are visible in the{" "}
+        <Link
+          className="underline decoration-[color:var(--line)] underline-offset-2 hover:decoration-[color:var(--brass)]"
+          href="/audit?q=corrected"
+        >
+          audit log
+        </Link>
+        . A system that detected its own divergence and corrected it in public
+        is the thesis working, and the dated corrections are the strongest
+        evidence the log is real.
+      </>
+    ),
+  },
+  {
     q: "Can I inspect a decision?",
     a: (
       <>
