@@ -43,8 +43,11 @@ function GateRow({ gate }: { gate: GateResult }) {
       </span>
       {/* Reason text stays ink in both states — oxide as 12px text fails 4.5:1
           in dark. The glyph carries the state; a failure also gets weight. */}
+      {/* relative: sr-only is absolutely positioned, and without a positioned
+          ancestor it resolves against the document — enough off-screen gate
+          rows extended the page below the desk shell and broke containment. */}
       <span
-        className={`text-[14px] leading-5 text-[color:var(--text)] ${
+        className={`relative text-[14px] leading-5 text-[color:var(--text)] ${
           state === "fail" ? "font-medium" : ""
         }`}
       >
