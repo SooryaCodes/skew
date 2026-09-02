@@ -16,6 +16,7 @@ python3 build.py test
 python3 build.py segments
 python3 build.py assemble
 python3 build.py mix
+python3 build.py watermark
 python3 build.py verify
 python3 build.py burn
 mkdir -p out/variant-a
@@ -25,6 +26,7 @@ echo "=== VARIANT B: with the corrections beat ==="
 export INCLUDE_BEAT=1
 if python3 build.py assemble; then
   python3 build.py mix
+  python3 build.py watermark
   if python3 build.py verify; then B_VERIFY=pass; else B_VERIFY=fail; fi
   python3 build.py burn
   mv out/skew-demo.mp4 out/skew-demo-correction-beat.mp4

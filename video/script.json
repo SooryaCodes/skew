@@ -18,6 +18,20 @@
   },
   "segments": [
     {
+      "id": "a10",
+      "act": 1,
+      "title": "IDENTITY",
+      "kind": "motion",
+      "page": "motion/open.html",
+      "speed": 1.0,
+      "vo_parts": [
+        {
+          "silence_s": 2.0
+        }
+      ],
+      "total_s": 2.45
+    },
+    {
       "id": "a11",
       "act": 1,
       "title": "TITLE",
@@ -71,9 +85,9 @@
       "vo_template": "Eight names, scanned every five minutes against live Alpaca chains. On this name implied volatility is running at {iv_words} while realized sits at {rv_words}. The market is overcharging by {vrp_words} points, and that gap is the entire signal.",
       "deferred": true,
       "speed": 1.0,
-      "vo": "Eight names, scanned every five minutes against live Alpaca chains. On this name implied volatility is running at twenty four point three while realized sits at eighteen. The market is overcharging by six point three points, and that gap is the entire signal.",
-      "duration_s": 17.103,
-      "total_s": 17.103
+      "vo": "Eight names, scanned every five minutes against live Alpaca chains. On this name implied volatility is running at twenty four point nine while realized sits at eighteen point eight. The market is overcharging by six point one points, and that gap is the entire signal.",
+      "duration_s": 17.679,
+      "total_s": 17.679
     },
     {
       "id": "a22",
@@ -106,7 +120,7 @@
       "vo_parts": [
         {
           "text_template": "Here is the one that matters. Every candidate is repriced across eighty four stress scenarios. Price shocks to three standard deviations, implied volatility doubling, at three points in time. On this trade, one ordinary move already consumes {consumed_words} percent of its maximum loss. The limit is {limit_words}.",
-          "text": "Here is the one that matters. Every candidate is repriced across eighty four stress scenarios. Price shocks to three standard deviations, implied volatility doubling, at three points in time. On this trade, one ordinary move already consumes sixty three percent of its maximum loss. The limit is sixty."
+          "text": "Here is the one that matters. Every candidate is repriced across eighty four stress scenarios. Price shocks to three standard deviations, implied volatility doubling, at three points in time. On this trade, one ordinary move already consumes sixty five percent of its maximum loss. The limit is sixty."
         },
         {
           "silence_s": 1.4
@@ -117,7 +131,9 @@
       ],
       "speed": 0.95,
       "deferred": true,
-      "vo": "Here is the one that matters. Every candidate is repriced across eighty four stress scenarios. Price shocks to three standard deviations, implied volatility doubling, at three points in time. On this trade, one ordinary move already consumes sixty three percent of its maximum loss. The limit is sixty. So it does not trade."
+      "vo": "Here is the one that matters. Every candidate is repriced across eighty four stress scenarios. Price shocks to three standard deviations, implied volatility doubling, at three points in time. On this trade, one ordinary move already consumes sixty five percent of its maximum loss. The limit is sixty. So it does not trade.",
+      "duration_s": 23.26,
+      "total_s": 23.26
     },
     {
       "id": "a31b",
@@ -128,7 +144,9 @@
       "vo_template": "Across this account the desk has looked at {looked_words} opportunities and declined almost all of them. It has filled {acted_words}. Restraint is the default, not the exception.",
       "deferred": true,
       "speed": 1.0,
-      "vo": "Across this account the desk has looked at more than two thousand six hundred opportunities and declined almost all of them. It has filled five times. Restraint is the default, not the exception."
+      "vo": "Across this account the desk has looked at more than two thousand seven hundred opportunities and declined almost all of them. It has filled five times. Restraint is the default, not the exception.",
+      "duration_s": 12.004,
+      "total_s": 12.004
     },
     {
       "id": "a31c",
@@ -140,7 +158,9 @@
       "deferred": true,
       "speed": 1.0,
       "vo_template": "On the second of September the desk caught its own record diverging from the broker, reconciled, and wrote {corr_words} corrections into the record. They are still there. A log that cannot disagree with you is not a log.",
-      "vo": "On the second of September the desk caught its own record diverging from the broker, reconciled, and wrote thirteen corrections into the record. They are still there. A log that cannot disagree with you is not a log."
+      "vo": "On the second of September the desk caught its own record diverging from the broker, reconciled, and wrote thirteen corrections into the record. They are still there. A log that cannot disagree with you is not a log.",
+      "duration_s": 13.135,
+      "total_s": 13.135
     },
     {
       "id": "a32",

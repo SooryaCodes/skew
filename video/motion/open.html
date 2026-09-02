@@ -1,0 +1,40 @@
+<!doctype html><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  /* The identity beat: black 0.4s, the real product mark scales up from 92%
+     over 300ms, the wordmark sets beside it, hold. Under 3 seconds; an
+     identity, not a title sequence. The mark is the baked production asset —
+     the same pixels the desk header renders — never redrawn. */
+  * { margin:0; box-sizing:border-box; }
+  body { width:1920px; height:1080px; background:#09090b; color:#f4f4f6;
+         overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  .lockup { display:flex; align-items:center; gap:36px; opacity:0; }
+  .go .lockup { animation: markIn .3s cubic-bezier(.2,.8,.2,1) .4s both; }
+  img.mark { width:148px; height:148px; border-radius:33px; display:block; }
+  .words { text-align:left; }
+  h1 { font-family:"Outfit", "Manrope", -apple-system, sans-serif;
+       font-size:118px; font-weight:800; letter-spacing:-0.02em; line-height:1; }
+  p  { font-family:"Geist Mono", ui-monospace, Menlo, monospace;
+       font-size:24px; font-weight:500; letter-spacing:.32em; color:#9d9da8;
+       margin-top:18px; opacity:0; }
+  .go p { animation: sub .35s ease-out .62s both; }
+  @keyframes markIn { from { opacity:0; transform:scale(.92); }
+                      to   { opacity:1; transform:none; } }
+  @keyframes sub    { from { opacity:0; transform:translateY(6px); }
+                      to   { opacity:1; transform:none; } }
+</style>
+<body>
+  <div class="lockup">
+    <img class="mark" src="assets/skew-logo-512.png" alt="">
+    <div class="words">
+      <h1>SKEW</h1>
+      <p>AUTONOMOUS VOLATILITY DESK</p>
+    </div>
+  </div>
+  <script>
+    // Fonts first, so the wordmark never pops mid-capture; then the timeline.
+    document.fonts.ready.then(() => requestAnimationFrame(
+      () => document.body.classList.add("go")));
+  </script>
+</body>

@@ -511,9 +511,6 @@ def mix_master() -> None:
        "-c:v", "copy", "-c:a", "aac", "-ar", "48000", "-ac", "2",
        "-movflags", "+faststart", str(mixed))
     mixed.replace(master)
-    sh("ffmpeg", "-y", "-v", "error", "-i", str(master),
-       "-c:v", "libvpx-vp9", "-crf", "34", "-b:v", "0", "-c:a", "libopus",
-       str(out / "skew-demo.webm"))
     (ROOT / "ASSETS-LICENSE.md").write_text(
         "# Audio assets\n\nThe ambient bed and both sound accents are synthesized "
         "by build.py (sine/pink-noise sources through ffmpeg filters) at build "
@@ -522,6 +519,46 @@ def mix_master() -> None:
     )
     print(f"mixed master: bed + accents, thin-out {thin_from:.1f}-{thin_to:.1f}s, "
           f"breach tone @{accent_breach:.1f}s, tick @{accent_tick:.1f}s")
+
+
+
+def watermark() -> None:
+    """The product mark, lower-left at 35% opacity throughout, dropping to
+    15% across the refusal beat so nothing competes with the refusal itself.
+    The mark is the baked production asset — the same pixels the desk header
+    renders. The webm fallback encodes from the watermarked master."""
+    spec = json.loads(SCRIPT.read_text())
+    out = ROOT / "out"
+    master = out / "skew-demo.mp4"
+    mark = ROOT / "motion" / "assets" / "skew-logo-512.png"
+
+    start = 0.0
+    for seg in active_segments(spec):
+        if seg["id"] == "a31":
+            break
+        start += seg["total_s"]
+    part0 = probe_duration(ROOT / "vo" / "gen" / "a31_part0.wav")
+    beat_at = start + HEAD_PAD_S + part0
+    dim_from, dim_to = beat_at - 5.0, beat_at + 5.0
+
+    marked = out / "skew-demo-marked.mp4"
+    sh("ffmpeg", "-y", "-v", "error", "-i", str(master), "-i", str(mark),
+       "-filter_complex",
+       f"[1:v]scale=64:64,format=rgba,split[m1][m2];"
+       f"[m1]colorchannelmixer=aa=0.35[wmA];"
+       f"[m2]colorchannelmixer=aa=0.15[wmB];"
+       f"[0:v][wmA]overlay=x=30:y=H-h-30:"
+       f"enable='not(between(t,{dim_from:.2f},{dim_to:.2f}))'[v1];"
+       f"[v1][wmB]overlay=x=30:y=H-h-30:"
+       f"enable='between(t,{dim_from:.2f},{dim_to:.2f})'[vout]",
+       "-map", "[vout]", "-map", "0:a",
+       "-c:v", "libx264", "-profile:v", "high", "-crf", "18", "-pix_fmt", "yuv420p",
+       "-c:a", "copy", "-movflags", "+faststart", str(marked))
+    marked.replace(master)
+    sh("ffmpeg", "-y", "-v", "error", "-i", str(master),
+       "-c:v", "libvpx-vp9", "-crf", "34", "-b:v", "0", "-c:a", "libopus",
+       str(out / "skew-demo.webm"))
+    print(f"watermark: mark lower-left, 35% -> 15% across {dim_from:.1f}-{dim_to:.1f}s")
 
 
 def spec_seg(spec, sid):
@@ -555,13 +592,21 @@ def verify_final() -> None:
          "-f", "null", "-"], capture_output=True, text=True).stderr
     import re as _re
 
-    gaps = [float(x) for x in _re.findall(r"silence_duration: ([\d.]+)", det)]
+    pairs = _re.findall(r"silence_start: ([\d.]+)[\s\S]*?silence_duration: ([\d.]+)", det)
+    gaps = [float(d) for _, d in pairs]
     total_silence = sum(gaps)
+    # The opening identity beat is designed silence (spec: black + mark, under
+    # 3s, before the first narration line) — it gets its own gate rather than
+    # tripping the dead-air one. Only a gap that STARTS the film qualifies.
+    leading = 0.0
+    if pairs and float(pairs[0][0]) < 0.5:
+        leading = gaps.pop(0)
     longest = max(gaps) if gaps else 0.0
     checks = [
         ("duration 130-165s", 130 <= duration <= 165.5, f"{duration:.1f}s"),
+        ("opening identity <= 3.0s", leading <= 3.0, f"{leading:.2f}s"),
         ("total silence < 12s", total_silence < 12, f"{total_silence:.1f}s"),
-        ("longest gap <= 1.6s", longest <= 1.6, f"{longest:.2f}s"),
+        ("longest gap <= 1.6s (after the open)", longest <= 1.6, f"{longest:.2f}s"),
         ("integrated -14 LUFS (±1)", abs(lufs + 14) <= 1.0, f"{lufs:.1f} LUFS"),
         ("true peak < -1.5 dBTP", tp <= -1.4, f"{tp:.1f} dBTP"),
     ]
@@ -591,6 +636,7 @@ if __name__ == "__main__":
     phase = sys.argv[1] if len(sys.argv) > 1 else "report"
     {"vo": build_vo, "report": report, "srt": build_srt, "test": test_splitter,
      "segments": build_segments, "assemble": assemble, "mix": mix_master,
+     "watermark": watermark,
      "burn": lambda: burn_captions(ROOT / "out" / "skew-demo.mp4",
                                    ROOT / "out" / "skew-demo-captions.mp4"),
      "verify": verify_final}[phase]()
