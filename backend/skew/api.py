@@ -19,13 +19,14 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from skew import loop
 from skew.audit import log as audit
+from skew.audit import query as audit_query
 from skew.config import PAPER_HOST, settings
 from skew.data.store import daily_closing_iv, history_window_days, observation_count
 from skew.db import init_db
@@ -485,6 +486,76 @@ def get_audit(
 @api.get("/audit/counts", summary="Executions vs refusals vs abstentions")
 def get_audit_counts(since_hours: int | None = Query(default=None, ge=1, le=8760)):
     return audit.counts(since_hours=since_hours)
+
+
+def _audit_query_from_params(
+    action: str | None,
+    symbols: str | None,
+    gate: str | None,
+    q: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    sort: str,
+    template: str | None,
+) -> "audit_query.AuditQuery":
+    return audit_query.AuditQuery(
+        action=action,
+        symbols=[s.strip().upper() for s in (symbols or "").split(",") if s.strip()],
+        gate=gate,
+        q=q,
+        date_from=audit_query.parse_when(date_from),
+        date_to=audit_query.parse_when(date_to, end_of_day=True),
+        sort=sort,
+        template=template,
+    )
+
+
+@api.get("/audit/query", summary="The full decision record — filtered, grouped, summarised")
+def get_audit_query(
+    action: str | None = Query(default=None, pattern="^(EXECUTED|REFUSED|ABSTAINED)$"),
+    symbols: str | None = Query(default=None, description="Comma-separated tickers"),
+    gate: str | None = Query(default=None, pattern="^(liquidity|earnings|term|stress|budget)$"),
+    q: str | None = Query(default=None, max_length=200),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    sort: str = Query(default="desc", pattern="^(asc|desc)$"),
+    grouped: bool = Query(default=True),
+    template: str | None = Query(default=None, max_length=16),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> dict[str, Any]:
+    """Powers the /audit page. Runs of identical reasoning collapse into one
+    item with a count and a time range (fills never collapse); the summary
+    block always describes exactly the filtered set."""
+    query = _audit_query_from_params(action, symbols, gate, q, date_from, date_to, sort, template)
+    result = audit_query.run_query(query, grouped=grouped, offset=offset, limit=limit)
+    result["totals"] = audit.counts()
+    result["account_suffix"] = str(loop.ACCOUNT.get("suffix") or "") or None
+    result["symbols_seen"] = audit_query.distinct_symbols()
+    return result
+
+
+@api.get("/audit/export.csv", summary="The current filtered view, as CSV")
+def get_audit_export(
+    action: str | None = Query(default=None, pattern="^(EXECUTED|REFUSED|ABSTAINED)$"),
+    symbols: str | None = Query(default=None),
+    gate: str | None = Query(default=None, pattern="^(liquidity|earnings|term|stress|budget)$"),
+    q: str | None = Query(default=None, max_length=200),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    sort: str = Query(default="desc", pattern="^(asc|desc)$"),
+):
+    import csv
+    import io
+
+    query = _audit_query_from_params(action, symbols, gate, q, date_from, date_to, sort, None)
+    buffer = io.StringIO()
+    csv.writer(buffer).writerows(audit_query.export_csv_rows(query))
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="skew-decisions.csv"'},
+    )
 
 
 @api.get("/iv-history/{symbol}", summary="Self-collected ATM IV history")

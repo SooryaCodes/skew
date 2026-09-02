@@ -13,6 +13,7 @@
 import useSWR, { type SWRResponse } from "swr";
 
 import type {
+  AuditQueryResult,
   Candidate,
   ClosedPosition,
   CycleStatus,
@@ -74,6 +75,9 @@ export const useClosedPositions = () =>
 export const useAudit = (limit = 40) => usePoll<Decision[]>(`/api/audit?limit=${limit}`);
 export const useAuditCounts = () =>
   usePoll<Record<string, number>>("/api/audit/counts", 15000);
+// The /audit page: the query string IS the page state, so the URL is the key.
+export const useAuditQuery = (qs: string) =>
+  usePoll<AuditQueryResult>(`/api/audit/query${qs ? `?${qs}` : ""}`, 30000);
 export const useVrpHistory = (symbol: string | null) =>
   usePoll<VrpHistory>(symbol ? `/api/vrp-history/${symbol}` : null, 60000);
 // Fast poll: this is what animates the RUN CYCLE NOW control while it thinks.

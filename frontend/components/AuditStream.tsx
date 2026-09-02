@@ -90,38 +90,45 @@ function reasonTemplate(reason: string): string {
 }
 
 /**
- * Consecutive entries with the same (outcome, reason template) collapse: the
- * first renders IN FULL, the rest fold into "+N more, same reason". Fills
- * never collapse, whatever their text.
+ * Entries with the same (outcome, reason template) collapse into one run: the
+ * first renders IN FULL, the rest fold into "+N more, same reason". Runs are
+ * bounded by FILLS, not by strict adjacency — the desk's cycles interleave
+ * refusals with abstentions, so strictly-consecutive runs break every two or
+ * three rows and a full book still reads as a wall of identical capacity
+ * refusals. A fill is a barrier: nothing groups across one, so the rare
+ * executions stay honest chronological anchors. Fills never collapse.
  */
 function groupDecisions(decisions: Decision[]): Group[] {
   const groups: Group[] = [];
-  let run: Decision[] = [];
-  let runKey: string | null = null;
-
-  const flush = () => {
-    if (run.length >= 2) {
-      groups.push({ kind: "run", first: run[0]!, rest: run.slice(1), key: run[0]!.id });
-    } else {
-      run.forEach((entry) => groups.push({ kind: "single", entry }));
-    }
-    run = [];
-    runKey = null;
-  };
+  const open = new Map<string, Extract<Group, { kind: "run" }>>();
 
   for (const decision of decisions) {
     if (decision.action === "EXECUTED") {
-      flush();
+      open.clear(); // barrier: a fill ends every open run
       groups.push({ kind: "single", entry: decision });
       continue;
     }
     const key = `${decision.action}|${reasonTemplate(decision.reason)}`;
-    if (key !== runKey) flush();
-    runKey = key;
-    run.push(decision);
+    const run = open.get(key);
+    if (run) {
+      run.rest.push(decision);
+    } else {
+      const fresh: Extract<Group, { kind: "run" }> = {
+        kind: "run",
+        first: decision,
+        rest: [],
+        key: decision.id,
+      };
+      open.set(key, fresh);
+      groups.push(fresh);
+    }
   }
-  flush();
-  return groups;
+  // A run of one is just a single entry.
+  return groups.map((group) =>
+    group.kind === "run" && group.rest.length === 0
+      ? { kind: "single" as const, entry: group.first }
+      : group,
+  );
 }
 
 function FullEntry({ decision, isNewest }: { decision: Decision; isNewest: boolean }) {
@@ -259,9 +266,19 @@ export function AuditStream({ decisions, counts }: Props) {
 
   return (
     <section className="flex flex-col p-4 lg:h-full lg:min-h-0 lg:flex-1" aria-label="Decision stream">
-      <h2 className="whitespace-nowrap text-[16px] font-bold tracking-tight text-[color:var(--text)]">
-        Audit log
-      </h2>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="whitespace-nowrap text-[16px] font-bold tracking-tight text-[color:var(--text)]">
+          Audit log
+        </h2>
+        {/* The way into the evidence — a judge reading the rail should see it
+            without scrolling. */}
+        <Link
+          href="/audit"
+          className="t-fast mono whitespace-nowrap text-[12px] uppercase tracking-wider text-[color:var(--text-dim)] hover:text-[color:var(--brass)]"
+        >
+          full record →
+        </Link>
+      </div>
       <p className="mt-0.5 text-[13px] leading-snug text-[color:var(--text-dim)]">
         Every decision is traceable — click any entry. Counts are all-time; the
         strip above counts this session only.
@@ -314,8 +331,15 @@ export function AuditStream({ decisions, counts }: Props) {
                 <Run key={group.key} first={group.first} rest={group.rest} isNewest={i === 0} />
               ),
             )}
-            <li className="py-3 text-center text-[12px] text-[color:var(--text-faint)]">
-              end of the loaded window — the full history lives in the audit DB
+            <li className="py-3 text-center">
+              <Link
+                href="/audit"
+                className="t-fast mono text-[12px] text-[color:var(--text-dim)] hover:text-[color:var(--brass)]"
+              >
+                {counts?.TOTAL
+                  ? `See all ${counts.TOTAL.toLocaleString("en-US")} decisions →`
+                  : "See the full record →"}
+              </Link>
             </li>
           </ul>
           <div

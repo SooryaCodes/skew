@@ -21,7 +21,7 @@ import { ThemeToggle } from "./ThemeToggle";
 
 interface Props {
   status: SystemStatus | undefined;
-  tab: "desk" | "positions";
+  tab: "desk" | "positions" | "audit";
 }
 
 function healthReport(status: SystemStatus | undefined): { ok: boolean; lines: string[] } {
@@ -66,6 +66,13 @@ export function Header({ status, tab }: Props) {
             style={{ color: tab === "positions" ? "var(--text)" : "var(--text-dim)" }}
           >
             positions
+          </Link>
+          <Link
+            href="/audit"
+            className="mono t-fast text-[13px] uppercase tracking-wider"
+            style={{ color: tab === "audit" ? "var(--text)" : "var(--text-dim)" }}
+          >
+            audit
           </Link>
         </nav>
 

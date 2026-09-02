@@ -254,6 +254,12 @@ export default function Landing() {
             >
               mcp setup
             </Link>
+            <Link
+              className="t-fast text-[color:var(--text-dim)] hover:text-[color:var(--text)]"
+              href="/audit"
+            >
+              audit record
+            </Link>
             <span
               className="cursor-default text-[color:var(--text-faint)]"
               title="Ships with the submission"

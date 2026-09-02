@@ -353,3 +353,57 @@ export interface Surface {
   slices: SurfaceSlice[];
   error?: string;
 }
+
+// ---------------------------------------------------------------- /audit page
+
+/** A table row on the full decision record — the trace holds the rest. */
+export interface AuditLite {
+  id: string;
+  ts: string;
+  action: DecisionAction;
+  symbol: string | null;
+  kind: string | null;
+  gates: string[];
+  reason: string;
+  order_id: string | null;
+  risk_tier: number;
+}
+
+/** A collapsed run: decisions sharing (outcome, reason template), bounded by
+ *  fills. `sample` is the newest member, rendered as the run's face. */
+export interface AuditRun {
+  type: "run";
+  action: DecisionAction;
+  template: string;
+  count: number;
+  first_ts: string;
+  last_ts: string;
+  symbols: string[];
+  kinds: string[];
+  gates: string[];
+  sample: AuditLite;
+}
+
+export type AuditItem = ({ type: "decision" } & AuditLite) | AuditRun;
+
+export interface AuditSummary {
+  count: number;
+  executed: number;
+  refused: number;
+  abstained: number;
+  by_gate: Array<{ gate: string; count: number }>;
+  per_day: Array<{ date: string; count: number }>;
+  top_refused: { symbol: string; count: number } | null;
+}
+
+export interface AuditQueryResult {
+  summary: AuditSummary;
+  items: AuditItem[];
+  total_items: number;
+  offset: number;
+  limit: number;
+  range: { first: string | null; last: string | null };
+  totals: Record<string, number>;
+  account_suffix: string | null;
+  symbols_seen: string[];
+}
