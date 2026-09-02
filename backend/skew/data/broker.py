@@ -143,9 +143,9 @@ class Broker:
         # the server log only — the API exposes just its last four characters.
         # Masked everywhere, logs included — the full id never leaves the DB.
         log.info(
-            "CONNECTED ACCOUNT …%s — equity $%,.2f",
+            "CONNECTED ACCOUNT …%s — equity $%s",
             number[-4:] if number else "????",
-            equity,
+            f"{equity:,.2f}",
         )
 
         expected = self.settings.alpaca_account_number
