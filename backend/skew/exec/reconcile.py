@@ -60,14 +60,17 @@ def _broker_leg_entries(broker: Any) -> dict[str, tuple[float, float]]:
 
 
 def _true_entry(structure: Structure, legs_at_broker: dict[str, tuple[float, float]], qty: int) -> float:
-    """Net credit (negative = debit) of qty spreads at the broker's average
-    entry prices. Falls back to the recorded entry when a leg is missing."""
+    """Net credit (positive = credit received, negative = debit paid) of qty
+    spreads at the broker's average entry prices. The signed-ratio sum is the
+    position's VALUE, so the credit convention is its negation — a debit
+    spread has positive value and negative net_credit. Falls back to the
+    recorded entry price when a leg is missing."""
     total = 0.0
     for leg in structure.legs:
         held = legs_at_broker.get(leg.symbol)
         price = held[1] if held else leg.mid
         total += leg.signed_ratio * price * CONTRACT_MULTIPLIER * qty
-    return round(total, 2)
+    return round(-total, 2)
 
 
 def reconcile(broker: Any) -> dict[str, Any]:
@@ -155,7 +158,15 @@ def reconcile(broker: Any) -> dict[str, Any]:
             report["warnings"].append(f"{row.id}: no structure JSON; cannot verify entry")
             continue
         true_entry = _true_entry(structure, legs_at_broker, true_qty)
-        per_spread_max_loss = row.max_loss / row.qty if row.qty else row.max_loss
+        # Max loss moves with the entry: for a vertical or condor,
+        # max_loss = width - credit (or = debit), so per spread it shifts by
+        # exactly the difference between intended and actual entry.
+        old_entry_per_spread = row.entry_credit / row.qty if row.qty else row.entry_credit
+        new_entry_per_spread = true_entry / true_qty if true_qty else true_entry
+        old_max_loss_per_spread = row.max_loss / row.qty if row.qty else row.max_loss
+        per_spread_max_loss = round(
+            old_max_loss_per_spread + (old_entry_per_spread - new_entry_per_spread), 2
+        )
 
         if true_qty != row.qty or abs(true_entry - row.entry_credit) > 1.0:
             new_legs = []

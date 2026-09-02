@@ -194,3 +194,18 @@ def test_config_wording_for_the_watched_params():
     assert "prior limit" in text
     assert "45% to 25%" in _describe_change("profit_target_pct", 0.45, 0.25)
     assert "2x to 1x" in _describe_change("loss_limit_multiple", 2.0, 1.0)
+
+
+def test_reconcile_entry_sign_and_max_loss_scaling():
+    """A debit spread's true entry is NEGATIVE net_credit, and max loss moves
+    with the actual fill: two AMD spreads at $5.00 debit are -$1,000 entry
+    and $1,000 max loss, not the intended $406."""
+    from skew.exec.reconcile import _true_entry
+    from tests.test_gates import make_candidate
+
+    structure = make_candidate().structure
+    legs = {leg.symbol: (leg.signed_ratio * 2.0, 14.5 if leg.side == "BUY" else 9.5)
+            for leg in structure.legs}
+    entry = _true_entry(structure, legs, 2)
+    # BUY leg 14.5, SELL leg 9.5 -> value +5.00/share -> net_credit -1000 for 2
+    assert entry == -1000.0
