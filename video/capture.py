@@ -125,7 +125,8 @@ def rect_of(page, label: str):
             .filter(e => e.childElementCount === 0);
           const want = label.toUpperCase();
           const el = pool.find(e => e.textContent.trim().toUpperCase() === want)
-                  || pool.find(e => e.textContent.trim().toUpperCase().startsWith(want));
+                  || pool.find(e => e.textContent.trim().toUpperCase().startsWith(want))
+                  || pool.find(e => e.textContent.trim().toUpperCase().includes(want));
           if (!el) return null;
           const r = (el.parentElement || el).getBoundingClientRect();
           return {x: r.x, y: r.y, w: r.width, h: r.height};
@@ -449,11 +450,17 @@ def scene(p, seg, ctx_extra=None):
         result = {"corr": corr}
         page.goto(f"{TARGET}/audit?action=CORRECTION&grouped=0&theme=dark", wait_until="networkidle")
         page.wait_for_selector("text=Decision record", timeout=30000)
+        page.wait_for_selector("tbody tr", timeout=30000)
         settle(page)
         inject(page)
         mark_ready()
         page.wait_for_timeout(1200)
-        anchored_scroll(page, by_text("corrected"), 140, 1800)
+        anchored_scroll(
+            page,
+            "[...document.querySelectorAll('td span')].find(e => e.textContent.includes('corrected'))",
+            140,
+            1800,
+        )
         ring(page, "Position size corrected")
         page.wait_for_timeout(int(hold * 1000))
         verify_numbers(page, sid, [str(corr)])
