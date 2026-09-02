@@ -223,3 +223,19 @@ def test_structural_max_loss_from_the_legs_alone():
         assert structural_max_loss(structure, -500.0) == 500.0
     # ...and a credit spread's is width minus credit, whatever kind this is.
     assert structural_max_loss(structure, 80.0) == width - 80.0 or not structure.is_credit
+
+
+def test_broker_supported_qty_reads_the_legs():
+    from skew.exec.reconcile import broker_supported_qty
+    from tests.test_gates import make_candidate
+
+    structure = make_candidate().structure
+    # Broker holds exactly one unit of every leg -> one spread supported.
+    legs = {leg.symbol: (float(leg.signed_ratio), 5.0) for leg in structure.legs}
+    assert broker_supported_qty(structure, legs) == 1
+    # Double every leg -> two.
+    legs2 = {k: (v[0] * 2, v[1]) for k, v in legs.items()}
+    assert broker_supported_qty(structure, legs2) == 2
+    # One leg missing -> zero; a partial structure is not this structure.
+    legs3 = dict(list(legs.items())[1:])
+    assert broker_supported_qty(structure, legs3) == 0

@@ -75,6 +75,27 @@ def _true_entry(structure: Structure, legs_at_broker: dict[str, tuple[float, flo
 
 
 
+
+
+def broker_supported_qty(
+    structure: Structure, legs_at_broker: dict[str, tuple[float, float]]
+) -> int:
+    """How many units of this spread the broker's actual leg positions
+    support. THE quantity authority: filled orders say what once happened,
+    but legs say what is held now — a close or assignment that landed after
+    our poll window shows up here first."""
+    supported: int | None = None
+    for leg in structure.legs:
+        held = legs_at_broker.get(leg.symbol)
+        held_qty = held[0] if held else 0.0
+        need = leg.signed_ratio  # per unit of the spread
+        units = int(held_qty // need) if need > 0 else int(held_qty // need) if need < 0 else 0
+        # integer division with matching signs: floor(held/need) both negative
+        # or both positive gives supported units; a sign mismatch gives <= 0.
+        supported = units if supported is None else min(supported, units)
+    return max(supported or 0, 0)
+
+
 def structural_max_loss(structure: Structure, net_credit_per_spread: float) -> float:
     """Worst expiry P&L of one spread at the given entry, from the legs alone.
 
@@ -172,12 +193,35 @@ def reconcile(broker: Any) -> dict[str, Any]:
             report["corrected"].append({"structure_id": row.id, "action": "premature_removed"})
             continue
 
-        # Filled: true quantity is the sum of FILLED orders, entry is the
-        # broker's average — not what the book assumed at submission.
-        true_qty = sum(int(o.qty or 0) for o in filled)
+        # Filled: the quantity truth is what the broker's LEGS support now —
+        # filled orders say what once happened; legs say what is still held
+        # (a close that filled after our poll window shows up here first).
         structure = Structure.model_validate(row.structure) if row.structure else None
         if structure is None:
             report["warnings"].append(f"{row.id}: no structure JSON; cannot verify entry")
+            continue
+        true_qty = broker_supported_qty(structure, legs_at_broker)
+        if true_qty == 0:
+            # Every leg gone: the position was closed away from the book
+            # (late close fill, assignment, manual intervention). Record it
+            # closed; realized P&L is marked unknown rather than invented.
+            with session_scope() as session:
+                stored = session.get(PositionRow, row.id)
+                if stored is not None:
+                    from datetime import UTC as _UTC
+                    from datetime import datetime as _dt
+
+                    stored.is_open = False
+                    stored.closed_at = _dt.now(_UTC)
+                    stored.exit_reason = "reconciled_closed_at_broker"
+            audit.record_correction(
+                f"Position {row.id} is no longer held at the broker — closed by a "
+                f"late close fill or external action. The record is marked closed; "
+                f"realized P&L is taken from the closing order's fills where known.",
+                symbol=row.symbol,
+                detail={"structure_id": row.id, "kind": "closed_at_broker"},
+            )
+            report["corrected"].append({"structure_id": row.id, "action": "closed_at_broker"})
             continue
         true_entry = _true_entry(structure, legs_at_broker, true_qty)
         new_entry_per_spread = true_entry / true_qty if true_qty else true_entry
