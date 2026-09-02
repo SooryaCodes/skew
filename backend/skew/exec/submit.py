@@ -25,7 +25,7 @@ from typing import Any
 from skew.config import Settings
 from skew.config import settings as default_settings
 from skew.gates.base import GateContext, run_gates
-from skew.models import Candidate, Structure
+from skew.models import CONTRACT_MULTIPLIER, Candidate, Structure
 
 log = logging.getLogger(__name__)
 
@@ -168,7 +168,16 @@ def build_mleg_request(
             f"{limit_price:+.2f}. Refusing to invert the trade."
         )
 
-    return LimitOrderRequest(**common, limit_price=round(limit_price, 2))
+    # UNITS: structure.limit_price is the position's DOLLAR total (mid x 100
+    # x qty); Alpaca's mleg limit_price is PER SHARE for one unit of the
+    # spread. Sending dollars made every credit order demand its whole credit
+    # per share (never filled — five orders expired that way) and every debit
+    # order into an unbounded marketable buy (AMD filled $1.00/share worse
+    # than intended). This division is the entire unit boundary; the model
+    # keeps its dollar convention everywhere else.
+    per_share = limit_price / (CONTRACT_MULTIPLIER * max(structure.qty, 1))
+
+    return LimitOrderRequest(**common, limit_price=round(per_share, 2))
 
 
 def preflight(

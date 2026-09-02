@@ -143,15 +143,18 @@ def test_ratio_quantities_reach_the_request_normalised(credit_spread):
 # ====================================================================
 
 
-def test_a_credit_spread_submits_a_negative_limit(credit_spread):
+def test_a_credit_spread_submits_a_negative_limit_per_share(credit_spread):
+    """The broker's mleg limit is PER SHARE. Sending the $80 dollar total made
+    the order demand $80.00/share of credit — it could never fill, and five
+    real orders expired exactly that way."""
     request = build_mleg_request(credit_spread, "cid")
-    assert float(request.limit_price) == pytest.approx(-80.0)
+    assert float(request.limit_price) == pytest.approx(-0.80)
     assert float(request.limit_price) < 0
 
 
-def test_a_debit_spread_submits_a_positive_limit(debit_spread):
+def test_a_debit_spread_submits_a_positive_limit_per_share(debit_spread):
     request = build_mleg_request(debit_spread, "cid")
-    assert float(request.limit_price) == pytest.approx(350.0)
+    assert float(request.limit_price) == pytest.approx(3.50)
     assert float(request.limit_price) > 0
 
 
