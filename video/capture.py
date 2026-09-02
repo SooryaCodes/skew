@@ -11,6 +11,7 @@ are collected into out/numeric-verification.json for review.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import time
@@ -81,6 +82,15 @@ def words_for(value: float) -> str:
     if whole is not None:
         return integer_words(whole)
     return integer_words(int(value)) + " point " + ones[int(round(value * 10)) % 10]
+
+
+def times_for(n: int) -> str:
+    """'once', 'twice', then 'N times' — how a person says a count of acts."""
+    if n == 1:
+        return "once"
+    if n == 2:
+        return "twice"
+    return f"{words_for(n)} times"
 
 
 def inject(page):
@@ -345,41 +355,56 @@ def scene(p, seg, ctx_extra=None):
         page.wait_for_timeout(int(hold * 1000))
 
     elif sid == "a31":
-        page.goto(f"{TARGET}/?theme=dark&capture=1", wait_until="networkidle")
-        settle(page, 3000)
+        # The refusal is REAL now: a stress-gate refusal from this account,
+        # filmed from the record itself. Open the full decision record with
+        # the refusals-by-gate breakdown visible, filter to the stress gate,
+        # then travel into the actual trace. The narration's numbers are read
+        # off the refusal text, never scripted.
+        with urllib.request.urlopen(
+            f"{API}/api/audit/query?action=REFUSED&gate=stress&grouped=0&limit=40",
+            timeout=20,
+        ) as r:
+            body = json.load(r)
+        rows = [i for i in body["items"] if i["type"] == "decision"]
+        # Clearest exhibit: a refusal where stress was the ONLY failing gate,
+        # newest first; otherwise the newest stress refusal of any shape.
+        pure = [i for i in rows if i.get("gates") == ["stress"]]
+        target = (pure or rows)[0]
+        m = re.search(r"(\d+)% of .*? against a (\d+)% limit", target["reason"])
+        if not m:
+            raise SystemExit(f"a31: could not read consumed/limit from: {target['reason'][:120]}")
+        consumed, limit = int(m.group(1)), int(m.group(2))
+        result = {"consumed": consumed, "limit": limit}
+
+        page.goto(f"{TARGET}/audit?action=REFUSED&theme=dark", wait_until="networkidle")
+        page.wait_for_selector("text=refusals by gate", timeout=30000)
+        settle(page)
         inject(page)
         mark_ready()
-        anchored_scroll(page, "[...document.querySelectorAll('section')].find(s=>s.getAttribute('aria-label')==='The refusal')", 0, 2200)
-        page.wait_for_timeout(600)
-        page.evaluate(
-            """async () => { const start = scrollY; const t0 = performance.now();
-              const ease = t => t < .5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2;
-              await new Promise(done => (function step(now) {
-                const t = Math.min(1, (now - t0) / 4200);
-                scrollTo(0, start + 780 * ease(t));
-                t < 1 ? requestAnimationFrame(step) : done(); })(t0)); }"""
+        ring(page, "refusals by gate")
+        page.wait_for_timeout(3200)
+        box = page.evaluate(
+            """() => {
+              const group = document.querySelector('[role="group"][aria-label="Filter the record"]');
+              if (!group) return null;
+              const btn = [...group.querySelectorAll('button')]
+                .find(b => b.textContent.trim() === 'stress');
+              if (!btn) return null;
+              const r = btn.getBoundingClientRect();
+              return {x: r.x, y: r.y, w: r.width, h: r.height};
+            }"""
         )
-        chip(page, "recorded 30 August · development desk", 1210, 150)
-        # Timed to the narration parts: hold the grid through the payload and
-        # the beat, then travel to the gate-chain section while the aside plays
-        # — "the gate is the floor" over the literal gates. Part durations are
-        # probed from the rendered audio so picture and words stay locked.
-        def part_dur(name):
-            f = ROOT / "vo" / "gen" / name
-            return float(sh("ffprobe", "-v", "error", "-show_entries", "format=duration",
-                            "-of", "default=nw=1:nk=1", str(f)).strip()) if f.exists() else 0.0
-
-        payload = part_dur("a31_part0.wav") + 1.5 + part_dur("a31_part2.wav")
-        page.wait_for_timeout(int((payload + 0.6) * 1000))
-        anchored_scroll(
-            page,
-            "[...document.querySelectorAll('section')].find(s=>s.getAttribute('aria-label')==='Architecture')",
-            60,
-            2400,
-        )
-        remaining = max(2.0, hold - payload - 3.2)
-        page.wait_for_timeout(int(remaining * 1000))
-        verify_numbers(page, sid, ["84"])
+        if box:
+            cursor_click(page, box["x"] + box["w"] / 2, box["y"] + box["h"] / 2)
+            page.wait_for_timeout(2600)
+        page.goto(f"{TARGET}/trace/{target['id']}?theme=dark", wait_until="networkidle")
+        settle(page)
+        inject(page)
+        anchored_scroll(page, by_text("gate"), 160, 2000)
+        page.wait_for_timeout(800)
+        ring(page, "STRESS FAILED")
+        page.wait_for_timeout(int(hold * 1000))
+        verify_numbers(page, sid, [f"{consumed}%", f"{limit}%"])
 
     elif sid == "a31b":
         page.goto(f"{TARGET}/desk?shot=1&theme=dark", wait_until="networkidle")
@@ -412,6 +437,26 @@ def scene(p, seg, ctx_extra=None):
         ring(page, "Audit log")
         page.wait_for_timeout(int(hold * 1000))
         verify_numbers(page, sid, [str(acted)])
+
+    elif sid == "a31c":
+        # The corrections beat: the audit log filtered to the reconciliation
+        # entries of 2 September — the segment where the system was tested
+        # rather than demonstrated. The count is read from the record.
+        with urllib.request.urlopen(
+            f"{API}/api/audit/query?action=CORRECTION&grouped=0&limit=1", timeout=20
+        ) as r:
+            corr = json.load(r)["summary"]["count"]
+        result = {"corr": corr}
+        page.goto(f"{TARGET}/audit?action=CORRECTION&grouped=0&theme=dark", wait_until="networkidle")
+        page.wait_for_selector("text=Decision record", timeout=30000)
+        settle(page)
+        inject(page)
+        mark_ready()
+        page.wait_for_timeout(1200)
+        anchored_scroll(page, by_text("corrected"), 140, 1800)
+        ring(page, "Position size corrected")
+        page.wait_for_timeout(int(hold * 1000))
+        verify_numbers(page, sid, [str(corr)])
 
     elif sid == "a32":
         page.goto(f"{TARGET}/positions?theme=dark", wait_until="networkidle")
@@ -484,11 +529,22 @@ def materialise_deferred(sid: str, values: dict):
             rv_words=words_for(values["rv"]),
             vrp_words=words_for(abs(values["vrp"])),
         )
+    elif sid == "a31":
+        part = seg["vo_parts"][0]
+        part["text"] = part["text_template"].format(
+            consumed_words=words_for(values["consumed"]),
+            limit_words=words_for(values["limit"]),
+        )
+        seg["vo"] = " ".join(
+            p.get("text", "") for p in seg["vo_parts"] if "text" in p
+        ).strip()
     elif sid == "a31b":
         seg["vo"] = seg["vo_template"].format(
-            looked_words=words_for(values["looked"]),
-            acted_words=words_for(values["acted"]),
+            looked_words=f"more than {words_for(values['looked'] // 100 * 100)}",
+            acted_words=times_for(values["acted"]),
         )
+    elif sid == "a31c":
+        seg["vo"] = seg["vo_template"].format(corr_words=words_for(values["corr"]))
     SPEC_PATH.write_text(json.dumps(spec, indent=2) + "\n")
     print(f"{sid} narration materialised: {seg['vo'][:110]}…")
 

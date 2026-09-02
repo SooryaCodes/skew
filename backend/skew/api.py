@@ -539,7 +539,7 @@ def _audit_query_from_params(
 
 @api.get("/audit/query", summary="The full decision record — filtered, grouped, summarised")
 def get_audit_query(
-    action: str | None = Query(default=None, pattern="^(EXECUTED|REFUSED|ABSTAINED)$"),
+    action: str | None = Query(default=None, pattern="^(EXECUTED|REFUSED|ABSTAINED|CORRECTION)$"),
     symbols: str | None = Query(default=None, description="Comma-separated tickers"),
     gate: str | None = Query(default=None, pattern="^(liquidity|earnings|term|stress|budget)$"),
     q: str | None = Query(default=None, max_length=200),
@@ -564,7 +564,7 @@ def get_audit_query(
 
 @api.get("/audit/export.csv", summary="The current filtered view, as CSV")
 def get_audit_export(
-    action: str | None = Query(default=None, pattern="^(EXECUTED|REFUSED|ABSTAINED)$"),
+    action: str | None = Query(default=None, pattern="^(EXECUTED|REFUSED|ABSTAINED|CORRECTION)$"),
     symbols: str | None = Query(default=None),
     gate: str | None = Query(default=None, pattern="^(liquidity|earnings|term|stress|budget)$"),
     q: str | None = Query(default=None, max_length=200),

@@ -33,6 +33,14 @@ TARGET_URL = "https://skew.zevora.io"
 _KOKORO = None
 
 
+def active_segments(spec) -> list:
+    """The segments this build includes. Optional segments (the corrections
+    beat) join only when INCLUDE_BEAT=1 — the pipeline renders both variants
+    from one capture pass."""
+    include = os.environ.get("INCLUDE_BEAT") == "1"
+    return [seg for seg in spec["segments"] if include or not seg.get("optional")]
+
+
 def kokoro_tts(text: str, dest: Path, speed: float | None = None) -> None:
     global _KOKORO
     if _KOKORO is None:
@@ -222,8 +230,9 @@ def report() -> None:
     meta = spec["meta"]
     total = 0.0
     silences: list[tuple[str, float]] = []
+    segments = active_segments(spec)
     print(f"{'id':5} {'title':18} {'vo':>7} {'total':>7}")
-    for i, seg in enumerate(spec["segments"]):
+    for i, seg in enumerate(segments):
         if "total_s" not in seg:
             if seg.get("deferred"):
                 print(f"{seg['id']:5} {seg['title']:18} {'—':>7} {'(capture-first)':>7}")
@@ -232,7 +241,7 @@ def report() -> None:
         total += seg["total_s"]
         print(f"{seg['id']:5} {seg['title']:18} {seg['duration_s']:7.2f} {seg['total_s']:7.2f}")
         # ledger: tail pad + next head pad form the cut gap; holds are silent
-        if i < len(spec["segments"]) - 1:
+        if i < len(segments) - 1:
             silences.append((f"cut {seg['id']}→next", TAIL_PAD_S + HEAD_PAD_S))
         hold = seg.get("total_s", 0) - seg.get("duration_s", 0)
         if hold > 0.05:
@@ -244,7 +253,7 @@ def report() -> None:
     longest = max(silences, key=lambda x: x[1])
     print(f"\ntotal picture: {total:.1f}s ({int(total//60)}:{total%60:04.1f})")
     print(f"total silence: {total_silence:.1f}s | longest gap: {longest[1]:.2f}s ({longest[0]})")
-    deferred = any("total_s" not in seg for seg in spec["segments"])
+    deferred = any("total_s" not in seg for seg in segments)
     ok = True
     if deferred:
         print("note: deferred segment(s) not yet measured — window checked at final report")
@@ -326,7 +335,7 @@ def fmt_ts(seconds: float) -> str:
 def cue_list() -> list[tuple[float, float, str]]:
     spec = json.loads(SCRIPT.read_text())
     cues, clock = [], 0.0
-    for seg in spec["segments"]:
+    for seg in active_segments(spec):
         duration = seg["total_s"]
         text = seg.get("vo") or " ".join(p.get("text", "") for p in seg.get("vo_parts", []))
         speech = seg["duration_s"] - HEAD_PAD_S - TAIL_PAD_S
@@ -388,7 +397,7 @@ def assemble() -> None:
     spec = json.loads(SCRIPT.read_text())
     out = ROOT / "out"
     out.mkdir(exist_ok=True)
-    segs = [ROOT / "frames" / f"{seg['id']}.mp4" for seg in spec["segments"]]
+    segs = [ROOT / "frames" / f"{seg['id']}.mp4" for seg in active_segments(spec)]
     missing = [p.name for p in segs if not p.exists()]
     if missing:
         raise SystemExit(f"missing segment renders: {missing}")
@@ -461,7 +470,7 @@ def mix_master() -> None:
 
     # a31's beat position in the final timeline, from measured audio.
     start = 0.0
-    for seg in spec["segments"]:
+    for seg in active_segments(spec):
         if seg["id"] == "a31":
             break
         start += seg["total_s"]
@@ -469,7 +478,7 @@ def mix_master() -> None:
     beat_at = start + HEAD_PAD_S + part0
     thin_from, thin_to = beat_at - 5.0, beat_at + 5.0
     a32_start = 0.0
-    for seg in spec["segments"]:
+    for seg in active_segments(spec):
         if seg["id"] == "a32":
             break
         a32_start += seg["total_s"]
@@ -538,7 +547,7 @@ def verify_final() -> None:
     spec = json.loads(SCRIPT.read_text())
     listfile.write_text("".join(
         f"file '{(ROOT / 'vo' / 'final' / (seg['id'] + '.wav')).resolve()}'\n"
-        for seg in spec["segments"]))
+        for seg in active_segments(spec)))
     sh("ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(listfile),
        "-c", "copy", str(vo_concat))
     det = subprocess.run(

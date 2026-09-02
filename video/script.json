@@ -105,22 +105,17 @@
       "scene": "refusal",
       "vo_parts": [
         {
-          "text": "Here is the one that matters. The exact structure is repriced across eighty four scenarios. Price shocks to three standard deviations, implied volatility doubling, at three points in time. In this cell the position loses more than its budget allows."
+          "text_template": "Here is the one that matters. Every candidate is repriced across eighty four stress scenarios. Price shocks to three standard deviations, implied volatility doubling, at three points in time. On this trade, one ordinary move already consumes {consumed_words} percent of its maximum loss. The limit is {limit_words}."
         },
         {
           "silence_s": 1.4
         },
         {
           "text": "So it does not trade."
-        },
-        {
-          "text": "This refusal is from the development desk. On the competition account the gate has not needed to fire, because structures are sized backwards from the budget. The gate is the floor, not the plan.",
-          "speed": 1.08
         }
       ],
-      "duration_s": 31.089,
-      "total_s": 31.089,
-      "speed": 0.95
+      "speed": 0.95,
+      "deferred": true
     },
     {
       "id": "a31b",
@@ -128,12 +123,20 @@
       "title": "RESTRAINT",
       "kind": "ui",
       "scene": "restraint",
-      "vo_template": "Across this account the desk has looked at {looked_words} opportunities and declined almost all of them. It has acted {acted_words} times. Restraint is the default, not the exception.",
+      "vo_template": "Across this account the desk has looked at {looked_words} opportunities and declined almost all of them. It has filled {acted_words}. Restraint is the default, not the exception.",
+      "deferred": true,
+      "speed": 1.0
+    },
+    {
+      "id": "a31c",
+      "act": 3,
+      "title": "THE CORRECTION",
+      "kind": "ui",
+      "scene": "corrections",
+      "optional": true,
       "deferred": true,
       "speed": 1.0,
-      "vo": "Across this account the desk has looked at two hundred and fifteen opportunities and declined almost all of them. It has acted three times. Restraint is the default, not the exception.",
-      "duration_s": 11.385,
-      "total_s": 11.385
+      "vo_template": "On the second of September the desk caught its own record diverging from the broker, reconciled, and wrote {corr_words} corrections into the record. They are still there. A log that cannot disagree with you is not a log."
     },
     {
       "id": "a32",

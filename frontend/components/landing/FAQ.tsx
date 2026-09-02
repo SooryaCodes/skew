@@ -82,7 +82,7 @@ const ENTRIES: Array<{ q: string; a: React.ReactNode }> = [
         broker every cycle, and the corrections are visible in the{" "}
         <Link
           className="underline decoration-[color:var(--line)] underline-offset-2 hover:decoration-[color:var(--brass)]"
-          href="/audit?q=corrected"
+          href="/audit?action=CORRECTION&grouped=0"
         >
           audit log
         </Link>
