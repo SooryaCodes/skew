@@ -338,14 +338,6 @@ def _live_equity() -> float | None:
         return None
 
 
-def _past_deadline_status() -> bool:
-    try:
-        from skew.loop import _past_deadline
-
-        return _past_deadline(settings)
-    except Exception:  # noqa: BLE001 — status must never 500
-        return False
-
 
 def _drawdown_paused() -> bool:
     """Whether the drawdown circuit breaker currently halts entries."""
@@ -430,17 +422,12 @@ def get_status() -> dict[str, Any]:
         "endpoint_is_paper": True,
         "instance_conflict": loop.CONFLICT["message"],
         "drawdown_paused": _drawdown_paused(),
-        # Post-deadline the desk keeps scanning and logging; it only stops
-        # OPENING. The frontend banners this so a judge sees a live system.
-        "past_deadline": _past_deadline_status(),
-        "deadline_utc": settings.deadline_utc or None,
         # The standing exit rules, so the positions view can print each
         # position's own exit conditions instead of a vague promise.
         "exit_rules": {
             "profit_target_pct": settings.profit_target_pct,
             "loss_limit_multiple": settings.loss_limit_multiple,
             "exit_dte_threshold": settings.exit_dte_threshold,
-            "deadline_utc": settings.deadline_utc or None,
         },
         "armed": (
             settings.auto_execute

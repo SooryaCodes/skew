@@ -1,6 +1,6 @@
 """Position monitoring and exit rules.
 
-Four reasons to close, checked in this order:
+Three reasons to close, plus the assignment defence, checked in this order:
 
 1. **Profit target.** Half the credit captured. Holding a credit spread to
    expiry for the last few dollars means carrying gamma risk into the final week
@@ -10,9 +10,8 @@ Four reasons to close, checked in this order:
    position whose premise has been falsified.
 3. **DTE threshold.** Close before the last week. Gamma rises sharply near
    expiry and a short spread that has been quiet for a month can move through
-   its whole width in a day.
-4. **Deadline.** Flatten everything before the competition ends, so the account
-   is not left holding open risk nobody is watching.
+   its whole width in a day. This is the calendar rule — there is no
+   date-driven flatten; the desk trades until its rules say otherwise.
 
 The kill switch halts *entries*, never monitoring. A system that stops watching
 its open positions when you pull the handbrake is worse than one with no
@@ -101,22 +100,6 @@ def evaluate_exit(
                     f"the money with spot at {spot:.2f}. Assignment risk is not a risk this "
                     f"desk carries; closing the whole structure early.",
                 )
-
-    # 4 — the deadline overrides everything else.
-    if cfg.deadline_utc:
-        try:
-            deadline = datetime.fromisoformat(cfg.deadline_utc)
-            if deadline.tzinfo is None:
-                deadline = deadline.replace(tzinfo=UTC)
-            if datetime.now(UTC) >= deadline:
-                return ExitSignal(
-                    True,
-                    "deadline",
-                    f"Competition deadline reached ({deadline:%d %b %H:%M UTC}). Flattening "
-                    f"rather than leaving open risk nobody is watching.",
-                )
-        except ValueError:
-            log.warning("DEADLINE_UTC is not a valid ISO-8601 timestamp: %r", cfg.deadline_utc)
 
     # 1 — profit target.
     if structure.is_credit and structure.net_credit > 0:

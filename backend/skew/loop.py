@@ -94,19 +94,6 @@ ACCOUNT: dict[str, str | float | None] = {
 }
 
 
-def _past_deadline(settings: Settings) -> bool:
-    """After DEADLINE_UTC the monitor flattens the book — entries must not
-    quietly rebuild it on the next cycle."""
-    if not settings.deadline_utc:
-        return False
-    try:
-        deadline = datetime.fromisoformat(settings.deadline_utc)
-        if deadline.tzinfo is None:
-            deadline = deadline.replace(tzinfo=UTC)
-    except ValueError:
-        return False
-    return datetime.now(UTC) >= deadline
-
 
 def breaker_engaged(risk, settings: Settings) -> bool:
     """The drawdown circuit breaker, pure and testable.
@@ -380,22 +367,6 @@ def _evaluate_and_act(
                     "structure_id": chosen.id,
                     "offered": [c.id for c in survivors],
                 },
-                trace=trace,
-            )
-        )
-        return decisions
-
-    if _past_deadline(settings):
-        decisions.append(
-            audit.record_abstention(
-                symbol=symbol,
-                reason=(
-                    f"Competition window closed on 4 September — "
-                    f"{len(survivors)} candidate(s) cleared every gate, but the desk no "
-                    f"longer opens positions. It continues to scan, measure and log."
-                ),
-                risk_tier=tier,
-                detail={"deadline": settings.deadline_utc},
                 trace=trace,
             )
         )

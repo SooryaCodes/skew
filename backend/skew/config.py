@@ -171,9 +171,6 @@ class Settings(BaseSettings):
     # would qualify for the time-exit on day one. Two days keeps us out of the
     # worst of expiry gamma without amputating the holding period.
     exit_dte_threshold: int = 2
-    # Hard deadline: flatten everything before the competition ends. ISO-8601, or
-    # empty to disable.
-    deadline_utc: str = ""
 
     # ------------------------------------------------------------------
     # The paper-only guarantee

@@ -120,6 +120,30 @@ def record_closed_trade(clean: bool = True) -> int:
         return row.tier
 
 
+def sync_closed_trades() -> int:
+    """Recompute the closed-trade credit from the position record itself.
+
+    Any clean close counts, HOWEVER it was recorded — the original exit path,
+    an operator close, or a reconciliation that recovered the fill after the
+    submission poll. The first two profit-target closes earned no credit
+    because only the original path called record_closed_trade; the tier is
+    earned by the record, so the record is the source of truth. Idempotent;
+    runs every reconciliation pass.
+    """
+    with session_scope() as session:
+        closed = session.scalars(
+            select(PositionRow).where(PositionRow.is_open.is_(False))
+        ).all()
+        clean = sum(1 for r in closed if (r.exit_reason or "") != "breach")
+        row = _state_row(session)
+        if clean != row.closed_trades:
+            previous = row.closed_trades
+            row.closed_trades = clean
+            row.updated_at = datetime.now(UTC)
+            log.info("closed-trade credit synced from the record: %d -> %d", previous, clean)
+        return row.closed_trades
+
+
 def evaluate_tier(equity: float) -> int:
     """Recompute the tier from the record. Idempotent; safe to call every cycle.
 

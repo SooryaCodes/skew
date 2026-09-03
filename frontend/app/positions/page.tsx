@@ -36,7 +36,6 @@ function exitConditions(position: Position, status?: SystemStatus): string {
   }
   parts.push(`dte ≤ ${rules.exit_dte_threshold}`);
   parts.push("short-ITM defence");
-  if (rules.deadline_utc) parts.push("deadline flatten");
   return parts.join(" · ");
 }
 
@@ -92,9 +91,7 @@ export default function PositionsPage() {
           <p className="mt-6 text-sm text-[color:var(--text-dim)]">
             {isLoading
               ? "Loading positions."
-              : status?.past_deadline
-                ? "Competition window closed on 4 September — every open position was flattened by the deadline rule. The closed table below is the complete lifecycle record."
-                : "No open positions. The desk holds nothing until a candidate clears every gate and the bounded selector picks it."}
+              : "No open positions. The desk holds nothing until a candidate clears every gate and the bounded selector picks it."}
           </p>
         ) : (
           <div className="panel mt-4 overflow-x-auto">
@@ -178,7 +175,7 @@ export default function PositionsPage() {
           {closedRows.length === 0 ? (
             <p className="mt-3 text-sm text-[color:var(--text-dim)]">
               No closed trades yet. A close fires on the profit target, the loss
-              limit, the days-to-expiry threshold, or the competition deadline —
+              limit, the days-to-expiry threshold, or the assignment defence —
               and lands here with its realised P&L and the rule that closed it.
             </p>
           ) : (
@@ -251,7 +248,7 @@ export default function PositionsPage() {
           Every position is defined-risk: the maximum loss was computed and
           gated before submission, and each spread was filled as a single atomic
           multi-leg order. Exits fire on the profit target, the loss limit, the
-          days-to-expiry threshold, or the competition deadline.
+          days-to-expiry threshold, or the assignment defence.
         </p>
       </main>
     </div>

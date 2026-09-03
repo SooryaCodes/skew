@@ -232,7 +232,6 @@ export interface ExitRules {
   profit_target_pct: number;
   loss_limit_multiple: number;
   exit_dte_threshold: number;
-  deadline_utc: string | null;
 }
 
 export interface SystemStatus {
@@ -262,9 +261,6 @@ export interface SystemStatus {
   instance_conflict?: string | null;
   /** Entries halted by the drawdown circuit breaker; monitoring continues. */
   drawdown_paused?: boolean;
-  /** Post-deadline: scanning and logging continue; no new positions open. */
-  past_deadline?: boolean;
-  deadline_utc?: string | null;
   /** Provenance, read from the broker at boot; null = unavailable, never a default. */
   equity?: number | null;
   starting_equity?: number | null;

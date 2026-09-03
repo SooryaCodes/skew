@@ -417,6 +417,15 @@ def reconcile(broker: Any) -> dict[str, Any]:
         )
         report["corrected"].append({"structure_id": row.id, "action": "realized_backfilled"})
 
+    # Tier credit follows the record: any clean close counts, however it was
+    # recorded. Promotion itself happens in evaluate_tier on the next cycle.
+    try:
+        from skew.risk.authority import sync_closed_trades
+
+        sync_closed_trades()
+    except Exception:  # noqa: BLE001 — credit sync must not stop reconciliation
+        log.exception("closed-trade credit sync raised")
+
     return report
 
 

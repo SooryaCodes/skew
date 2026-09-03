@@ -391,28 +391,6 @@ def test_dte_threshold_fires_in_the_final_week(credit_spread):
     assert "Gamma rises sharply" in signal.reason
 
 
-def test_the_deadline_overrides_everything(credit_spread):
-    short = next(leg for leg in credit_spread.legs if leg.side == "SELL")
-    long_leg = next(leg for leg in credit_spread.legs if leg.side == "BUY")
-    mids = {short.symbol: 1.90, long_leg.symbol: 1.15}
-    cfg = Settings(deadline_utc="2020-01-01T00:00:00+00:00")
-
-    signal = evaluate_exit(credit_spread, mids, as_of=date(2026, 8, 30), settings=cfg)
-    assert signal.should_exit
-    assert signal.rule == "deadline"
-
-
-def test_a_malformed_deadline_is_logged_not_fatal(credit_spread):
-    short = next(leg for leg in credit_spread.legs if leg.side == "SELL")
-    long_leg = next(leg for leg in credit_spread.legs if leg.side == "BUY")
-    mids = {short.symbol: 1.90, long_leg.symbol: 1.15}
-    cfg = Settings(deadline_utc="not-a-timestamp")
-    assert not evaluate_exit(credit_spread, mids, as_of=date(2026, 8, 30), settings=cfg)
-
-
-# ====================================================================
-# Position persistence
-# ====================================================================
 
 
 def test_a_position_is_recorded_as_one_structure_not_n_legs(credit_spread):

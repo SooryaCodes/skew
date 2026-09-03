@@ -3,7 +3,7 @@
 /**
  * The closed-market state and the session summary.
  *
- * Judging happens after the deadline, likely on a weekend. Without this, the
+ * Judging may happen on a weekend. Without this, the
  * best work in the project is invisible: an inert screen of abstentions. When
  * the market is closed the desk says exactly what it is showing — the full
  * last session, honestly timestamped.
@@ -24,12 +24,10 @@ function sessionLabel(iso: string): string {
 
 export function KillBanner() {
   const { data: status } = useStatus();
-  if (!status?.kill_switch && !status?.drawdown_paused && !status?.past_deadline) return null;
+  if (!status?.kill_switch && !status?.drawdown_paused) return null;
   const message = status.kill_switch
     ? "Entries halted by the kill switch. Open positions still monitored."
-    : status.drawdown_paused
-      ? "Entries paused — drawdown circuit breaker at 5%. Open positions still monitored; entries resume when equity recovers."
-      : "Competition window closed on 4 September. The desk continues to scan and log decisions; it no longer opens positions.";
+    : "Entries paused — drawdown circuit breaker at 5%. Open positions still monitored; entries resume when equity recovers.";
   return (
     <div
       className="flex items-center gap-2.5 border-b border-[color:var(--line)] bg-[color:var(--panel-alt)] px-5 py-2"
