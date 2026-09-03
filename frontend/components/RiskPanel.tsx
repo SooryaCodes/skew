@@ -114,6 +114,12 @@ export function RiskPanel({ risk }: { risk: RiskAuthority | undefined }) {
           {pct(risk.max_loss_pct, 1)} / trade
         </span>
       </div>
+      {/* What promotion takes, where the tier lives — not only on /positions. */}
+      {risk.next_promotion && (
+        <p className="mt-1 text-[12px] leading-snug text-[color:var(--text-dim)]">
+          {risk.next_promotion}
+        </p>
+      )}
 
       <div className="mt-3 border-t border-[color:var(--line)] pt-2">
         {/* Two separate risk dimensions. Merging them once locked the desk out. */}

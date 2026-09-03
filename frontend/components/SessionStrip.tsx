@@ -15,7 +15,7 @@
  */
 
 import { clockTime, timeAgo } from "@/lib/format";
-import { useSession, useStatus } from "@/lib/api";
+import { useClosedPositions, useSession, useStatus } from "@/lib/api";
 
 function sessionLabel(iso: string): string {
   const d = new Date(`${iso}T12:00:00Z`);
@@ -73,10 +73,17 @@ function Segment({
 export function SessionStrip() {
   const { data: status } = useStatus();
   const { data: session } = useSession();
+  const { data: closedPositions } = useClosedPositions();
 
   if (!session) return null;
   const closed = status ? !status.market_open : false;
   const counts = session.counts;
+  // Closes are not fills: a session that closed two winners and opened
+  // nothing is a session where something happened, and the strip says so.
+  // Counted over the same window the other session figures use.
+  const closedThisSession = (closedPositions ?? []).filter(
+    (t) => t.closed_at && new Date(t.closed_at) >= new Date(session.counts_since),
+  ).length;
 
   // ONE strip, three labelled segments — market state, the last cycle, the
   // session — with the most recent fill as the right-hand proof. The old
@@ -106,7 +113,8 @@ export function SessionStrip() {
         label="Session"
         title={`decisions since ${new Date(session.counts_since).toLocaleString()}`}
       >
-        <Stat label="filled" value={counts.EXECUTED ?? 0} />
+        <Stat label="opened" value={counts.EXECUTED ?? 0} />
+        <Stat label="closed" value={closedThisSession} />
         <Stat label="refused" value={counts.REFUSED ?? 0} />
         <Stat label="abstained" value={counts.ABSTAINED ?? 0} />
       </Segment>

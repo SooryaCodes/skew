@@ -16,6 +16,7 @@
  */
 
 import Link from "next/link";
+import { useState } from "react";
 
 import { Header } from "@/components/Header";
 import { TierPips } from "@/components/RiskPanel";
@@ -46,11 +47,14 @@ function occStrike(symbol: string): number {
 function legSides(position: Position): Array<{ symbol: string; side: "SELL" | "BUY" }> {
   const legs = [...position.legs].sort((a, b) => occStrike(a) - occStrike(b));
   const kind = position.kind ?? "";
+  // Short legs first, always: the obligation leads, the cap follows.
   const bySide = (short: Set<string>) =>
-    legs.map((symbol) => ({
-      symbol,
-      side: (short.has(symbol) ? "SELL" : "BUY") as "SELL" | "BUY",
-    }));
+    legs
+      .map((symbol) => ({
+        symbol,
+        side: (short.has(symbol) ? "SELL" : "BUY") as "SELL" | "BUY",
+      }))
+      .sort((a, b) => (a.side === b.side ? 0 : a.side === "SELL" ? -1 : 1));
 
   if (kind === "PUT_CREDIT" && legs.length === 2) return bySide(new Set([legs[1]!]));
   if (kind === "CALL_CREDIT" && legs.length === 2) return bySide(new Set([legs[0]!]));
@@ -61,9 +65,14 @@ function legSides(position: Position): Array<{ symbol: string; side: "SELL" | "B
   return legs.map((symbol) => ({ symbol, side: "BUY" as const }));
 }
 
-/** Long wings cap the short legs on credit structures — name that plainly. */
-function isProtection(position: Position, side: "SELL" | "BUY"): boolean {
-  return side === "BUY" && position.entry_credit > 0;
+/** What each leg IS, named on every leg so nothing reads as a missing field.
+ *  Credit: the long wing caps the short leg — that is the protection. Debit:
+ *  the long leg is the position itself and the short leg finances it; the
+ *  debit paid is already the maximum loss, so no leg is "protection". */
+function legLabel(position: Position, side: "SELL" | "BUY"): string {
+  const credit = position.entry_credit > 0;
+  if (credit) return side === "SELL" ? "short leg" : "long leg · protection";
+  return side === "BUY" ? "long leg · the position" : "short leg · financing";
 }
 
 /**
@@ -75,7 +84,7 @@ function isProtection(position: Position, side: "SELL" | "BUY"): boolean {
 function exitChips(
   position: Position,
   status?: SystemStatus,
-): Array<{ label: string; near: boolean }> {
+): Array<{ label: string; near: boolean; hint?: string }> {
   const rules = status?.exit_rules;
   if (!rules) {
     return ["profit target", "loss limit", "dte", "short-ITM defence"].map((label) => ({
@@ -83,12 +92,13 @@ function exitChips(
       near: false,
     }));
   }
-  const scores: Array<{ label: string; score: number }> = [];
+  const scores: Array<{ label: string; score: number; hint?: string }> = [];
+  const tpPct = Math.round(rules.profit_target_pct * 100);
   if (position.entry_credit > 0) {
     const target = position.entry_credit * rules.profit_target_pct;
     const limit = position.entry_credit * rules.loss_limit_multiple;
     scores.push({
-      label: `tp +${dollars(target, 0)} (${Math.round(rules.profit_target_pct * 100)}%)`,
+      label: `tp +${dollars(target, 0)} (${tpPct}%)`,
       score: target > 0 ? Math.max(0, position.unrealized_pnl / target) : 0,
     });
     scores.push({
@@ -96,9 +106,22 @@ function exitChips(
       score: limit > 0 ? Math.max(0, -position.unrealized_pnl / limit) : 0,
     });
   } else {
+    // Debit vertical: max profit is width minus the debit paid — both already
+    // on the card (strikes and entry). Same chip format as the credit side.
+    const strikes = position.legs.map(occStrike).sort((a, b) => a - b);
+    const width = (strikes[strikes.length - 1]! - strikes[0]!) * 100;
+    const maxProfit = Math.max(0, width - Math.abs(position.entry_credit));
+    const target = maxProfit * rules.profit_target_pct;
     scores.push({
-      label: `tp ${Math.round(rules.profit_target_pct * 100)}% of max profit`,
+      label: target > 0 ? `tp +${dollars(target, 0)} (${tpPct}%)` : `tp ${tpPct}% of max profit`,
+      score: target > 0 ? Math.max(0, position.unrealized_pnl / target) : 0,
+    });
+    // No separate stop exists BY DESIGN: the debit paid is the maximum loss.
+    // An absent chip reads as a gap; a stated reason reads as design.
+    scores.push({
+      label: "max loss is the debit",
       score: 0,
+      hint: "A debit spread has no separate stop: the premium paid is the maximum loss, capped at entry.",
     });
   }
   scores.push({
@@ -108,9 +131,10 @@ function exitChips(
   scores.push({ label: "short-ITM defence", score: 0 });
 
   const nearest = scores.reduce((a, b) => (b.score > a.score ? b : a));
-  return scores.map(({ label, score }) => ({
+  return scores.map(({ label, score, hint }) => ({
     label,
     near: score > 0 && label === nearest.label,
+    hint,
   }));
 }
 
@@ -126,9 +150,30 @@ const EXIT_LABEL: Record<string, string> = {
   breach: "Breach",
 };
 
-/** The symbol mark: a monogram tile in the app's accent. Always renders —
- *  never a broken image, never an empty box. */
+/** Symbols with a committed logo asset in /public/logos (fetched once from
+ *  Parqet's asset service, served locally — no runtime dependency). Any
+ *  symbol outside this set falls back to the monogram tile, so a future
+ *  universe change never renders a broken image. */
+const LOGO_SYMBOLS = new Set(["SPY", "QQQ", "IWM", "AAPL", "MSFT", "NVDA", "AMD", "TSLA"]);
+
+/** The symbol mark: the real logo where an asset exists, otherwise a monogram
+ *  tile in the app's accent. Always renders — never a broken image. */
 function SymbolMark({ symbol, size = 30 }: { symbol: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  if (LOGO_SYMBOLS.has(symbol) && !failed) {
+    return (
+      <img
+        src={`/logos/${symbol}.jpg`}
+        alt=""
+        aria-hidden
+        width={size}
+        height={size}
+        className="shrink-0 object-cover"
+        style={{ borderRadius: "var(--radius)" }}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
   return (
     <span
       aria-hidden
@@ -165,7 +210,7 @@ function Figure({ label, value, tone }: { label: string; value: React.ReactNode;
   );
 }
 
-function ExitChip({ label, near }: { label: string; near: boolean }) {
+function ExitChip({ label, near, hint }: { label: string; near: boolean; hint?: string }) {
   return (
     <span
       className="mono whitespace-nowrap rounded-full border px-2.5 py-1 text-[12px] font-semibold"
@@ -174,7 +219,7 @@ function ExitChip({ label, near }: { label: string; near: boolean }) {
         background: near ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent",
         color: near ? "var(--text)" : "var(--text-dim)",
       }}
-      title={near ? "The rule currently closest to firing" : undefined}
+      title={hint ?? (near ? "The rule currently closest to firing" : undefined)}
     >
       {label}
     </span>
@@ -225,23 +270,29 @@ function PositionCard({ position, status }: { position: Position; status?: Syste
               {contractLabel(symbol)}
             </span>
             <span className="mono shrink-0 text-[12px] text-[color:var(--text-faint)]">
-              {side === "SELL" ? "short leg" : isProtection(position, side) ? "long leg · protection" : "long leg"}
+              {legLabel(position, side)}
             </span>
           </li>
         ))}
       </ul>
 
-      {/* metrics — four columns, mono, tabular */}
+      {/* metrics — four columns, mono, tabular. The mark is a VALUE, never a
+          change: unsigned, uncoloured, and named for what it is per structure.
+          UNREALISED above is the only P&L figure on the card. */}
       <div className="mt-3 grid grid-cols-4 gap-2 border-t border-[color:var(--line)] pt-3">
         {(
           [
-            ["entry", dollars(position.entry_credit, 2)],
-            ["mark", money(position.current_value, 0)],
-            ["max loss", dollars(position.max_loss, 2)],
-            ["held", daysHeld(position)],
+            ["entry", dollars(position.entry_credit, 2), undefined],
+            [
+              position.entry_credit > 0 ? "cost to close" : "value now",
+              `$${Math.abs(position.current_value).toLocaleString("en-US", { maximumFractionDigits: 0 })}`,
+              "The structure's current market value — not profit or loss.",
+            ],
+            ["max loss", dollars(position.max_loss, 2), undefined],
+            ["held", daysHeld(position), undefined],
           ] as const
-        ).map(([label, value]) => (
-          <div key={label}>
+        ).map(([label, value, hint]) => (
+          <div key={label} title={hint}>
             <p className="mono text-[11px] uppercase tracking-wider text-[color:var(--text-dim)]">
               {label}
             </p>
