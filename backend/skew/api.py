@@ -1002,6 +1002,109 @@ def post_kill(
     return {"kill_switch": settings.kill_switch, "at": datetime.now(UTC).isoformat()}
 
 
+
+
+# 60s cache for the strategy page's gate tallies — the record is a few
+# thousand rows and the page is public.
+_GATE_TALLY_CACHE: dict[str, Any] = {"at": 0.0, "value": None}
+
+
+def _gate_tallies() -> dict[str, dict[str, int]]:
+    """Pass and refusal counts per gate, tallied from the audit record itself.
+
+    Every candidate-level decision stores its full gate chain; the strategy
+    page cites these so its description of the gates is backed by the record
+    rather than asserted.
+    """
+    import time as _time
+
+    now = _time.monotonic()
+    if _GATE_TALLY_CACHE["value"] is not None and now - _GATE_TALLY_CACHE["at"] < 60:
+        return _GATE_TALLY_CACHE["value"]
+
+    from sqlalchemy import select
+
+    from skew.audit.models import DecisionRow
+    from skew.db import session_scope
+
+    tallies: dict[str, dict[str, int]] = {}
+    with session_scope() as session:
+        rows = session.execute(
+            select(DecisionRow.detail).where(DecisionRow.action.in_(["REFUSED", "EXECUTED"]))
+        ).all()
+    for (detail,) in rows:
+        for gate in (detail or {}).get("gates") or []:
+            if not isinstance(gate, dict) or gate.get("skipped"):
+                continue
+            name = str(gate.get("gate") or "")
+            if not name:
+                continue
+            bucket = tallies.setdefault(name, {"passed": 0, "refused": 0})
+            bucket["passed" if gate.get("passed") else "refused"] += 1
+    _GATE_TALLY_CACHE.update(at=now, value=tallies)
+    return tallies
+
+
+@api.get("/strategy", summary="Every parameter the desk is running, read live")
+def get_strategy() -> dict[str, Any]:
+    """The strategy page's source of truth: current configuration values and
+    per-gate tallies from the audit record. Read-only; a page showing the
+    desk's ACTUAL parameters is evidence, one describing them from memory is
+    marketing."""
+    from skew.risk.authority import TIERS
+    from skew.universe import effective_universe
+
+    return {
+        "signal": {
+            "vrp_sell_floor": settings.vrp_sell_floor,
+            "vrp_buy_ceiling": settings.vrp_buy_ceiling,
+            "term_far_target_dte": settings.term_far_target_dte,
+            "term_backwardation_floor": settings.term_backwardation_floor,
+            "universe": effective_universe(settings),
+        },
+        "construction": {
+            "short_leg_delta_target": settings.short_leg_delta_target,
+            "target_dte_min": settings.target_dte_min,
+            "target_dte_max": settings.target_dte_max,
+            "target_width_pct": settings.target_width_pct,
+            "structures": ["PUT_CREDIT", "CALL_CREDIT", "IRON_CONDOR", "CALL_DEBIT", "PUT_DEBIT"],
+        },
+        "gates": {
+            "order": ["liquidity", "earnings", "term", "stress", "budget"],
+            "liquidity": {
+                "min_open_interest": settings.min_open_interest,
+                "max_spread_pct": settings.max_spread_pct,
+            },
+            "earnings": {
+                "blackout_days": settings.earnings_blackout_days,
+                "unknown_blocks": settings.earnings_unknown_blocks,
+            },
+            "stress": {
+                "routine_sigma": settings.routine_sigma,
+                "routine_max_loss_pct": settings.routine_max_loss_pct,
+            },
+            "tallies": _gate_tallies(),
+        },
+        "model": {"name": settings.anthropic_model},
+        "exits": {
+            "profit_target_pct": settings.profit_target_pct,
+            "loss_limit_multiple": settings.loss_limit_multiple,
+            "exit_dte_threshold": settings.exit_dte_threshold,
+            "drawdown_breaker_pct": settings.drawdown_breaker_pct,
+        },
+        "tiers": [
+            {
+                "level": tier.level,
+                "max_loss_pct": tier.max_loss_pct,
+                "portfolio_pct": tier.portfolio_pct,
+                "trades_required": tier.trades_required,
+                "description": tier.description,
+            }
+            for tier in TIERS.values()
+        ],
+    }
+
+
 @api.post(
     "/close",
     summary="Operator close — atomic multi-leg, broker-verified. Requires auth.",

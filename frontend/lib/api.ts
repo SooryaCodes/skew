@@ -13,6 +13,7 @@
 import useSWR, { type SWRResponse } from "swr";
 
 import type {
+  StrategyConfig,
   AuditQueryResult,
   Candidate,
   ClosedPosition,
@@ -77,6 +78,7 @@ export const useAudit = (limit = 40) => usePoll<Decision[]>(`/api/audit?limit=${
 // is only the newest slice and can be all one outcome after a quiet stretch.
 export const useAuditFiltered = (action: string | null, limit = 60) =>
   usePoll<Decision[]>(action ? `/api/audit?limit=${limit}&action=${action}` : null, 20000);
+export const useStrategy = () => usePoll<StrategyConfig>("/api/strategy", 60000);
 export const useAuditCounts = () =>
   usePoll<Record<string, number>>("/api/audit/counts", 15000);
 // The /audit page: the query string IS the page state, so the URL is the key.

@@ -422,3 +422,42 @@ export interface AuditQueryResult {
   account_suffix: string | null;
   symbols_seen: string[];
 }
+
+/** /api/strategy — every parameter the desk is running, read live. */
+export interface StrategyConfig {
+  signal: {
+    vrp_sell_floor: number;
+    vrp_buy_ceiling: number;
+    term_far_target_dte: number;
+    term_backwardation_floor: number;
+    universe: string[];
+  };
+  construction: {
+    short_leg_delta_target: number;
+    target_dte_min: number;
+    target_dte_max: number;
+    target_width_pct: number;
+    structures: string[];
+  };
+  gates: {
+    order: string[];
+    liquidity: { min_open_interest: number; max_spread_pct: number };
+    earnings: { blackout_days: number; unknown_blocks: boolean };
+    stress: { routine_sigma: number; routine_max_loss_pct: number };
+    tallies: Record<string, { passed: number; refused: number }>;
+  };
+  model: { name: string };
+  exits: {
+    profit_target_pct: number;
+    loss_limit_multiple: number;
+    exit_dte_threshold: number;
+    drawdown_breaker_pct: number;
+  };
+  tiers: Array<{
+    level: number;
+    max_loss_pct: number;
+    portfolio_pct: number;
+    trades_required: number;
+    description: string;
+  }>;
+}
