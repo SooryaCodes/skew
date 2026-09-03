@@ -426,10 +426,12 @@ def _recover_realized(broker: Any, row: PositionRow) -> tuple[float, str] | None
     Recovered from the closing order's actual fill prices — never estimated.
     Returns None when no filled close order can be found."""
     with session_scope() as session:
+        # Closing OrderRows persist under the ORIGINAL structure id (see
+        # exit.py's record dict) with intent CLOSE — not under "<id>:CLOSE".
         closes = list(
             session.scalars(
                 select(OrderRow).where(
-                    OrderRow.structure_id == f"{row.id}:CLOSE", OrderRow.intent == "CLOSE"
+                    OrderRow.structure_id == row.id, OrderRow.intent == "CLOSE"
                 )
             ).all()
         )

@@ -631,9 +631,10 @@ def _close_already_resting(structure_id: str) -> bool:
     from skew.exec.submit import RESTING_OR_FILLED
 
     with session_scope() as session:
+        # Closing OrderRows persist under the ORIGINAL structure id.
         orders = session.scalars(
             select(OrderRow).where(
-                OrderRow.structure_id == f"{structure_id}:CLOSE", OrderRow.intent == "CLOSE"
+                OrderRow.structure_id == structure_id, OrderRow.intent == "CLOSE"
             )
         ).all()
         return any((o.status or "").lower() in RESTING_OR_FILLED - {"filled"} for o in orders)
