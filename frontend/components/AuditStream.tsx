@@ -301,10 +301,14 @@ export function AuditStream({ decisions, counts }: Props) {
   const { data: serverFiltered, isLoading: filterLoading } = useAuditFiltered(
     filter === "ALL" ? null : filter,
   );
-  const filtered = useMemo(
-    () => (filter === "ALL" ? decisions : (serverFiltered ?? [])),
-    [decisions, filter, serverFiltered],
-  );
+  const filtered = useMemo(() => {
+    if (filter === "ALL") return decisions;
+    const rows = serverFiltered ?? [];
+    // The Filled chip counts broker-confirmed fills, so it shows exactly
+    // those — submissions that died (gray "Submitted") and close orders
+    // stay visible under All, beside their corrections.
+    return filter === "EXECUTED" ? rows.filter((d) => d.order_filled === true) : rows;
+  }, [decisions, filter, serverFiltered]);
   const groups = useMemo(() => groupDecisions(filtered), [filtered]);
 
   const chips: Array<{ key: Filter; label: string; count?: number }> = [
