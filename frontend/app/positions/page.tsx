@@ -45,6 +45,9 @@ const EXIT_LABEL: Record<string, string> = {
   loss_limit: "loss limit",
   dte: "dte threshold",
   deadline: "deadline",
+  short_itm: "assignment defence",
+  duplicate_correction: "duplicate correction",
+  reconciled_closed_at_broker: "closed at broker",
 };
 
 export default function PositionsPage() {
@@ -89,7 +92,9 @@ export default function PositionsPage() {
           <p className="mt-6 text-sm text-[color:var(--text-dim)]">
             {isLoading
               ? "Loading positions."
-              : "No open positions. The desk holds nothing until a candidate clears every gate and the bounded selector picks it."}
+              : status?.past_deadline
+                ? "Competition window closed on 4 September — every open position was flattened by the deadline rule. The closed table below is the complete lifecycle record."
+                : "No open positions. The desk holds nothing until a candidate clears every gate and the bounded selector picks it."}
           </p>
         ) : (
           <div className="panel mt-4 overflow-x-auto">
@@ -220,7 +225,16 @@ export default function PositionsPage() {
                             (trade.realized_pnl ?? 0) >= 0 ? "var(--verdigris)" : "var(--brass)",
                         }}
                       >
-                        {trade.realized_pnl !== null ? money(trade.realized_pnl) : "—"}
+                        {trade.realized_pnl !== null ? (
+                          money(trade.realized_pnl)
+                        ) : (
+                          <span
+                            className="text-[12px] text-[color:var(--text-dim)]"
+                            title="The close filled at the broker but its fill price could not be recovered — stated rather than estimated."
+                          >
+                            closed at broker · realised unavailable
+                          </span>
+                        )}
                       </td>
                       <td className="mono px-3 py-2 text-[12px] uppercase tracking-wide text-[color:var(--text)]">
                         {EXIT_LABEL[trade.exit_reason ?? ""] ?? trade.exit_reason ?? "—"}

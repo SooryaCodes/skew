@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { useAuditFiltered } from "@/lib/api";
 import { clockTime, timeAgo } from "@/lib/format";
 import type { Decision, DecisionAction } from "@/lib/types";
 
@@ -293,9 +294,16 @@ type Filter = "ALL" | DecisionAction;
 
 export function AuditStream({ decisions, counts }: Props) {
   const [filter, setFilter] = useState<Filter>("ALL");
+  // A selected chip queries the FULL record server-side. The rail's loaded
+  // window is only the newest slice — after a quiet stretch it is all
+  // abstentions, and filtering it client-side made all-time counts look
+  // fabricated ("Refused 1,244" -> zero rows).
+  const { data: serverFiltered, isLoading: filterLoading } = useAuditFiltered(
+    filter === "ALL" ? null : filter,
+  );
   const filtered = useMemo(
-    () => (filter === "ALL" ? decisions : decisions.filter((d) => d.action === filter)),
-    [decisions, filter],
+    () => (filter === "ALL" ? decisions : (serverFiltered ?? [])),
+    [decisions, filter, serverFiltered],
   );
   const groups = useMemo(() => groupDecisions(filtered), [filtered]);
 
@@ -322,8 +330,8 @@ export function AuditStream({ decisions, counts }: Props) {
         </Link>
       </div>
       <p className="mt-0.5 text-[13px] leading-snug text-[color:var(--text-dim)]">
-        Every decision is traceable — click any entry. Counts are all-time; the
-        strip above counts this session only.
+        Every decision is traceable — click any entry. Counts are all-time, and
+        selecting a filter searches the full record, not just the latest slice.
       </p>
       <div className="mb-3 mt-2.5 flex flex-wrap gap-1.5" role="group" aria-label="Filter decisions">
         {chips.map((chip) => {
@@ -358,7 +366,9 @@ export function AuditStream({ decisions, counts }: Props) {
         <p className="text-[13px] text-[color:var(--text-dim)]">
           {filter === "ALL"
             ? "No decisions yet. The desk logs every refusal and abstention here, not only the trades it takes."
-            : "Nothing with this outcome in the loaded window."}
+            : filterLoading
+              ? "Searching the full record…"
+              : "No decisions with this outcome anywhere on the record."}
         </p>
       ) : (
         // The list must LOOK scrollable: a persistent scrollbar plus a fade at

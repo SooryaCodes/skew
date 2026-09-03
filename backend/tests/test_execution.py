@@ -196,9 +196,9 @@ def test_client_order_ids_are_deterministic_per_structure_and_day(credit_spread)
     ids = {client_order_id(credit_spread) for _ in range(50)}
     assert len(ids) == 1
 
-    from datetime import UTC, datetime
+    from datetime import UTC, datetime, timedelta
 
-    other_day = client_order_id(credit_spread, when=datetime(2026, 9, 3, tzinfo=UTC))
+    other_day = client_order_id(credit_spread, when=datetime.now(UTC) + timedelta(days=1))
     assert other_day not in ids  # a later session may legitimately re-enter
 
 

@@ -73,6 +73,10 @@ export const usePositions = () => usePoll<Position[]>("/api/positions", 10000);
 export const useClosedPositions = () =>
   usePoll<ClosedPosition[]>("/api/positions/closed", 30000);
 export const useAudit = (limit = 40) => usePoll<Decision[]>(`/api/audit?limit=${limit}`);
+// A rail filter chip queries the whole record server-side — the loaded window
+// is only the newest slice and can be all one outcome after a quiet stretch.
+export const useAuditFiltered = (action: string | null, limit = 60) =>
+  usePoll<Decision[]>(action ? `/api/audit?limit=${limit}&action=${action}` : null, 20000);
 export const useAuditCounts = () =>
   usePoll<Record<string, number>>("/api/audit/counts", 15000);
 // The /audit page: the query string IS the page state, so the URL is the key.

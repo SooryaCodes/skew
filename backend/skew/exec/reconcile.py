@@ -205,6 +205,7 @@ def reconcile(broker: Any) -> dict[str, Any]:
             # Every leg gone: the position was closed away from the book
             # (late close fill, assignment, manual intervention). Record it
             # closed; realized P&L is marked unknown rather than invented.
+            recovered = _recover_realized(broker, row)
             with session_scope() as session:
                 stored = session.get(PositionRow, row.id)
                 if stored is not None:
@@ -213,13 +214,24 @@ def reconcile(broker: Any) -> dict[str, Any]:
 
                     stored.is_open = False
                     stored.closed_at = _dt.now(_UTC)
-                    stored.exit_reason = "reconciled_closed_at_broker"
+                    if recovered is not None:
+                        stored.realized_pnl, stored.exit_reason = recovered
+                    else:
+                        stored.exit_reason = "reconciled_closed_at_broker"
             audit.record_correction(
-                f"Position {row.id} is no longer held at the broker — closed by a "
-                f"late close fill or external action. The record is marked closed; "
-                f"realized P&L is taken from the closing order's fills where known.",
+                f"Position {row.id} is no longer held at the broker — its close "
+                f"filled after the submission poll. "
+                + (
+                    f"Realized ${recovered[0]:+,.2f} on {recovered[1]}, taken from "
+                    f"the closing order's actual fills."
+                    if recovered is not None
+                    else "No filled closing order could be found; realized P&L is "
+                    "recorded as unavailable rather than invented."
+                ),
                 symbol=row.symbol,
-                detail={"structure_id": row.id, "kind": "closed_at_broker"},
+                detail={"structure_id": row.id, "kind": "closed_at_broker",
+                        "realized_pnl": recovered[0] if recovered else None,
+                        "rule": recovered[1] if recovered else None},
             )
             report["corrected"].append({"structure_id": row.id, "action": "closed_at_broker"})
             continue
@@ -378,7 +390,82 @@ def reconcile(broker: Any) -> dict[str, Any]:
                     {"structure_id": row.id, "action": "close_unfilled_reopened"}
                 )
 
+    # Backfill: closed rows that never captured realized P&L (closed before
+    # recovery existed). Recover from the broker's close fills; the correction
+    # is written once, on success only — an unrecoverable row stays honest
+    # ("unavailable") and is retried silently next pass.
+    for row in closed_rows:
+        if row.realized_pnl is not None or not row.closed_at:
+            continue
+        recovered = _recover_realized(broker, row)
+        if recovered is None:
+            continue
+        realized, rule = recovered
+        with session_scope() as session:
+            stored = session.get(PositionRow, row.id)
+            if stored is not None and stored.realized_pnl is None:
+                stored.realized_pnl = realized
+                stored.exit_reason = rule
+        audit.record_correction(
+            f"Realized P&L recovered from the broker's close fills: {row.id} "
+            f"closed on {rule} for ${realized:+,.2f}. The close filled after the "
+            f"submission poll and was reconciled without its fill price; the "
+            f"figure above is the broker's, not an estimate.",
+            symbol=row.symbol,
+            detail={"structure_id": row.id, "kind": "realized_backfilled",
+                    "realized_pnl": realized, "rule": rule},
+        )
+        report["corrected"].append({"structure_id": row.id, "action": "realized_backfilled"})
+
     return report
+
+
+def _recover_realized(broker: Any, row: PositionRow) -> tuple[float, str] | None:
+    """Realized P&L and the closing rule for a position whose close FILLED at
+    the broker without being recorded (the fill landed after the submit poll).
+    Recovered from the closing order's actual fill prices — never estimated.
+    Returns None when no filled close order can be found."""
+    with session_scope() as session:
+        closes = list(
+            session.scalars(
+                select(OrderRow).where(
+                    OrderRow.structure_id == f"{row.id}:CLOSE", OrderRow.intent == "CLOSE"
+                )
+            ).all()
+        )
+        for order in closes:
+            session.expunge(order)
+    for order in reversed(closes):  # newest attempt first
+        try:
+            branch = broker.get_order_by_client_id(order.client_order_id)
+        except Exception:  # noqa: BLE001 — recovery is best-effort, retried next pass
+            continue
+        status = str(getattr(branch, "status", "")).lower()
+        if "filled" not in status or "partially" in status:
+            continue
+        prices = {
+            str(leg.symbol): float(leg.filled_avg_price or 0.0)
+            for leg in (getattr(branch, "legs", None) or [])
+        }
+        legs = order.legs or []
+        if not legs or any(
+            leg["symbol"] not in prices or prices[leg["symbol"]] <= 0 for leg in legs
+        ):
+            continue
+        signed = sum((1 if leg["side"] == "BUY" else -1) * prices[leg["symbol"]] for leg in legs)
+        close_credit = round(-signed * CONTRACT_MULTIPLIER * int(order.qty or row.qty or 1), 2)
+        realized = round(row.entry_credit + close_credit, 2)
+        rule = None
+        with session_scope() as session:
+            from skew.audit.models import DecisionRow
+
+            dec = session.scalars(
+                select(DecisionRow).where(DecisionRow.order_id == order.client_order_id)
+            ).first()
+            if dec is not None:
+                rule = (dec.detail or {}).get("rule")
+        return realized, (rule or "close")
+    return None
 
 
 def broker_holds_legs(broker: Any, structure: Structure, qty: int | None = None) -> bool:

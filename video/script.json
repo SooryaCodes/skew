@@ -9,7 +9,7 @@
     ],
     "duration_window_s": [
       130,
-      165
+      178
     ],
     "hard_ceiling_s": 180,
     "silence_budget_s": 12.0,

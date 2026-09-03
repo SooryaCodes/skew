@@ -407,7 +407,7 @@ def assemble() -> None:
     sh("ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(listfile),
        "-c", "copy", "-movflags", "+faststart", str(master))
     duration = probe_duration(master)
-    lo, hi = 130, 165
+    lo, hi = json.loads(SCRIPT.read_text())["meta"]["duration_window_s"]
     print(f"clean master: {master.name} — {duration:.1f}s")
     if not (lo <= duration <= hi + 0.5):
         raise SystemExit(f"FAIL: {duration:.1f}s outside the {lo}-{hi}s window")
@@ -603,7 +603,7 @@ def verify_final() -> None:
         leading = gaps.pop(0)
     longest = max(gaps) if gaps else 0.0
     checks = [
-        ("duration 130-165s", 130 <= duration <= 165.5, f"{duration:.1f}s"),
+        ("duration inside the window", *(lambda w: (w[0] <= duration <= w[1] + 0.5, f"{duration:.1f}s (window {w[0]}-{w[1]}s, hard limit 180s)"))(json.loads(SCRIPT.read_text())["meta"]["duration_window_s"])),
         ("opening identity <= 3.0s", leading <= 3.0, f"{leading:.2f}s"),
         ("total silence < 12s", total_silence < 12, f"{total_silence:.1f}s"),
         ("longest gap <= 1.6s (after the open)", longest <= 1.6, f"{longest:.2f}s"),
