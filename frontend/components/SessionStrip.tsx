@@ -15,7 +15,13 @@
  */
 
 import { clockTime, timeAgo } from "@/lib/format";
-import { useClosedPositions, useSession, useStatus } from "@/lib/api";
+import {
+  useAudit,
+  useAuditQuery,
+  useClosedPositions,
+  useSession,
+  useStatus,
+} from "@/lib/api";
 
 function sessionLabel(iso: string): string {
   const d = new Date(`${iso}T12:00:00Z`);
@@ -91,8 +97,9 @@ export function SessionStrip() {
   return (
     <section
       aria-label="Session summary"
-      className="flex flex-wrap items-center gap-x-7 gap-y-1.5 border-b border-[color:var(--line)] bg-[color:var(--panel)] px-5 py-2.5"
+      className="border-b border-[color:var(--line)] bg-[color:var(--panel)] px-5 py-2.5"
     >
+      <div className="flex flex-wrap items-center gap-x-7 gap-y-1.5">
       <Segment label={closed ? "Closed" : "Open"}>
         <span className="text-[13px] text-[color:var(--text-dim)]">
           {closed
@@ -109,31 +116,113 @@ export function SessionStrip() {
         <Stat label="survived" value={session.cycle.survivors} />
       </Segment>
 
-      <Segment
-        label="Session"
-        title={`decisions since ${new Date(session.counts_since).toLocaleString()}`}
+      {/* keyed by its own numbers: a completed cycle re-mounts the segment
+          and the one-shot pulse marks the change, then settles */}
+      <span
+        key={`${counts.EXECUTED}-${closedThisSession}-${counts.REFUSED}-${counts.ABSTAINED}`}
+        className="pulse-once rounded-[var(--radius)]"
       >
-        <Stat label="opened" value={counts.EXECUTED ?? 0} />
-        <Stat label="closed" value={closedThisSession} />
-        <Stat label="refused" value={counts.REFUSED ?? 0} />
-        <Stat label="abstained" value={counts.ABSTAINED ?? 0} />
-      </Segment>
+        <Segment
+          label="Session"
+          title={`decisions since ${new Date(session.counts_since).toLocaleString()}`}
+        >
+          <Stat label="opened" value={counts.EXECUTED ?? 0} />
+          <Stat label="closed" value={closedThisSession} />
+          <Stat label="refused" value={counts.REFUSED ?? 0} />
+          <Stat label="abstained" value={counts.ABSTAINED ?? 0} />
+        </Segment>
+      </span>
 
-      {session.last_fill && (
-        <span className="ml-auto flex min-w-0 items-baseline gap-2">
-          <span
-            className="inline-block h-[7px] w-[7px] shrink-0 self-center rounded-full"
-            style={{ background: "var(--positive)" }}
-            aria-hidden
-          />
-          <span className="mono truncate text-[12px] text-[color:var(--text)]">
-            {session.last_fill.symbol} · {session.last_fill.reason}
-          </span>
-          <span className="mono shrink-0 text-[12px] text-[color:var(--text-dim)]">
-            {timeAgo(session.last_fill.ts)}
-          </span>
-        </span>
-      )}
+      <LatestEvent lastFill={session.last_fill} />
+      </div>
+      <SessionSentence
+        sessionDate={session.session_date}
+        opened={counts.EXECUTED ?? 0}
+        closed={closedThisSession}
+        refused={counts.REFUSED ?? 0}
+        abstained={counts.ABSTAINED ?? 0}
+      />
     </section>
+  );
+}
+
+/** The most recent fill OR refusal, keyed by identity so a new one arrives
+ *  with the one-shot highlight before settling. */
+function LatestEvent({
+  lastFill,
+}: {
+  lastFill: { symbol: string | null; reason: string; ts: string } | null;
+}) {
+  const { data: latest } = useAudit(1);
+  const newest = latest?.[0];
+  const showRefusal =
+    newest?.action === "REFUSED" &&
+    (!lastFill || new Date(newest.ts) > new Date(lastFill.ts));
+  const event = showRefusal
+    ? { symbol: newest!.symbol ?? "—", reason: newest!.reason, ts: newest!.ts, fill: false }
+    : lastFill
+      ? { symbol: lastFill.symbol ?? "—", reason: lastFill.reason, ts: lastFill.ts, fill: true }
+      : null;
+  if (!event) return null;
+  return (
+    <span
+      key={`${event.ts}-${event.fill}`}
+      className="pulse-once ml-auto flex min-w-0 items-baseline gap-2 rounded-[var(--radius)]"
+    >
+      <span
+        className="inline-block h-[7px] w-[7px] shrink-0 self-center rounded-full"
+        style={{ background: event.fill ? "var(--positive)" : "var(--negative)" }}
+        aria-hidden
+      />
+      <span className="mono truncate text-[12px] text-[color:var(--text)]">
+        {event.symbol} · {event.reason}
+      </span>
+      <span className="mono shrink-0 text-[12px] text-[color:var(--text-dim)]">
+        {timeAgo(event.ts)}
+      </span>
+    </span>
+  );
+}
+
+/** One plain sentence a judge can read instead of inferring the session from
+ *  four numbers. Every figure comes from the record: the session counts above
+ *  and the refusals-by-gate breakdown for the session window. */
+function SessionSentence({
+  sessionDate,
+  opened,
+  closed,
+  refused,
+  abstained,
+}: {
+  sessionDate: string;
+  opened: number;
+  closed: number;
+  refused: number;
+  abstained: number;
+}) {
+  const { data: status } = useStatus();
+  const { data: refusals } = useAuditQuery(
+    `action=REFUSED&date_from=${sessionDate}&limit=1`,
+  );
+  const names = status?.universe_size;
+  const gates = refusals?.summary?.by_gate ?? [];
+  const dominant = gates.length ? gates[0] : null;
+  const parts: string[] = [];
+  parts.push(
+    `${names ?? "The"} name${names === 1 ? "" : "s"} scanned since the session opened: ` +
+      `${opened} position${opened === 1 ? "" : "s"} opened, ${closed} closed, ` +
+      `${refused.toLocaleString()} candidate${refused === 1 ? "" : "s"} refused, ` +
+      `${abstained.toLocaleString()} scans ended in abstention.`,
+  );
+  if (dominant && refused > 0) {
+    parts.push(
+      `The binding constraint was ${dominant.gate}, which stopped ` +
+        `${dominant.count.toLocaleString()} of the refusals.`,
+    );
+  }
+  return (
+    <p className="mt-1.5 text-[13px] leading-snug text-[color:var(--text-dim)]">
+      {parts.join(" ")}
+    </p>
   );
 }

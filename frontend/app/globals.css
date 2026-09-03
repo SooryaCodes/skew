@@ -305,6 +305,21 @@ body {
   animation: audit-slide-in 200ms ease 500ms both;
 }
 
+/* One restrained transition for "something just changed": a background that
+   breathes once and settles. Used when a cycle lands. */
+@keyframes pulse-settle {
+  0% {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.pulse-once {
+  animation: pulse-settle 900ms ease both;
+}
+
 @keyframes curve-draw {
   from {
     stroke-dashoffset: var(--dash, 1200);

@@ -10,16 +10,24 @@
  */
 
 import { regimeColor, regimeLabel, volPoints } from "@/lib/format";
-import type { VolState } from "@/lib/types";
+import type { PerSymbolSummary, VolState } from "@/lib/types";
 
 interface Props {
   states: VolState[];
   selected: string | null;
   onSelect: (symbol: string) => void;
   loading?: boolean;
+  /** All-time decision depth per symbol, from the audit record. */
+  perSymbol?: Record<string, PerSymbolSummary>;
 }
 
-export function UniverseRail({ states, selected, onSelect, loading }: Props) {
+const OUTCOME_DOT: Record<string, { color: string; label: string }> = {
+  EXECUTED: { color: "var(--positive)", label: "filled" },
+  REFUSED: { color: "var(--negative)", label: "refused" },
+  ABSTAINED: { color: "var(--text-faint)", label: "abstained" },
+};
+
+export function UniverseRail({ states, selected, onSelect, loading, perSymbol }: Props) {
   if (states.length === 0) {
     return (
       <div className="p-3">
@@ -49,11 +57,15 @@ export function UniverseRail({ states, selected, onSelect, loading }: Props) {
           const color = regimeColor(state.regime);
           return (
             <li key={state.symbol}>
+              {/* keyed by as_of so a fresh cycle re-mounts the row and the
+                  one-shot pulse marks the change — restrained, then settles */}
               <button
+                key={`${state.symbol}-${state.as_of}`}
                 type="button"
                 onClick={() => onSelect(state.symbol)}
                 aria-current={active ? "true" : undefined}
-                className="t-fast flex w-full items-baseline gap-2 px-2 py-1.5 text-left"
+                title={perSymbol?.[state.symbol]?.last_reason}
+                className="t-fast pulse-once flex w-full flex-col gap-0.5 px-2 py-1.5 text-left"
                 style={{
                   background: active ? "var(--panel-alt)" : "transparent",
                   // Inactive rows dim the BAR, never the text — 85% opacity on
@@ -62,13 +74,32 @@ export function UniverseRail({ states, selected, onSelect, loading }: Props) {
                   borderRadius: "var(--radius)",
                 }}
               >
-                <span className="mono w-11 shrink-0 text-[15px]">{state.symbol}</span>
-                <span className="mono w-14 shrink-0 text-right text-[15px] text-[color:var(--text)]">
-                  {volPoints(state.vrp)}
+                <span className="flex w-full items-baseline gap-2">
+                  <span className="mono w-11 shrink-0 text-[15px]">{state.symbol}</span>
+                  <span className="mono w-14 shrink-0 text-right text-[15px] text-[color:var(--text)]">
+                    {volPoints(state.vrp)}
+                  </span>
+                  <span className="mono flex-1 truncate text-right text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
+                    {regimeLabel(state.regime)}
+                  </span>
                 </span>
-                <span className="mono flex-1 truncate text-right text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
-                  {regimeLabel(state.regime)}
-                </span>
+                {/* what the desk has actually DONE with this name — all-time
+                    count and the latest outcome, reason on hover */}
+                {perSymbol?.[state.symbol] && (
+                  <span className="mono flex w-full items-center gap-1.5 text-[11px] text-[color:var(--text-faint)]">
+                    {perSymbol[state.symbol]!.total.toLocaleString()} decisions
+                    <span
+                      className="ml-auto inline-block h-[5px] w-[5px] rounded-full"
+                      style={{
+                        background:
+                          OUTCOME_DOT[perSymbol[state.symbol]!.last_action]?.color ??
+                          "var(--text-faint)",
+                      }}
+                      aria-hidden
+                    />
+                    last {OUTCOME_DOT[perSymbol[state.symbol]!.last_action]?.label ?? "—"}
+                  </span>
+                )}
               </button>
             </li>
           );

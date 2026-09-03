@@ -15,7 +15,7 @@ import { useMemo, useState } from "react";
 
 import { useAuditFiltered } from "@/lib/api";
 import { clockTime, timeAgo } from "@/lib/format";
-import type { Decision, DecisionAction } from "@/lib/types";
+import type { AuditCounts, Decision, DecisionAction } from "@/lib/types";
 
 /** Strip the legacy tier-promotion tail from rows written before it was
  *  removed at the source — identical on every refusal, already in the risk
@@ -287,7 +287,7 @@ function Run({ first, rest, isNewest }: { first: Decision; rest: Decision[]; isN
 
 interface Props {
   decisions: Decision[];
-  counts?: Record<string, number>;
+  counts?: AuditCounts;
 }
 
 type Filter = "ALL" | DecisionAction;

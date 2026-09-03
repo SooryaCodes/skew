@@ -266,6 +266,7 @@ export interface SystemStatus {
   starting_equity?: number | null;
   options_approval_level?: number | string | null;
   endpoint_is_paper?: boolean;
+  cycle_interval_seconds?: number;
   exit_rules?: ExitRules;
   /** The most recent trading session — what the closed-market header names. */
   last_session: string;
@@ -460,4 +461,21 @@ export interface StrategyConfig {
     trades_required: number;
     description: string;
   }>;
+}
+
+/** Per-symbol summary carried on /api/audit/counts for the universe rail. */
+export interface PerSymbolSummary {
+  total: number;
+  last_action: DecisionAction;
+  last_reason: string;
+  last_id: string;
+  last_ts: string;
+}
+
+export interface AuditCounts {
+  EXECUTED: number;
+  REFUSED: number;
+  ABSTAINED: number;
+  TOTAL: number;
+  per_symbol?: Record<string, PerSymbolSummary>;
 }

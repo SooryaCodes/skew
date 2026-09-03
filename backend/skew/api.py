@@ -426,6 +426,7 @@ def get_status() -> dict[str, Any]:
         "drawdown_paused": _drawdown_paused(),
         # The standing exit rules, so the positions view can print each
         # position's own exit conditions instead of a vague promise.
+        "cycle_interval_seconds": settings.loop_interval_seconds,
         "exit_rules": {
             "profit_target_pct": settings.profit_target_pct,
             "loss_limit_multiple": settings.loss_limit_multiple,
@@ -501,7 +502,57 @@ def get_audit(
 
 @api.get("/audit/counts", summary="Executions vs refusals vs abstentions")
 def get_audit_counts(since_hours: int | None = Query(default=None, ge=1, le=8760)):
-    return audit.counts(since_hours=since_hours)
+    body = audit.counts(since_hours=since_hours)
+    # Per-symbol depth for the universe rail: all-time decision count, the
+    # most recent outcome and its reason. Cached like the gate tallies —
+    # the record is a few thousand rows and the rail polls.
+    body["per_symbol"] = _per_symbol_summary()
+    return body
+
+
+_PER_SYMBOL_CACHE: dict[str, Any] = {"at": 0.0, "value": None}
+
+
+def _per_symbol_summary() -> dict[str, dict[str, Any]]:
+    import time as _time
+
+    now = _time.monotonic()
+    if _PER_SYMBOL_CACHE["value"] is not None and now - _PER_SYMBOL_CACHE["at"] < 60:
+        return _PER_SYMBOL_CACHE["value"]
+
+    from sqlalchemy import func, select
+
+    from skew.audit.models import DecisionRow
+    from skew.db import session_scope
+
+    out: dict[str, dict[str, Any]] = {}
+    with session_scope() as session:
+        totals = session.execute(
+            select(DecisionRow.symbol, func.count(DecisionRow.id))
+            .where(DecisionRow.symbol.is_not(None))
+            .where(DecisionRow.action.in_(["EXECUTED", "REFUSED", "ABSTAINED"]))
+            .group_by(DecisionRow.symbol)
+        ).all()
+        for symbol, count in totals:
+            latest = session.execute(
+                select(DecisionRow.action, DecisionRow.reason, DecisionRow.id, DecisionRow.ts)
+                .where(DecisionRow.symbol == symbol)
+                .where(DecisionRow.action.in_(["EXECUTED", "REFUSED", "ABSTAINED"]))
+                .order_by(DecisionRow.ts.desc())
+                .limit(1)
+            ).first()
+            if latest is None:
+                continue
+            action, reason, decision_id, ts = latest
+            out[str(symbol)] = {
+                "total": int(count),
+                "last_action": action,
+                "last_reason": reason,
+                "last_id": decision_id,
+                "last_ts": (ts if ts.tzinfo else ts.replace(tzinfo=None)).isoformat(),
+            }
+    _PER_SYMBOL_CACHE.update(at=now, value=out)
+    return out
 
 
 def _audit_query_from_params(

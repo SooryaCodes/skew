@@ -11,6 +11,7 @@
  */
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { LogoMark } from "@/components/Logo";
 
@@ -40,6 +41,29 @@ function healthReport(status: SystemStatus | undefined): { ok: boolean; lines: s
   const ok =
     status.broker_connected && (!status.auto_execute || status.armed) && !status.kill_switch;
   return { ok, lines };
+}
+
+/** "next cycle in m:ss", ticking — a running system shows its clock. Hidden
+ *  when the market is closed or the cycle is overdue (the timestamp beside it
+ *  already says how stale things are). */
+function CycleCountdown({ status }: { status: SystemStatus }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const interval = status.cycle_interval_seconds;
+  if (!interval || !status.market_open || !status.last_cycle) return null;
+  const next = new Date(status.last_cycle).getTime() + interval * 1000;
+  const remaining = Math.floor((next - now) / 1000);
+  if (remaining <= 0 || remaining > interval) return null;
+  const m = Math.floor(remaining / 60);
+  const ss = String(remaining % 60).padStart(2, "0");
+  return (
+    <span className="text-[color:var(--text-faint)]">
+      {" "}· next in {m}m {ss}s
+    </span>
+  );
 }
 
 export function Header({ status, tab }: Props) {
@@ -104,6 +128,7 @@ export function Header({ status, tab }: Props) {
           {status?.last_cycle && (
             <span className="mono text-[12px] text-[color:var(--text-dim)]">
               cycle {timeAgo(status.last_cycle)}
+              <CycleCountdown status={status} />
             </span>
           )}
 
