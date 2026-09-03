@@ -358,7 +358,6 @@ def by_id(decision_id: str) -> Decision | None:
         return _to_model(row) if row else None
 
 
-
 def filled_order_ids(session) -> set[str]:
     """Client order ids the broker actually FILLED (reconciled each cycle).
     The fills counter counts these, not submissions — an EXECUTED entry whose
@@ -380,13 +379,17 @@ def counts_since(moment: datetime) -> dict[str, int]:
             .group_by(DecisionRow.action)
         ).all()
         filled = filled_order_ids(session)
-        executed_filled = session.execute(
-            select(func.count(DecisionRow.id)).where(
-                DecisionRow.ts >= moment,
-                DecisionRow.action == "EXECUTED",
-                DecisionRow.order_id.in_(filled) if filled else DecisionRow.order_id.is_(None),
-            )
-        ).scalar_one() if filled else 0
+        executed_filled = (
+            session.execute(
+                select(func.count(DecisionRow.id)).where(
+                    DecisionRow.ts >= moment,
+                    DecisionRow.action == "EXECUTED",
+                    DecisionRow.order_id.in_(filled) if filled else DecisionRow.order_id.is_(None),
+                )
+            ).scalar_one()
+            if filled
+            else 0
+        )
     out = {"EXECUTED": 0, "REFUSED": 0, "ABSTAINED": 0}
     for action, count in rows:
         if action in out:  # CONFIG/CORRECTION markers are not decisions

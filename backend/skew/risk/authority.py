@@ -131,9 +131,7 @@ def sync_closed_trades() -> int:
     runs every reconciliation pass.
     """
     with session_scope() as session:
-        closed = session.scalars(
-            select(PositionRow).where(PositionRow.is_open.is_(False))
-        ).all()
+        closed = session.scalars(select(PositionRow).where(PositionRow.is_open.is_(False))).all()
         clean = sum(1 for r in closed if (r.exit_reason or "") != "breach")
         row = _state_row(session)
         if clean != row.closed_trades:

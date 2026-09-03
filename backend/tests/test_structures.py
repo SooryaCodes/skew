@@ -563,9 +563,7 @@ def _put_ladder(step=5.0):
     quotes = []
     for i, strike in enumerate(range(550, 600, int(step))):
         distance = (600 - strike) / 50  # 1.0 far, ~0.1 near
-        quotes.append(
-            _quote(float(strike), "PUT", mid=0.3 + i * 0.60, delta=-(0.05 + i * 0.03))
-        )
+        quotes.append(_quote(float(strike), "PUT", mid=0.3 + i * 0.60, delta=-(0.05 + i * 0.03)))
     del distance
     return quotes
 

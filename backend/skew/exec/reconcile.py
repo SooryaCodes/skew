@@ -59,7 +59,9 @@ def _broker_leg_entries(broker: Any) -> dict[str, tuple[float, float]]:
     return out
 
 
-def _true_entry(structure: Structure, legs_at_broker: dict[str, tuple[float, float]], qty: int) -> float:
+def _true_entry(
+    structure: Structure, legs_at_broker: dict[str, tuple[float, float]], qty: int
+) -> float:
     """Net credit (positive = credit received, negative = debit paid) of qty
     spreads at the broker's average entry prices. The signed-ratio sum is the
     position's VALUE, so the credit convention is its negation — a debit
@@ -71,10 +73,6 @@ def _true_entry(structure: Structure, legs_at_broker: dict[str, tuple[float, flo
         price = held[1] if held else leg.mid
         total += leg.signed_ratio * price * CONTRACT_MULTIPLIER * qty
     return round(-total, 2)
-
-
-
-
 
 
 def broker_supported_qty(
@@ -107,11 +105,18 @@ def structural_max_loss(structure: Structure, net_credit_per_spread: float) -> f
     probes = [0.0, *strikes, strikes[-1] * 2 + 100.0]
     worst = 0.0
     for spot in probes:
-        value = sum(
-            leg.signed_ratio
-            * (max(spot - leg.strike, 0.0) if leg.right == "CALL" else max(leg.strike - spot, 0.0))
-            for leg in structure.legs
-        ) * CONTRACT_MULTIPLIER
+        value = (
+            sum(
+                leg.signed_ratio
+                * (
+                    max(spot - leg.strike, 0.0)
+                    if leg.right == "CALL"
+                    else max(leg.strike - spot, 0.0)
+                )
+                for leg in structure.legs
+            )
+            * CONTRACT_MULTIPLIER
+        )
         worst = min(worst, net_credit_per_spread + value)
     return round(-worst, 2)
 
@@ -154,9 +159,10 @@ def reconcile(broker: Any) -> dict[str, Any]:
 
         if not filled and not resting:
             # Phantom: recorded at submission, never filled, orders all dead.
-            named = ", ".join(
-                f"{cid} ({statuses.get(cid, 'unknown')})" for cid in statuses
-            ) or "no order record"
+            named = (
+                ", ".join(f"{cid} ({statuses.get(cid, 'unknown')})" for cid in statuses)
+                or "no order record"
+            )
             with session_scope() as session:
                 stored = session.get(PositionRow, row.id)
                 if stored is not None:
@@ -229,9 +235,12 @@ def reconcile(broker: Any) -> dict[str, Any]:
                     "recorded as unavailable rather than invented."
                 ),
                 symbol=row.symbol,
-                detail={"structure_id": row.id, "kind": "closed_at_broker",
-                        "realized_pnl": recovered[0] if recovered else None,
-                        "rule": recovered[1] if recovered else None},
+                detail={
+                    "structure_id": row.id,
+                    "kind": "closed_at_broker",
+                    "realized_pnl": recovered[0] if recovered else None,
+                    "rule": recovered[1] if recovered else None,
+                },
             )
             report["corrected"].append({"structure_id": row.id, "action": "closed_at_broker"})
             continue
@@ -251,9 +260,7 @@ def reconcile(broker: Any) -> dict[str, Any]:
             new_legs = []
             for leg in structure.legs:
                 held = legs_at_broker.get(leg.symbol)
-                new_legs.append(
-                    leg.model_copy(update={"mid": held[1]}) if held else leg
-                )
+                new_legs.append(leg.model_copy(update={"mid": held[1]}) if held else leg)
             corrected_structure = structure.model_copy(
                 update={
                     "qty": true_qty,
@@ -328,8 +335,11 @@ def reconcile(broker: Any) -> dict[str, Any]:
                         f"Late fill reconciled — {structure_id} filled at the broker "
                         f"after submission and is now recorded as an open position.",
                         symbol=order.symbol,
-                        detail={"structure_id": structure_id, "kind": "late_fill_opened",
-                                "order": order.client_order_id},
+                        detail={
+                            "structure_id": structure_id,
+                            "kind": "late_fill_opened",
+                            "order": order.client_order_id,
+                        },
                     )
                     report["corrected"].append(
                         {"structure_id": structure_id, "action": "late_fill_opened"}
@@ -344,8 +354,12 @@ def reconcile(broker: Any) -> dict[str, Any]:
                     f"unfilled — no position resulted. The submission entry above "
                     f"stands; it does not count as a fill.",
                     symbol=order.symbol,
-                    detail={"structure_id": structure_id, "kind": "submission_died",
-                            "order": order.client_order_id, "status": status},
+                    detail={
+                        "structure_id": structure_id,
+                        "kind": "submission_died",
+                        "order": order.client_order_id,
+                        "status": status,
+                    },
                 )
                 report["corrected"].append(
                     {"structure_id": structure_id, "action": "submission_died"}
@@ -383,8 +397,11 @@ def reconcile(broker: Any) -> dict[str, Any]:
                     f"{row.id} is still open at the broker and the record has been "
                     f"reopened. Exit rules will re-evaluate it next cycle.",
                     symbol=row.symbol,
-                    detail={"structure_id": row.id, "close_order": latest.client_order_id,
-                            "kind": "close_unfilled_reopened"},
+                    detail={
+                        "structure_id": row.id,
+                        "close_order": latest.client_order_id,
+                        "kind": "close_unfilled_reopened",
+                    },
                 )
                 report["corrected"].append(
                     {"structure_id": row.id, "action": "close_unfilled_reopened"}
@@ -412,8 +429,12 @@ def reconcile(broker: Any) -> dict[str, Any]:
             f"submission poll and was reconciled without its fill price; the "
             f"figure above is the broker's, not an estimate.",
             symbol=row.symbol,
-            detail={"structure_id": row.id, "kind": "realized_backfilled",
-                    "realized_pnl": realized, "rule": rule},
+            detail={
+                "structure_id": row.id,
+                "kind": "realized_backfilled",
+                "realized_pnl": realized,
+                "rule": rule,
+            },
         )
         report["corrected"].append({"structure_id": row.id, "action": "realized_backfilled"})
 
@@ -423,7 +444,7 @@ def reconcile(broker: Any) -> dict[str, Any]:
         from skew.risk.authority import sync_closed_trades
 
         sync_closed_trades()
-    except Exception:  # noqa: BLE001 — credit sync must not stop reconciliation
+    except Exception:
         log.exception("closed-trade credit sync raised")
 
     return report
@@ -439,9 +460,7 @@ def _recover_realized(broker: Any, row: PositionRow) -> tuple[float, str] | None
         # exit.py's record dict) with intent CLOSE — not under "<id>:CLOSE".
         closes = list(
             session.scalars(
-                select(OrderRow).where(
-                    OrderRow.structure_id == row.id, OrderRow.intent == "CLOSE"
-                )
+                select(OrderRow).where(OrderRow.structure_id == row.id, OrderRow.intent == "CLOSE")
             ).all()
         )
         for order in closes:

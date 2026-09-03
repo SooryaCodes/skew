@@ -148,8 +148,11 @@ async def lifespan(_app: FastAPI):
 
             recon = reconcile(desk.broker)
             if recon["corrected"]:
-                log.warning("boot reconciliation corrected %d record(s): %s",
-                            len(recon["corrected"]), recon["corrected"])
+                log.warning(
+                    "boot reconciliation corrected %d record(s): %s",
+                    len(recon["corrected"]),
+                    recon["corrected"],
+                )
         except Exception:
             log.exception("boot reconciliation raised")
 
@@ -338,7 +341,6 @@ def _live_equity() -> float | None:
         return None
 
 
-
 def _drawdown_paused() -> bool:
     """Whether the drawdown circuit breaker currently halts entries."""
     try:
@@ -511,7 +513,7 @@ def _audit_query_from_params(
     date_to: str | None,
     sort: str,
     template: str | None,
-) -> "audit_query.AuditQuery":
+) -> audit_query.AuditQuery:
     return audit_query.AuditQuery(
         action=action,
         symbols=[s.strip().upper() for s in (symbols or "").split(",") if s.strip()],
@@ -1002,8 +1004,6 @@ def post_kill(
     return {"kill_switch": settings.kill_switch, "at": datetime.now(UTC).isoformat()}
 
 
-
-
 # 60s cache for the strategy page's gate tallies — the record is a few
 # thousand rows and the page is public.
 _GATE_TALLY_CACHE: dict[str, Any] = {"at": 0.0, "value": None}
@@ -1203,8 +1203,13 @@ def post_close(
         symbol=row.symbol,
         structure_id=structure_id,
         order_id=order["client_order_id"],
-        detail={"rule": rule, "qty_closed": close_qty, "realized_pnl": realized,
-                "fill_confirmed": filled, "operator": True},
+        detail={
+            "rule": rule,
+            "qty_closed": close_qty,
+            "realized_pnl": realized,
+            "fill_confirmed": filled,
+            "operator": True,
+        },
     )
     return {
         "structure_id": structure_id,

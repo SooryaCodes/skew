@@ -23,7 +23,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, datetime, time
 from typing import Any
 
 from sqlalchemy import select
@@ -232,7 +232,8 @@ def group_rows(rows: list[DecisionRow], filled_ids: set[str] | None = None) -> l
 
     # A run of one is just a decision.
     return [
-        {"type": "decision", **item["sample"]} if item["type"] == "run" and item["count"] == 1
+        {"type": "decision", **item["sample"]}
+        if item["type"] == "run" and item["count"] == 1
         else item
         for item in items
     ]
@@ -266,12 +267,9 @@ def summarise(rows: list[DecisionRow], filled_ids: set[str] | None = None) -> di
         "refused": counts["REFUSED"],
         "abstained": counts["ABSTAINED"],
         "by_gate": [
-            {"gate": gate, "count": n}
-            for gate, n in sorted(by_gate.items(), key=lambda kv: -kv[1])
+            {"gate": gate, "count": n} for gate, n in sorted(by_gate.items(), key=lambda kv: -kv[1])
         ],
-        "per_day": [
-            {"date": day, "count": n} for day, n in sorted(per_day.items())
-        ],
+        "per_day": [{"date": day, "count": n} for day, n in sorted(per_day.items())],
         "top_refused": (
             {"symbol": top_refused[0], "count": top_refused[1]} if top_refused else None
         ),
@@ -311,7 +309,10 @@ def run_query(
         "total_items": total_items,
         "offset": offset,
         "limit": limit,
-        "range": {"first": min(all_ts) if all_ts else None, "last": max(all_ts) if all_ts else None},
+        "range": {
+            "first": min(all_ts) if all_ts else None,
+            "last": max(all_ts) if all_ts else None,
+        },
     }
 
 
@@ -320,22 +321,36 @@ def export_csv_rows(query: AuditQuery) -> list[list[str]]:
     rows = apply_text_filters(load_rows(query), query)
     if not query.action:  # the full record keeps its era markers
         rows = merge_by_time(rows, load_config_rows(query), query.sort)
-    out = [["ts", "action", "symbol", "structure", "failing_gates", "reason",
-            "model_rationale", "order_id", "risk_tier", "id"]]
+    out = [
+        [
+            "ts",
+            "action",
+            "symbol",
+            "structure",
+            "failing_gates",
+            "reason",
+            "model_rationale",
+            "order_id",
+            "risk_tier",
+            "id",
+        ]
+    ]
     for r in rows:
         detail = r.detail or {}
-        out.append([
-            _ts(r),
-            r.action,
-            r.symbol or "",
-            str(detail.get("kind") or ""),
-            "|".join(failing_gates(detail)),
-            r.reason,
-            r.model_rationale or "",
-            r.order_id or "",
-            str(r.risk_tier),
-            r.id,
-        ])
+        out.append(
+            [
+                _ts(r),
+                r.action,
+                r.symbol or "",
+                str(detail.get("kind") or ""),
+                "|".join(failing_gates(detail)),
+                r.reason,
+                r.model_rationale or "",
+                r.order_id or "",
+                str(r.risk_tier),
+                r.id,
+            ]
+        )
     return out
 
 

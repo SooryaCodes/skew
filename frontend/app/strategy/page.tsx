@@ -43,6 +43,56 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+/**
+ * The decision lifecycle, drawn with the page's own tokens: the spine is one
+ * cycle, every branch exits into the audit log. The same picture lives in the
+ * repository README as Mermaid; here it uses the site's system.
+ */
+function Lifecycle() {
+  const gates = ["liquidity", "earnings", "term", "stress", "budget"];
+  const Node = ({ children, exit }: { children: React.ReactNode; exit?: string }) => (
+    <div className="flex items-center gap-3">
+      <div className="mono w-64 shrink-0 rounded-[var(--radius)] border border-[color:var(--line)] px-3 py-1.5 text-[12px] text-[color:var(--text)]">
+        {children}
+      </div>
+      {exit && (
+        <span className="mono text-[11px] text-[color:var(--negative)]">
+          ✗ {exit} → logged
+        </span>
+      )}
+    </div>
+  );
+  const Drop = () => (
+    <div className="mono pl-8 text-[11px] leading-none text-[color:var(--text-faint)]" aria-hidden>
+      ↓
+    </div>
+  );
+  return (
+    <div className="space-y-1 py-3" role="img" aria-label="One decision cycle, from scan to outcome; every branch ends in the audit log">
+      <Node>scan universe · measure IV, RV, VRP, term</Node>
+      <Drop />
+      <Node exit="no edge, or stressed — abstain">classify regime · sell vol / buy vol</Node>
+      <Drop />
+      <Node exit="nothing fits the budget — abstain">build defined-risk candidates, sized backwards from the budget</Node>
+      <Drop />
+      {gates.map((gate, i) => (
+        <div key={gate} className="space-y-1">
+          <Node exit="refused">{`gate ${i + 1} · ${gate}`}</Node>
+          <Drop />
+        </div>
+      ))}
+      <Node exit="abstains, or answers malformed — abstain">bounded selector · one offered ID, or abstain</Node>
+      <Drop />
+      <Node exit="market moved — refused">pre-flight · every gate re-run on fresh quotes</Node>
+      <Drop />
+      <Node>one atomic multi-leg order → broker-confirmed fill</Node>
+      <p className="mono pt-1.5 text-[11px] text-[color:var(--text-dim)]">
+        every path — fill, refusal, abstention, correction — terminates in the audit log
+      </p>
+    </div>
+  );
+}
+
 const GATE_COPY: Record<string, { blocks: string; why: string }> = {
   liquidity: {
     blocks: "Illiquid contracts — thin open interest or wide bid-ask spreads.",
@@ -171,6 +221,9 @@ export default function StrategyPage() {
                 the model is asked anything. Every result — pass or fail — is in
                 the audit record; the counts below are tallied from it.
               </p>
+              <div className="overflow-x-auto">
+                <Lifecycle />
+              </div>
               {strategy.gates.order.map((gate, i) => {
                 const tally = strategy.gates.tallies[gate];
                 const copy = GATE_COPY[gate];

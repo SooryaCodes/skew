@@ -1,6 +1,6 @@
 # SKEW — an autonomous volatility desk
 
-[![ci](https://github.com/USER/skew/actions/workflows/ci.yml/badge.svg)](https://github.com/USER/skew/actions/workflows/ci.yml)
+[![ci](https://github.com/SooryaCodes/skew/actions/workflows/ci.yml/badge.svg)](https://github.com/SooryaCodes/skew/actions/workflows/ci.yml)
 
 **SKEW never predicts price direction.** It measures the gap between implied and
 realized volatility — the variance risk premium — and takes defined-risk options
@@ -80,6 +80,38 @@ that](backend/tests/test_vol_signal.py).
                    └─────────────────────────────────────────┘
 ```
 
+One cycle, end to end — every path terminates in the audit log, which is why
+any decision in it can be traced to the branch that produced it:
+
+```mermaid
+flowchart TD
+    A[scan universe<br/>chains, bars, IV off the snapshot] --> B[measure<br/>RV, IV, VRP, term structure]
+    B --> C{classify regime}
+    C -- "VRP &ge; +4.0" --> S[SELL_VOL]
+    C -- "VRP &le; &minus;2.0" --> BV[BUY_VOL]
+    C -- "in between, or RV percentile stressed" --> AB1([abstain &mdash; logged])
+    S --> D[build defined-risk candidates<br/>sized backwards from the budget]
+    BV --> D
+    D -- "nothing buildable inside the budget" --> AB2([abstain &mdash; logged])
+    D --> G1{liquidity}
+    G1 -- fail --> R([refused &mdash; logged with the full chain])
+    G1 -- pass --> G2{earnings}
+    G2 -- fail --> R
+    G2 -- pass --> G3{term}
+    G3 -- fail --> R
+    G3 -- pass --> G4{stress<br/>84 scenarios}
+    G4 -- fail --> R
+    G4 -- pass --> G5{budget<br/>per-trade &middot; portfolio &middot; count}
+    G5 -- fail --> R
+    G5 -- pass --> SEL{bounded selector}
+    SEL -- "abstain, or anything malformed" --> AB3([abstain &mdash; logged])
+    SEL -- "one ID from the offered list" --> PF{pre-flight<br/>re-run every gate on fresh quotes}
+    PF -- "market moved" --> R
+    PF -- pass --> X[ONE atomic multi-leg order]
+    X -- "broker confirms the fill" --> P([position opened &mdash; logged])
+    X -- "expires or dies unfilled" --> K([reconciled &mdash; correction logged])
+```
+
 Full module map in [docs/01-ARCHITECTURE.md](docs/01-ARCHITECTURE.md).
 
 ---
@@ -120,6 +152,26 @@ one of exactly two outcomes: an ID from the list it was given, or abstain.
 | Times out, errors, or is unreachable | Abstains — the desk does not trade when the selection step is down |
 | Is given an empty candidate list | Abstains **without calling the model at all** |
 
+```mermaid
+flowchart LR
+    subgraph DESK["deterministic code &mdash; holds everything"]
+        DATA[market data] --> GATES[gate chain]
+        GATES --> CAND[pre-validated<br/>candidate list]
+        EXEC[execution path<br/>atomic mleg orders]
+        KEYS[(broker +<br/>credentials)]
+        EXEC --- KEYS
+    end
+    subgraph MODEL["the model &mdash; holds nothing"]
+        LLM[bounded selector]
+    end
+    CAND -- "serialised candidates,<br/>nothing else" --> LLM
+    LLM -- "one offered ID,<br/>or abstain" --> EXEC
+```
+
+The model's only inbound line is the candidate list and its only outbound line
+is a choice. There is no edge from the model to the broker, the credentials, or
+the account — not a guarded one; none.
+
 Its free-text rationale is stored and displayed but **never parsed for
 instructions**. There is no string the model can emit that causes anything other
 than one of the N+1 outcomes the risk engine already sanctioned. 26 tests defend
@@ -133,6 +185,20 @@ this boundary in
 | 0 | 0.5% of equity | default | — |
 | 1 | 1.0% | 3 closed trades, no breach | any breach |
 | 2 | 2.0% | 6 closed trades, drawdown < 3% | breach, or drawdown > 3% |
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> T0
+    T0: tier 0 &mdash; 0.5% per trade
+    T1: tier 1 &mdash; 1.0% per trade
+    T2: tier 2 &mdash; 2.0% per trade
+    T0 --> T1: 3 clean closed trades, no breach
+    T1 --> T2: 6 clean closed trades, drawdown under 3%
+    T1 --> T0: any breach
+    T2 --> T0: any breach
+    T2 --> T1: drawdown over 3%
+```
 
 A breach demotes to **tier 0**, not one step down, and is not forgiven by later
 clean trades — "wait long enough and it stops counting" is not a risk policy.
@@ -165,6 +231,17 @@ asks a different question of each side:
   test would refuse every debit spread ever built, because an adverse move takes
   80–100% of a debit spread's premium at *every* volatility level. That is the
   structure working as designed, not a defect.
+
+The grid itself: seven price shocks by four IV shocks, repriced at three points
+in time — 7 × 4 × 3 = 84 cells per candidate. One time slice, with the cell
+that produced the refusal quoted below marked:
+
+| MID slice (of NOW · MID · EXPIRY) | −3σ | −2σ | **−1σ** | 0 | +1σ | +2σ | +3σ |
+|---|---|---|---|---|---|---|---|
+| IV × 0.7 | · | · | **✗ breach** | · | · | · | · |
+| IV × 1.0 | · | · | · | · | · | · | · |
+| IV × 1.5 | · | · | · | · | · | · | · |
+| IV × 2.0 | · | · | · | · | · | · | · |
 
 A real refusal, rendered verbatim in the UI:
 
@@ -227,7 +304,7 @@ submitted. `python -m skew.cli account` reports it.
 cd backend && pytest
 ```
 
-**344 tests.** Not coverage theatre — each one maps to a way the system could be
+**390 tests.** Not coverage theatre — each one maps to a way the system could be
 wrong about money.
 
 | Area | What is actually pinned |
@@ -319,7 +396,7 @@ backend/skew/     the desk — 49 modules
   risk/           the earned tier state machine
   audit/          append-only decision log
   loop.py         the cycle · api.py · mcp_server.py · cli.py
-backend/tests/    344 tests, real captured fixtures
+backend/tests/    390 tests, real captured fixtures
 frontend/         Next.js 15, TypeScript strict, Tailwind v4
 docs/             the specification
 ```

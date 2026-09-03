@@ -63,8 +63,6 @@ def closing_order_id(structure: Structure, when: datetime | None = None) -> str:
     return f"skewX-{structure.symbol}-{stamp}-{tail}"[:64]
 
 
-
-
 RESTING_OR_FILLED = {"new", "accepted", "pending_new", "partially_filled", "held", "filled"}
 
 
@@ -72,19 +70,17 @@ def _duplicate_of(structure: Structure) -> str | None:
     """A reason string when this structure is already open or already has a
     live opening order; None when it is genuinely new. Checked BEFORE the
     order goes out — the client-order-id is the backstop, not the guard."""
+    from sqlalchemy import select
+
     from skew.audit.models import OrderRow, PositionRow
     from skew.db import session_scope
-
-    from sqlalchemy import select
 
     with session_scope() as session:
         row = session.get(PositionRow, structure.id)
         if row is not None and row.is_open:
             return f"position {structure.id} is already open"
         orders = session.scalars(
-            select(OrderRow).where(
-                OrderRow.structure_id == structure.id, OrderRow.intent == "OPEN"
-            )
+            select(OrderRow).where(OrderRow.structure_id == structure.id, OrderRow.intent == "OPEN")
         ).all()
         for order in orders:
             if (order.status or "").lower() in RESTING_OR_FILLED:

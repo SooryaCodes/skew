@@ -94,7 +94,6 @@ ACCOUNT: dict[str, str | float | None] = {
 }
 
 
-
 def breaker_engaged(risk, settings: Settings) -> bool:
     """The drawdown circuit breaker, pure and testable.
 
@@ -504,8 +503,11 @@ def _monitor(desk: Desk, dry_run: bool, settings: Settings):
     try:
         report = reconcile(desk.broker)
         if report["corrected"]:
-            log.warning("reconciliation corrected %d record(s): %s",
-                        len(report["corrected"]), report["corrected"])
+            log.warning(
+                "reconciliation corrected %d record(s): %s",
+                len(report["corrected"]),
+                report["corrected"],
+            )
     except Exception:  # a failed reconcile pass must not stop monitoring
         log.exception("reconciliation pass raised")
 
@@ -535,8 +537,10 @@ def _monitor(desk: Desk, dry_run: bool, settings: Settings):
             continue
 
         if _close_already_resting(action["structure_id"]):
-            log.info("close for %s already resting at the broker; not resubmitting",
-                     action["structure_id"])
+            log.info(
+                "close for %s already resting at the broker; not resubmitting",
+                action["structure_id"],
+            )
             continue
 
         try:
@@ -564,9 +568,7 @@ def _monitor(desk: Desk, dry_run: bool, settings: Settings):
         # a close is a submission until then, exactly like an open.
         filled = _await_fill(desk.broker, order["client_order_id"])
         if filled:
-            monitor.record_close(
-                action["structure_id"], action["unrealized_pnl"], action["reason"]
-            )
+            monitor.record_close(action["structure_id"], action["unrealized_pnl"], action["reason"])
             # A position closed on the loss limit is not a gate breach — the
             # gates held and the structure stayed inside its defined risk.
             # Only a genuine breach demotes.
@@ -577,8 +579,7 @@ def _monitor(desk: Desk, dry_run: bool, settings: Settings):
                 reason=(
                     f"Closed on {action['rule']}: {action['reason']}"
                     if filled
-                    else f"Submitted close on {action['rule']} — awaiting fill: "
-                    f"{action['reason']}"
+                    else f"Submitted close on {action['rule']} — awaiting fill: {action['reason']}"
                 ),
                 risk_tier=tier,
                 symbol=action["symbol"],

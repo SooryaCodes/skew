@@ -204,8 +204,10 @@ def test_reconcile_entry_sign_and_max_loss_scaling():
     from tests.test_gates import make_candidate
 
     structure = make_candidate().structure
-    legs = {leg.symbol: (leg.signed_ratio * 2.0, 14.5 if leg.side == "BUY" else 9.5)
-            for leg in structure.legs}
+    legs = {
+        leg.symbol: (leg.signed_ratio * 2.0, 14.5 if leg.side == "BUY" else 9.5)
+        for leg in structure.legs
+    }
     entry = _true_entry(structure, legs, 2)
     # BUY leg 14.5, SELL leg 9.5 -> value +5.00/share -> net_credit -1000 for 2
     assert entry == -1000.0
@@ -250,23 +252,51 @@ def test_committed_dollars_counts_resting_order_risk(tmp_path, monkeypatch):
     from skew.risk.authority import committed_dollars
 
     with session_scope() as session:
-        session.add(PositionRow(
-            id="T:OPEN:1", symbol="T", kind="PUT_CREDIT",
-            qty=1, entry_credit=50.0, max_loss=200.0, is_open=True,
-            legs=[], structure={},
-        ))
-        session.add(OrderRow(
-            client_order_id="skew-resting-risk-test", symbol="T2",
-            structure_id="T2:RESTING:1", kind="PUT_CREDIT", intent="OPEN",
-            qty=1, limit_price=-0.5, net_credit=50.0, max_loss=300.0,
-            status="new", legs=[], detail={},
-        ))
-        session.add(OrderRow(
-            client_order_id="skew-dead-risk-test", symbol="T3",
-            structure_id="T3:DEAD:1", kind="PUT_CREDIT", intent="OPEN",
-            qty=1, limit_price=-0.5, net_credit=50.0, max_loss=999.0,
-            status="expired", legs=[], detail={},
-        ))
+        session.add(
+            PositionRow(
+                id="T:OPEN:1",
+                symbol="T",
+                kind="PUT_CREDIT",
+                qty=1,
+                entry_credit=50.0,
+                max_loss=200.0,
+                is_open=True,
+                legs=[],
+                structure={},
+            )
+        )
+        session.add(
+            OrderRow(
+                client_order_id="skew-resting-risk-test",
+                symbol="T2",
+                structure_id="T2:RESTING:1",
+                kind="PUT_CREDIT",
+                intent="OPEN",
+                qty=1,
+                limit_price=-0.5,
+                net_credit=50.0,
+                max_loss=300.0,
+                status="new",
+                legs=[],
+                detail={},
+            )
+        )
+        session.add(
+            OrderRow(
+                client_order_id="skew-dead-risk-test",
+                symbol="T3",
+                structure_id="T3:DEAD:1",
+                kind="PUT_CREDIT",
+                intent="OPEN",
+                qty=1,
+                limit_price=-0.5,
+                net_credit=50.0,
+                max_loss=999.0,
+                status="expired",
+                legs=[],
+                detail={},
+            )
+        )
     try:
         committed, count = committed_dollars()
         assert committed >= 500.0  # 200 open + 300 resting
@@ -275,7 +305,11 @@ def test_committed_dollars_counts_resting_order_risk(tmp_path, monkeypatch):
         assert committed < 999.0 or committed - 500.0 < 499.0
     finally:
         with session_scope() as session:
-            for model, key in ((PositionRow, "T:OPEN:1"), (OrderRow, "skew-resting-risk-test"), (OrderRow, "skew-dead-risk-test")):
+            for model, key in (
+                (PositionRow, "T:OPEN:1"),
+                (OrderRow, "skew-resting-risk-test"),
+                (OrderRow, "skew-dead-risk-test"),
+            ):
                 row = session.get(model, key)
                 if row is not None:
                     session.delete(row)

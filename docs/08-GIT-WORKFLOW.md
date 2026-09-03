@@ -54,7 +54,7 @@ At the end of each phase:
 1. Run the tests
 2. Run ruff
 3. Commit
-4. Write two lines in `PROGRESS.md`: what works now, what's known broken
+4. Write two lines in `docs/PROGRESS.md`: what works now, what's known broken
 
-`PROGRESS.md` is committed. It's a running build log, and it's genuinely useful
+`docs/PROGRESS.md` is committed. It's a running build log, and it's genuinely useful
 when you're writing the README at 2am on Sep 4.

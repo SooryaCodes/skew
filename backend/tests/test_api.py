@@ -114,20 +114,25 @@ def test_audit_counts_report_the_ratio(client):
     audit.record(action="REFUSED", reason="b", risk_tier=0)
     _filled_order("skew-counts-test")
     audit.record(action="EXECUTED", reason="c", risk_tier=0, order_id="skew-counts-test")
-    audit.record(action="EXECUTED", reason="unfilled submission", risk_tier=0,
-                 order_id="skew-never-filled")
+    audit.record(
+        action="EXECUTED", reason="unfilled submission", risk_tier=0, order_id="skew-never-filled"
+    )
 
     counts = client.get("/api/audit/counts").json()
     assert counts["REFUSED"] >= 2
     assert counts["EXECUTED"] >= 1  # the filled one counts...
     # ...and the unfilled submission does not add to it: fills come only from
     # order rows the broker marked filled.
-    from skew.audit.models import OrderRow
-    from skew.db import session_scope
     from sqlalchemy import select
 
+    from skew.audit.models import OrderRow
+    from skew.db import session_scope
+
     with session_scope() as session:
-        filled = {c for (c,) in session.execute(select(OrderRow.client_order_id).where(OrderRow.status == "filled")).all()}
+        rows = session.execute(
+            select(OrderRow.client_order_id).where(OrderRow.status == "filled")
+        ).all()
+        filled = {c for (c,) in rows}
     assert "skew-never-filled" not in filled
 
 

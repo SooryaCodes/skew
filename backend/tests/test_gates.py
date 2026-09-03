@@ -622,8 +622,13 @@ def test_shallow_inversion_is_noise_not_stress():
     from skew.vol.term import TermStructure
 
     shallow = TermStructure(
-        symbol="AAPL", near_iv=0.251, far_iv=0.244, near_dte=10, far_dte=75,
-        slope=-0.007, backwardation_floor=0.015,
+        symbol="AAPL",
+        near_iv=0.251,
+        far_iv=0.244,
+        near_dte=10,
+        far_dte=75,
+        slope=-0.007,
+        backwardation_floor=0.015,
         points=[],
     )
     assert not shallow.is_backwardation
