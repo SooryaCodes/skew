@@ -50,7 +50,7 @@ function AccountStrip() {
 
 const MAX_TIER = 2;
 
-function TierPips({ tier }: { tier: number }) {
+export function TierPips({ tier }: { tier: number }) {
   return (
     <span className="inline-flex gap-1" aria-hidden>
       {Array.from({ length: MAX_TIER + 1 }, (_, i) => (

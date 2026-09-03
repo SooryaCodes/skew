@@ -7,9 +7,18 @@
  * landing view is the decision surface and this is behind a tab. That is a
  * design argument, not an oversight: leading with a P&L number over a few days
  * of paper trading would be leading with noise.
+ *
+ * Presentation rules, in the desk's own system: open positions read as cards
+ * (a position is a thing you own, not a row), the closed record stays a table
+ * (a record is a thing you scan). Every leg is labelled with its side and, on
+ * credit structures, which leg is the protection — the defined-risk claim made
+ * visible rather than asserted. No token, colour or component exists only here.
  */
 
+import Link from "next/link";
+
 import { Header } from "@/components/Header";
+import { TierPips } from "@/components/RiskPanel";
 import { contractLabel, dollars, money, structureLabel, timeAgo } from "@/lib/format";
 import { useClosedPositions, usePositions, useRisk, useStatus } from "@/lib/api";
 import type { Position, SystemStatus } from "@/lib/types";
@@ -21,33 +30,235 @@ function daysHeld(position: Position): string {
   return days < 1 ? `${Math.max(1, Math.round(days * 24))}h` : `${days.toFixed(1)}d`;
 }
 
-/** This position's OWN exit conditions, in dollars, from the standing rules. */
-function exitConditions(position: Position, status?: SystemStatus): string {
-  const rules = status?.exit_rules;
-  if (!rules) return "profit target · loss limit · dte";
-  const parts: string[] = [];
-  if (position.entry_credit > 0) {
-    parts.push(
-      `tp +${dollars(position.entry_credit * rules.profit_target_pct, 0)} (${Math.round(rules.profit_target_pct * 100)}%)`,
-    );
-    parts.push(`sl −${dollars(position.entry_credit * rules.loss_limit_multiple, 0)}`);
-  } else {
-    parts.push(`tp ${Math.round(rules.profit_target_pct * 100)}% of max profit`);
-  }
-  parts.push(`dte ≤ ${rules.exit_dte_threshold}`);
-  parts.push("short-ITM defence");
-  return parts.join(" · ");
+/** Strike parsed from an OCC symbol, for ordering and side inference. */
+function occStrike(symbol: string): number {
+  const match = /(\d{8})$/.exec(symbol);
+  return match ? Number(match[1]) / 1000 : 0;
 }
 
+/**
+ * Which side each leg is on, derived from the structure kind and strikes.
+ * Pure presentation: the sides are fixed by construction for every structure
+ * the desk trades (the short leg of a put credit is the higher strike, of a
+ * call credit the lower, condors short the inner strikes, debit spreads long
+ * the nearer-the-money strike).
+ */
+function legSides(position: Position): Array<{ symbol: string; side: "SELL" | "BUY" }> {
+  const legs = [...position.legs].sort((a, b) => occStrike(a) - occStrike(b));
+  const kind = position.kind ?? "";
+  const bySide = (short: Set<string>) =>
+    legs.map((symbol) => ({
+      symbol,
+      side: (short.has(symbol) ? "SELL" : "BUY") as "SELL" | "BUY",
+    }));
+
+  if (kind === "PUT_CREDIT" && legs.length === 2) return bySide(new Set([legs[1]!]));
+  if (kind === "CALL_CREDIT" && legs.length === 2) return bySide(new Set([legs[0]!]));
+  if (kind === "CALL_DEBIT" && legs.length === 2) return bySide(new Set([legs[1]!]));
+  if (kind === "PUT_DEBIT" && legs.length === 2) return bySide(new Set([legs[0]!]));
+  if (kind === "IRON_CONDOR" && legs.length === 4)
+    return bySide(new Set([legs[1]!, legs[2]!]));
+  return legs.map((symbol) => ({ symbol, side: "BUY" as const }));
+}
+
+/** Long wings cap the short legs on credit structures — name that plainly. */
+function isProtection(position: Position, side: "SELL" | "BUY"): boolean {
+  return side === "BUY" && position.entry_credit > 0;
+}
+
+/**
+ * The exit rules as chips, with the rule closest to firing carrying the
+ * accent. Proximity is the displayed figures' own arithmetic — fraction of
+ * the trigger already travelled — computed from nothing the page does not
+ * already show.
+ */
+function exitChips(
+  position: Position,
+  status?: SystemStatus,
+): Array<{ label: string; near: boolean }> {
+  const rules = status?.exit_rules;
+  if (!rules) {
+    return ["profit target", "loss limit", "dte", "short-ITM defence"].map((label) => ({
+      label,
+      near: false,
+    }));
+  }
+  const scores: Array<{ label: string; score: number }> = [];
+  if (position.entry_credit > 0) {
+    const target = position.entry_credit * rules.profit_target_pct;
+    const limit = position.entry_credit * rules.loss_limit_multiple;
+    scores.push({
+      label: `tp +${dollars(target, 0)} (${Math.round(rules.profit_target_pct * 100)}%)`,
+      score: target > 0 ? Math.max(0, position.unrealized_pnl / target) : 0,
+    });
+    scores.push({
+      label: `sl −${dollars(limit, 0)} (${rules.loss_limit_multiple}x)`,
+      score: limit > 0 ? Math.max(0, -position.unrealized_pnl / limit) : 0,
+    });
+  } else {
+    scores.push({
+      label: `tp ${Math.round(rules.profit_target_pct * 100)}% of max profit`,
+      score: 0,
+    });
+  }
+  scores.push({
+    label: `dte ≤ ${rules.exit_dte_threshold}`,
+    score: position.dte > 0 ? rules.exit_dte_threshold / position.dte : 1,
+  });
+  scores.push({ label: "short-ITM defence", score: 0 });
+
+  const nearest = scores.reduce((a, b) => (b.score > a.score ? b : a));
+  return scores.map(({ label, score }) => ({
+    label,
+    near: score > 0 && label === nearest.label,
+  }));
+}
+
+/** Human wording for every close rule — the machine name never renders. */
 const EXIT_LABEL: Record<string, string> = {
-  profit_target: "profit target",
-  loss_limit: "loss limit",
-  dte: "dte threshold",
-  deadline: "deadline",
-  short_itm: "assignment defence",
-  duplicate_correction: "duplicate correction",
-  reconciled_closed_at_broker: "closed at broker",
+  profit_target: "Profit target",
+  loss_limit: "Loss limit",
+  dte: "DTE threshold",
+  deadline: "Deadline",
+  short_itm: "Assignment defence",
+  duplicate_correction: "Duplicate correction",
+  reconciled_closed_at_broker: "Closed at broker",
+  breach: "Breach",
 };
+
+/** The symbol mark: a monogram tile in the app's accent. Always renders —
+ *  never a broken image, never an empty box. */
+function SymbolMark({ symbol, size = 30 }: { symbol: string; size?: number }) {
+  return (
+    <span
+      aria-hidden
+      className="mono inline-flex shrink-0 items-center justify-center font-bold"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "var(--radius)",
+        background: "color-mix(in srgb, var(--accent) 14%, transparent)",
+        color: "var(--accent)",
+        fontSize: size * 0.4,
+        letterSpacing: "-0.02em",
+      }}
+    >
+      {symbol.slice(0, size >= 30 ? 4 : 3)}
+    </span>
+  );
+}
+
+/** One labelled figure of the header strip — the desk's label-over-value idiom. */
+function Figure({ label, value, tone }: { label: string; value: React.ReactNode; tone?: string }) {
+  return (
+    <div>
+      <p className="mono text-[12px] uppercase tracking-widest text-[color:var(--text-dim)]">
+        {label}
+      </p>
+      <p
+        className="mono mt-0.5 text-[17px] font-semibold tabular-nums"
+        style={tone ? { color: tone } : undefined}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function ExitChip({ label, near }: { label: string; near: boolean }) {
+  return (
+    <span
+      className="mono whitespace-nowrap rounded-full border px-2.5 py-1 text-[12px] font-semibold"
+      style={{
+        borderColor: near ? "var(--accent)" : "var(--line)",
+        background: near ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent",
+        color: near ? "var(--text)" : "var(--text-dim)",
+      }}
+      title={near ? "The rule currently closest to firing" : undefined}
+    >
+      {label}
+    </span>
+  );
+}
+
+function PositionCard({ position, status }: { position: Position; status?: SystemStatus }) {
+  const pnlColor = position.unrealized_pnl >= 0 ? "var(--verdigris)" : "var(--brass)";
+  return (
+    <article className="panel p-4">
+      {/* header — symbol, structure, dte; unrealised carries the weight */}
+      <div className="flex items-center gap-2.5">
+        <SymbolMark symbol={position.symbol} />
+        <div className="min-w-0">
+          <p className="text-[15px] font-bold tracking-tight text-[color:var(--text)]">
+            {position.symbol}
+            <span className="font-normal text-[color:var(--text-dim)]">
+              {" "}
+              · {position.kind ? structureLabel(position.kind) : "—"} · {position.dte} DTE
+            </span>
+          </p>
+        </div>
+        <p
+          className="mono ml-auto shrink-0 text-[19px] font-semibold tabular-nums"
+          style={{ color: pnlColor }}
+        >
+          {money(position.unrealized_pnl)}
+        </p>
+      </div>
+
+      {/* legs — the same side dots the candidate cards use; the long wing on a
+          credit structure IS the defined risk, so it says so */}
+      <ul className="mt-3 space-y-1 border-t border-[color:var(--line)] pt-3">
+        {legSides(position).map(({ symbol, side }) => (
+          <li key={symbol} className="flex items-baseline gap-2 text-[13px]">
+            <span className="flex w-11 shrink-0 items-center gap-1">
+              <span
+                className="inline-block h-[6px] w-[6px] shrink-0"
+                style={{
+                  background: side === "SELL" ? "var(--brass)" : "var(--steel)",
+                  borderRadius: "1px",
+                }}
+                aria-hidden
+              />
+              <span className="mono uppercase text-[color:var(--text-dim)]">{side}</span>
+            </span>
+            <span className="contract flex-1 truncate text-[color:var(--text)]">
+              {contractLabel(symbol)}
+            </span>
+            <span className="mono shrink-0 text-[12px] text-[color:var(--text-faint)]">
+              {side === "SELL" ? "short leg" : isProtection(position, side) ? "long leg · protection" : "long leg"}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      {/* metrics — four columns, mono, tabular */}
+      <div className="mt-3 grid grid-cols-4 gap-2 border-t border-[color:var(--line)] pt-3">
+        {(
+          [
+            ["entry", dollars(position.entry_credit, 2)],
+            ["mark", money(position.current_value, 0)],
+            ["max loss", dollars(position.max_loss, 2)],
+            ["held", daysHeld(position)],
+          ] as const
+        ).map(([label, value]) => (
+          <div key={label}>
+            <p className="mono text-[11px] uppercase tracking-wider text-[color:var(--text-dim)]">
+              {label}
+            </p>
+            <p className="mono mt-0.5 text-[14px] tabular-nums text-[color:var(--text)]">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* exit rules as chips; the nearest one takes the accent */}
+      <div className="mt-3 flex flex-wrap gap-1.5 border-t border-[color:var(--line)] pt-3">
+        {exitChips(position, status).map((chip) => (
+          <ExitChip key={chip.label} {...chip} />
+        ))}
+      </div>
+    </article>
+  );
+}
 
 export default function PositionsPage() {
   const { data: status } = useStatus();
@@ -60,115 +271,90 @@ export default function PositionsPage() {
   const totalPnl = rows.reduce((acc, p) => acc + p.unrealized_pnl, 0);
   const totalRisk = rows.reduce((acc, p) => acc + p.max_loss, 0);
   const realizedTotal = closedRows.reduce((acc, p) => acc + (p.realized_pnl ?? 0), 0);
+  const fmt = (v: number) => `$${v.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
   return (
     <div className="flex min-h-screen flex-col">
       <Header status={status} tab="positions" />
 
       <main className="flex-1 p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-4">
-          <h1 className="font-display text-[length:var(--fs-md)]">Positions</h1>
-          <p className="mono text-[13px] text-[color:var(--text-dim)]">
-            {rows.length} open · {dollars(totalRisk)} at risk
-            {risk && ` · tier ${risk.tier}`}
-          </p>
-        </div>
-
+        <h1 className="font-display text-[length:var(--fs-md)]">Positions</h1>
         {/* Present, but not the headline. Performance over a few days is noise. */}
         <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[color:var(--text-dim)]">
           A few days of paper results are not evidence of edge. This is the
           record of what the desk actually did.
         </p>
-        <p className="mono mt-2 text-[13px] text-[color:var(--text-dim)]">
-          session · {rows.length} open · {closedRows.length} closed · unrealised{" "}
-          {money(totalPnl)} · realised {money(realizedTotal)}
-          {status?.equity != null &&
-            status?.starting_equity != null &&
-            ` · equity $${status.equity.toLocaleString("en-US", { minimumFractionDigits: 2 })} against $${status.starting_equity.toLocaleString("en-US", { minimumFractionDigits: 2 })} starting`}
-        </p>
 
+        {/* header strip — four labelled figures. Equity is a denominator for
+            the risk limits, not a scoreboard: same scale, never coloured. */}
+        <div className="panel mt-4 grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+          <Figure label="open" value={`${rows.length} · ${dollars(totalRisk)} at risk`} />
+          <Figure
+            label="unrealised"
+            value={money(totalPnl)}
+            tone={totalPnl >= 0 ? "var(--verdigris)" : "var(--brass)"}
+          />
+          <Figure
+            label="realised"
+            value={money(realizedTotal)}
+            tone={realizedTotal >= 0 ? "var(--verdigris)" : "var(--brass)"}
+          />
+          <Figure
+            label="equity vs starting"
+            value={
+              status?.equity != null && status?.starting_equity != null
+                ? `${fmt(status.equity)} / ${fmt(status.starting_equity)}`
+                : "—"
+            }
+          />
+        </div>
+
+        {/* tier progress — the mechanism lives where the closes that earn it live */}
+        {risk && (
+          <div className="panel mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5">
+            <span className="flex items-center gap-2">
+              <span className="font-display text-[15px]">Tier {risk.tier}</span>
+              <TierPips tier={risk.tier} />
+            </span>
+            <span className="mono text-[13px] text-[color:var(--text-dim)]">
+              {(risk.max_loss_pct * 100).toFixed(1)}% per trade ·{" "}
+              {(risk.portfolio_pct * 100).toFixed(1)}% deployed
+            </span>
+            <span className="mono ml-auto text-[13px] text-[color:var(--text-dim)]">
+              {risk.next_promotion}
+            </span>
+          </div>
+        )}
+
+        {/* open positions as cards */}
         {rows.length === 0 ? (
           <p className="mt-6 text-sm text-[color:var(--text-dim)]">
             {isLoading
               ? "Loading positions."
-              : "No open positions. The desk holds nothing until a candidate clears every gate and the bounded selector picks it."}
+              : "No open positions. The desk opens one when a candidate clears every gate and the budget has room."}
           </p>
         ) : (
-          <div className="panel mt-4 overflow-x-auto">
-            <table className="w-full min-w-[52rem] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-[color:var(--line)]">
-                  {["symbol", "structure", "legs", "dte", "held", "entry", "mark", "unrealised", "max loss", "exit conditions"].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        scope="col"
-                        className="mono px-3 py-2 text-[12px] font-medium uppercase tracking-wider text-[color:var(--text-dim)]"
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((position) => (
-                  <tr key={position.id} className="border-b border-[color:var(--line)] last:border-0">
-                    <td className="mono px-3 py-2 text-[14px]">{position.symbol}</td>
-                    <td className="px-3 py-2 text-[14px]">
-                      {position.kind ? structureLabel(position.kind) : "—"}
-                    </td>
-                    <td className="px-3 py-2">
-                      <ul>
-                        {position.legs.map((leg) => (
-                          <li
-                            key={leg}
-                            className="contract text-[12px] text-[color:var(--text-dim)]"
-                          >
-                            {contractLabel(leg)}
-                          </li>
-                        ))}
-                      </ul>
-                    </td>
-                    <td className="mono px-3 py-2 text-[14px]">{position.dte}</td>
-                    <td className="mono px-3 py-2 text-[14px]">{daysHeld(position)}</td>
-                    <td className="mono px-3 py-2 text-[14px]">
-                      {dollars(position.entry_credit, 2)}
-                    </td>
-                    <td className="mono px-3 py-2 text-[14px] text-[color:var(--text-dim)]">
-                      {money(position.current_value, 0)}
-                    </td>
-                    <td
-                      className="mono px-3 py-2 text-[14px]"
-                      style={{
-                        // Deliberately NOT --oxide. That colour is spent on
-                        // failed gates and nothing else, losses included.
-                        color:
-                          position.unrealized_pnl >= 0 ? "var(--verdigris)" : "var(--brass)",
-                      }}
-                    >
-                      {money(position.unrealized_pnl)}
-                    </td>
-                    <td className="mono px-3 py-2 text-[14px]">
-                      {dollars(position.max_loss, 2)}
-                    </td>
-                    <td className="mono px-3 py-2 text-[12px] text-[color:var(--text-dim)]">
-                      {exitConditions(position, status)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {rows.map((position) => (
+              <PositionCard key={position.id} position={position} status={status} />
+            ))}
           </div>
         )}
 
-        {/* closed trades — the lifecycle record judges are told to look for */}
+        {/* closed trades — a record people scan stays a table */}
         <section className="mt-8" aria-label="Closed trades">
           <div className="flex flex-wrap items-baseline justify-between gap-4">
             <h2 className="font-display text-[length:var(--fs-sm)]">Closed trades</h2>
             {closedRows.length > 0 && (
               <p className="mono text-[13px] text-[color:var(--text-dim)]">
-                {closedRows.length} closed · realised {money(realizedTotal)}
+                {closedRows.length} closed · realised{" "}
+                <span
+                  style={{
+                    color: realizedTotal >= 0 ? "var(--verdigris)" : "var(--brass)",
+                  }}
+                >
+                  {money(realizedTotal)}
+                </span>
               </p>
             )}
           </div>
@@ -179,68 +365,97 @@ export default function PositionsPage() {
               and lands here with its realised P&L and the rule that closed it.
             </p>
           ) : (
-            <div className="panel mt-3 overflow-x-auto">
-              <table className="w-full min-w-[46rem] border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-[color:var(--line)]">
-                    {["symbol", "structure", "opened", "closed", "held", "entry", "realised", "closed by"].map(
-                      (h) => (
-                        <th
-                          key={h}
-                          scope="col"
-                          className="mono px-3 py-2 text-[12px] font-medium uppercase tracking-wider text-[color:var(--text-dim)]"
-                        >
-                          {h}
-                        </th>
-                      ),
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {closedRows.map((trade) => (
-                    <tr key={trade.id} className="border-b border-[color:var(--line)] last:border-0">
-                      <td className="mono px-3 py-2 text-[14px]">{trade.symbol}</td>
-                      <td className="px-3 py-2 text-[14px]">
-                        {trade.kind ? structureLabel(trade.kind) : "—"}
-                      </td>
-                      <td className="mono px-3 py-2 text-[13px] text-[color:var(--text-dim)]">
-                        {trade.opened_at ? timeAgo(trade.opened_at) : "—"}
-                      </td>
-                      <td className="mono px-3 py-2 text-[13px] text-[color:var(--text-dim)]">
-                        {trade.closed_at ? timeAgo(trade.closed_at) : "—"}
-                      </td>
-                      <td className="mono px-3 py-2 text-[14px]">
-                        {trade.days_held !== null ? `${trade.days_held}d` : "—"}
-                      </td>
-                      <td className="mono px-3 py-2 text-[14px]">
-                        {dollars(trade.entry_credit, 2)}
-                      </td>
-                      <td
-                        className="mono px-3 py-2 text-[14px]"
-                        style={{
-                          color:
-                            (trade.realized_pnl ?? 0) >= 0 ? "var(--verdigris)" : "var(--brass)",
-                        }}
-                      >
-                        {trade.realized_pnl !== null ? (
-                          money(trade.realized_pnl)
-                        ) : (
-                          <span
-                            className="text-[12px] text-[color:var(--text-dim)]"
-                            title="The close filled at the broker but its fill price could not be recovered — stated rather than estimated."
+            <>
+              <div className="panel mt-3 overflow-x-auto">
+                <table className="w-full min-w-[46rem] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-[color:var(--line)]">
+                      {["symbol", "structure", "opened", "closed", "held", "entry", "realised", "closed by"].map(
+                        (h) => (
+                          <th
+                            key={h}
+                            scope="col"
+                            className="mono px-3 py-2 text-[12px] font-medium uppercase tracking-wider text-[color:var(--text-dim)]"
                           >
-                            closed at broker · realised unavailable
-                          </span>
-                        )}
-                      </td>
-                      <td className="mono px-3 py-2 text-[12px] uppercase tracking-wide text-[color:var(--text)]">
-                        {EXIT_LABEL[trade.exit_reason ?? ""] ?? trade.exit_reason ?? "—"}
-                      </td>
+                            {h}
+                          </th>
+                        ),
+                      )}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {closedRows.map((trade) => (
+                      <tr
+                        key={trade.id}
+                        className="border-b border-[color:var(--line)] last:border-0"
+                      >
+                        <td className="px-3 py-2">
+                          <span className="flex items-center gap-2">
+                            <SymbolMark symbol={trade.symbol} size={24} />
+                            <span className="mono text-[14px]">{trade.symbol}</span>
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-[14px]">
+                          {trade.kind ? structureLabel(trade.kind) : "—"}
+                        </td>
+                        <td className="mono px-3 py-2 text-[13px] text-[color:var(--text-dim)]">
+                          {trade.opened_at ? timeAgo(trade.opened_at) : "—"}
+                        </td>
+                        <td className="mono px-3 py-2 text-[13px] text-[color:var(--text-dim)]">
+                          {trade.closed_at ? timeAgo(trade.closed_at) : "—"}
+                        </td>
+                        <td className="mono px-3 py-2 text-[14px]">
+                          {trade.days_held !== null ? `${trade.days_held}d` : "—"}
+                        </td>
+                        <td className="mono px-3 py-2 text-[14px] tabular-nums">
+                          {dollars(trade.entry_credit, 2)}
+                        </td>
+                        <td
+                          className="mono px-3 py-2 text-[14px] tabular-nums"
+                          style={{
+                            color:
+                              (trade.realized_pnl ?? 0) >= 0
+                                ? "var(--verdigris)"
+                                : "var(--brass)",
+                          }}
+                        >
+                          {trade.realized_pnl !== null ? (
+                            money(trade.realized_pnl)
+                          ) : (
+                            <span
+                              className="text-[12px] text-[color:var(--text-dim)]"
+                              title="The close filled at the broker but its fill price could not be recovered — stated rather than estimated."
+                            >
+                              closed at broker · realised unavailable
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span
+                            className="mono whitespace-nowrap rounded-full border border-[color:var(--line)] px-2.5 py-1 text-[12px] font-semibold text-[color:var(--text-dim)]"
+                          >
+                            {EXIT_LABEL[trade.exit_reason ?? ""] ?? trade.exit_reason ?? "—"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* provenance: realised figures recovered by reconciliation come
+                  from the broker's own close fills, and the corrections say so */}
+              <p className="mono mt-2 text-[12px] text-[color:var(--text-faint)]">
+                Where a close filled after the submission poll, its realised
+                figure was recovered from the broker&rsquo;s own fills —{" "}
+                <Link
+                  href="/audit?action=CORRECTION&grouped=0&q=recovered"
+                  className="t-fast underline decoration-[color:var(--line)] underline-offset-2 hover:text-[color:var(--text)]"
+                >
+                  the corrections are in the audit log
+                </Link>
+                .
+              </p>
+            </>
           )}
         </section>
 

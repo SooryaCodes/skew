@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Manrope } from "next/font/google";
+import { Geist_Mono, Instrument_Sans, Manrope } from "next/font/google";
 import "./globals.css";
 
 // Two roles, two faces.
@@ -10,6 +10,15 @@ const sans = Manrope({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
   variable: "--font-sans",
+  display: "swap",
+});
+
+// Instrument Sans carries exactly one voice: structure names on the positions
+// record — a third face used sparingly, never for body copy.
+const instrument = Instrument_Sans({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  variable: "--font-instrument",
   display: "swap",
 });
 
@@ -52,7 +61,7 @@ export default function RootLayout({
       lang="en"
       data-theme="dark"
       suppressHydrationWarning
-      className={`${sans.variable} ${mono.variable}`}
+      className={`${sans.variable} ${mono.variable} ${instrument.variable}`}
     >
       <body className="min-h-screen bg-ground text-text antialiased">
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
