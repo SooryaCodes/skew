@@ -86,9 +86,9 @@
       "vo_template": "Eight names, scanned every five minutes against live Alpaca chains. On this name implied volatility is running at {iv_words} while realized sits at {rv_words}. The market is overcharging by {vrp_words} points, and that gap is the entire signal.",
       "deferred": true,
       "speed": 1.0,
-      "vo": "Eight names, scanned every five minutes against live Alpaca chains. On this name implied volatility is running at twenty four point nine while realized sits at eighteen point eight. The market is overcharging by six point one points, and that gap is the entire signal.",
-      "duration_s": 17.679,
-      "total_s": 17.679
+      "vo": "Eight names, scanned every five minutes against live Alpaca chains. On this name implied volatility is running at twenty four point seven while realized sits at eighteen point nine. The market is overcharging by five point eight points, and that gap is the entire signal.",
+      "duration_s": 17.892,
+      "total_s": 17.892
     },
     {
       "id": "a22",
@@ -145,9 +145,9 @@
       "vo_template": "Across this account the desk has looked at {looked_words} opportunities and declined almost all of them. It has filled {acted_words}. Restraint is the default, not the exception.",
       "deferred": true,
       "speed": 1.0,
-      "vo": "Across this account the desk has looked at more than two thousand seven hundred opportunities and declined almost all of them. It has filled five times. Restraint is the default, not the exception.",
-      "duration_s": 12.004,
-      "total_s": 12.004
+      "vo": "Across this account the desk has looked at more than three thousand three hundred opportunities and declined almost all of them. It has filled five times. Restraint is the default, not the exception.",
+      "duration_s": 11.961,
+      "total_s": 11.961
     },
     {
       "id": "a31c",
@@ -158,10 +158,10 @@
       "optional": true,
       "deferred": true,
       "speed": 1.0,
-      "vo_template": "On the second of September the desk caught its own record diverging from the broker, reconciled, and wrote {corr_words} corrections into the record. They are still there. A log that cannot disagree with you is not a log.",
-      "vo": "On the second of September the desk caught its own record diverging from the broker, reconciled, and wrote thirteen corrections into the record. They are still there. A log that cannot disagree with you is not a log.",
-      "duration_s": 13.135,
-      "total_s": 13.135
+      "vo_template": "On the second of September the desk caught its own record diverging from the broker, reconciled, and has written {corr_words} corrections into the record since. They are still there. A log that cannot disagree with you is not a log.",
+      "vo": "On the second of September the desk caught its own record diverging from the broker, reconciled, and has written eighteen corrections into the record since. They are still there. A log that cannot disagree with you is not a log.",
+      "duration_s": 13.796,
+      "total_s": 13.796
     },
     {
       "id": "a32",
@@ -169,10 +169,10 @@
       "title": "EXECUTION",
       "kind": "ui",
       "scene": "execution",
-      "vo": "A structure that clears every gate executes as a single atomic multi leg order. Four legs, one order, straight into a hundred thousand dollar paper account.",
-      "duration_s": 10.276,
-      "total_s": 10.276,
-      "speed": 1.0
+      "vo": "A structure that clears every gate executes as a single atomic multi leg order. Every leg together, one order, straight into a hundred thousand dollar paper account.",
+      "speed": 1.0,
+      "duration_s": 10.788,
+      "total_s": 10.788
     },
     {
       "id": "a33",

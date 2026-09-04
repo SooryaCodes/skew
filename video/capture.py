@@ -219,6 +219,39 @@ def anchored_scroll(page, find_js: str, offset: int = 90, ms: int = 1400):
         raise RuntimeError(f"anchored_scroll failed: {ok}")
 
 
+
+import time as _time
+
+CB = str(int(_time.time()))
+
+
+def bust(url: str) -> str:
+    """Cache-bust every capture URL: the domain's edge cache once served a
+    two-day-old build on previously-captured ?shot= URLs."""
+    return f"{url}{'&' if '?' in url else '?'}cb={CB}"
+
+
+def fresh_guard(page, sid: str, scope: str) -> None:
+    """Refuse to keep a frame from a stale build, and refuse to keep ANY frame
+    carrying something that must never be filmed. scope: 'shot' pages hide the
+    header (assert the session sentence); 'nav' pages show it (assert the
+    four-item nav); 'none' runs only the sensitive scan."""
+    text = page.evaluate("document.body.innerText")
+    if scope == "shot":
+        assert (
+            "names scanned since the session opened" in text
+            or "No session activity" in text
+        ), f"{sid}: STALE BUILD - session sentence missing"
+    elif scope == "nav":
+        nav = page.evaluate(
+            "document.querySelector('nav[aria-label=\"Views\"]')?.innerText || ''"
+        )
+        assert "strategy" in nav.lower(), f"{sid}: STALE BUILD - three-item nav"
+    for needle in ("3GO9TVGHG5", "localhost", "APCA-", "OPERATOR_TOKEN"):
+        assert needle not in text, f"{sid}: SENSITIVE CONTENT ON FRAME: {needle}"
+    VERIFY.append({"segment": sid, "kind": "fresh+sensitive", "ok": True})
+
+
 def by_text(label: str) -> str:
     return (
         "[...document.querySelectorAll('p,span,h2,h3,div')].find(e =>"
@@ -286,11 +319,12 @@ def scene(p, seg, ctx_extra=None):
         page.wait_for_timeout(int(hold * 1000))
 
     elif sid == "a21":
-        page.goto(f"{TARGET}/desk?shot=1&theme=dark", wait_until="networkidle")
+        page.goto(bust(f"{TARGET}/desk?shot=1&theme=dark"), wait_until="networkidle")
         page.wait_for_selector("text=VRP", timeout=30000)
         settle(page)
         inject(page)
         mark_ready()
+        fresh_guard(page, sid, "shot")
         row = page.evaluate(
             """() => { const rows=[...document.querySelectorAll('nav[aria-label="Universe"] button')];
               const best = rows.map(b=>({b, v:parseFloat((b.textContent.match(/[+\\u2212-]\\d+\\.\\d/)||['0'])[0].replace('\\u2212','-'))}))
@@ -319,11 +353,12 @@ def scene(p, seg, ctx_extra=None):
         verify_numbers(page, sid, [f"{iv:.1f}", f"{rv:.1f}", f"{abs(vrp):.1f}"])
 
     elif sid == "a22":
-        page.goto(f"{TARGET}/desk?shot=1&theme=dark", wait_until="networkidle")
+        page.goto(bust(f"{TARGET}/desk?shot=1&theme=dark"), wait_until="networkidle")
         page.wait_for_selector("text=CANDIDATES", timeout=30000)
         settle(page)
         inject(page)
         mark_ready()
+        fresh_guard(page, sid, "shot")
         tab = page.evaluate(
             """() => { const t = document.querySelector('[role=tab]');
                  if (!t) return null; const r = t.getBoundingClientRect();
@@ -341,18 +376,32 @@ def scene(p, seg, ctx_extra=None):
         verify_numbers(page, sid, [])
 
     elif sid == "a23":
-        page.goto(f"{TARGET}/desk?shot=1&theme=dark", wait_until="networkidle")
+        page.goto(bust(f"{TARGET}/desk?shot=1&theme=dark"), wait_until="networkidle")
         page.wait_for_selector("text=CANDIDATES", timeout=30000)
         settle(page)
         inject(page)
         mark_ready()
+        fresh_guard(page, sid, "shot")
         anchored_scroll(page, by_text("candidates"), 40)
         page.wait_for_timeout(1200)
         for label in ("liquidity", "earnings", "term", "stress", "budget"):
             box = rect_of(page, label)
             if box:
-                cursor_to(page, box["x"] + box["w"] / 2, box["y"] + box["h"] / 2, 450)
-                page.wait_for_timeout(900)
+                cursor_to(page, box["x"] + box["w"] / 2, box["y"] + box["h"] / 2, 350)
+                page.wait_for_timeout(650)
+        # The three-second /strategy glimpse: the same five gates with their
+        # live pass and refusal tallies from the record, then back. No extra
+        # narration — the deterministic-gates line already covers it.
+        page.goto(bust(f"{TARGET}/strategy?theme=dark"), wait_until="networkidle")
+        page.wait_for_selector("text=the gate chain", timeout=30000)
+        inject(page)
+        fresh_guard(page, sid, "nav")
+        anchored_scroll(page, by_text("the gate chain"), 60, 900)
+        page.wait_for_timeout(3000)
+        page.goto(bust(f"{TARGET}/desk?shot=1&theme=dark"), wait_until="networkidle")
+        page.wait_for_selector("text=CANDIDATES", timeout=30000)
+        inject(page)
+        anchored_scroll(page, by_text("candidates"), 40, 700)
         page.wait_for_timeout(int(hold * 1000))
 
     elif sid == "a31":
@@ -377,11 +426,12 @@ def scene(p, seg, ctx_extra=None):
         consumed, limit = int(m.group(1)), int(m.group(2))
         result = {"consumed": consumed, "limit": limit}
 
-        page.goto(f"{TARGET}/audit?action=REFUSED&theme=dark", wait_until="networkidle")
+        page.goto(bust(f"{TARGET}/audit?action=REFUSED&theme=dark"), wait_until="networkidle")
         page.wait_for_selector("text=refusals by gate", timeout=30000)
         settle(page)
         inject(page)
         mark_ready()
+        fresh_guard(page, sid, "nav")
         ring(page, "refusals by gate")
         page.wait_for_timeout(3200)
         box = page.evaluate(
@@ -398,9 +448,10 @@ def scene(p, seg, ctx_extra=None):
         if box:
             cursor_click(page, box["x"] + box["w"] / 2, box["y"] + box["h"] / 2)
             page.wait_for_timeout(2600)
-        page.goto(f"{TARGET}/trace/{target['id']}?theme=dark", wait_until="networkidle")
+        page.goto(bust(f"{TARGET}/trace/{target['id']}?theme=dark"), wait_until="networkidle")
         settle(page)
         inject(page)
+        fresh_guard(page, sid, "nav")
         anchored_scroll(page, by_text("gate"), 160, 2000)
         page.wait_for_timeout(800)
         ring(page, "STRESS FAILED")
@@ -408,11 +459,12 @@ def scene(p, seg, ctx_extra=None):
         verify_numbers(page, sid, [f"{consumed}%", f"{limit}%"])
 
     elif sid == "a31b":
-        page.goto(f"{TARGET}/desk?shot=1&theme=dark", wait_until="networkidle")
+        page.goto(bust(f"{TARGET}/desk?shot=1&theme=dark"), wait_until="networkidle")
         page.wait_for_selector("text=Audit log", timeout=30000)
         settle(page)
         inject(page)
         mark_ready()
+        fresh_guard(page, sid, "shot")
         with urllib.request.urlopen(f"{API}/api/audit/counts", timeout=20) as r:
             counts = json.load(r)
         looked, acted = counts["TOTAL"], counts["EXECUTED"]
@@ -448,12 +500,13 @@ def scene(p, seg, ctx_extra=None):
         ) as r:
             corr = json.load(r)["summary"]["count"]
         result = {"corr": corr}
-        page.goto(f"{TARGET}/audit?action=CORRECTION&grouped=0&theme=dark", wait_until="networkidle")
+        page.goto(bust(f"{TARGET}/audit?action=CORRECTION&grouped=0&theme=dark"), wait_until="networkidle")
         page.wait_for_selector("text=Decision record", timeout=30000)
         page.wait_for_selector("tbody tr", timeout=30000)
         settle(page)
         inject(page)
         mark_ready()
+        fresh_guard(page, sid, "nav")
         page.wait_for_timeout(1200)
         anchored_scroll(
             page,
@@ -466,22 +519,30 @@ def scene(p, seg, ctx_extra=None):
         verify_numbers(page, sid, [str(corr)])
 
     elif sid == "a32":
-        page.goto(f"{TARGET}/positions?theme=dark", wait_until="networkidle")
+        page.goto(bust(f"{TARGET}/positions?theme=dark"), wait_until="networkidle")
         settle(page)
         inject(page)
         mark_ready()
-        lower_third(page, "one atomic multi-leg order · four legs together")
-        ring(page, "LEGS")
-        cursor_to(page, 700, 450, 900)
+        fresh_guard(page, sid, "nav")
+        page.wait_for_selector("text=Tier", timeout=30000)
+        lower_third(page, "one atomic multi-leg order · every leg together")
+        # The redesigned page: cards with labelled legs, the tier strip, real
+        # closed trades. Ring the max-loss metric — the defined-risk number —
+        # and rest the cursor on a labelled leg row.
+        ring(page, "MAX LOSS")
+        box = rect_of(page, "long leg")
+        if box:
+            cursor_to(page, box["x"] + box["w"] / 2, box["y"] + box["h"] / 2, 900)
         page.wait_for_timeout(int(hold * 1000))
         verify_numbers(page, sid, ["100,000"])
 
     elif sid == "a33":
-        page.goto(f"{TARGET}/desk?shot=1&theme=dark", wait_until="networkidle")
+        page.goto(bust(f"{TARGET}/desk?shot=1&theme=dark"), wait_until="networkidle")
         page.wait_for_selector("text=RISK AUTHORITY", timeout=30000)
         settle(page)
         inject(page)
         mark_ready()
+        fresh_guard(page, sid, "shot")
         ring(page, "RISK AUTHORITY")
         page.wait_for_timeout(2500)
         ring(page, "EQUITY", underline=True)
@@ -492,10 +553,11 @@ def scene(p, seg, ctx_extra=None):
         verify_numbers(page, sid, ["0.5%", "$100,000"])
 
     elif sid == "a34":
-        page.goto(f"{TARGET}/mcp?theme=dark", wait_until="networkidle")
+        page.goto(bust(f"{TARGET}/mcp?theme=dark"), wait_until="networkidle")
         settle(page, 2000)
         inject(page)
         mark_ready()
+        fresh_guard(page, sid, "none")
         lower_third(page, "skew.zevora.io/mcp")
         anchored_scroll(page, by_text("read tools — always on"), 120, 1600)
         page.wait_for_timeout(3500)
@@ -507,10 +569,11 @@ def scene(p, seg, ctx_extra=None):
     elif sid == "a35":
         with urllib.request.urlopen(f"{API}/api/audit?limit=1", timeout=20) as r:
             trace_id = json.load(r)[0]["id"]
-        page.goto(f"{TARGET}/trace/{trace_id}?theme=dark", wait_until="networkidle")
+        page.goto(bust(f"{TARGET}/trace/{trace_id}?theme=dark"), wait_until="networkidle")
         settle(page)
         inject(page)
         mark_ready()
+        fresh_guard(page, sid, "nav")
         anchored_scroll(page, by_text("gate"), 200, 1800)
         page.wait_for_timeout(int(hold * 1000))
 

@@ -201,6 +201,13 @@ def build_vo() -> None:
         raw = gen / f"{sid}.wav"
         if override.exists():
             source = override
+        elif raw.exists() and not seg.get("deferred"):
+            # Unchanged narration reuses its audio — a re-capture, not a
+            # rebuild. Segments whose text changed have their gen file
+            # deleted; deferred segments are always re-synthesised from the
+            # captured frame's numbers.
+            source = raw
+            print(f"{sid}: narration reused")
         else:
             if "vo_parts" in seg:
                 parts = []
