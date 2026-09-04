@@ -142,12 +142,12 @@
       "title": "RESTRAINT",
       "kind": "ui",
       "scene": "restraint",
-      "vo_template": "Across this account the desk has looked at {looked_words} opportunities and declined almost all of them. It has filled {acted_words}. Restraint is the default, not the exception.",
+      "vo_template": "Across this account the desk has evaluated more than {looked_words} times and found an edge worth taking {acted_words} of them. Most of the market, most of the time, is fairly priced. Recognising that is the job.",
       "deferred": true,
       "speed": 1.0,
-      "vo": "Across this account the desk has looked at more than three thousand three hundred opportunities and declined almost all of them. It has filled five times. Restraint is the default, not the exception.",
-      "duration_s": 11.961,
-      "total_s": 11.961
+      "vo": "Across this account the desk has evaluated more than three thousand three hundred times and found an edge worth taking five of them. Most of the market, most of the time, is fairly priced. Recognising that is the job.",
+      "duration_s": 13.412,
+      "total_s": 13.412
     },
     {
       "id": "a31c",
@@ -158,10 +158,10 @@
       "optional": true,
       "deferred": true,
       "speed": 1.0,
-      "vo_template": "On the second of September the desk caught its own record diverging from the broker, reconciled, and has written {corr_words} corrections into the record since. They are still there. A log that cannot disagree with you is not a log.",
-      "vo": "On the second of September the desk caught its own record diverging from the broker, reconciled, and has written eighteen corrections into the record since. They are still there. A log that cannot disagree with you is not a log.",
-      "duration_s": 13.796,
-      "total_s": 13.796
+      "vo_template": "The desk caught its own record diverging from the broker, reconciled, and has written {corr_words} corrections into the record since. They are still there. A log that cannot disagree with you is not a log.",
+      "vo": "The desk caught its own record diverging from the broker, reconciled, and has written eighteen corrections into the record since. They are still there. A log that cannot disagree with you is not a log.",
+      "duration_s": 12.132,
+      "total_s": 12.132
     },
     {
       "id": "a32",

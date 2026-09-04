@@ -610,8 +610,8 @@ def materialise_deferred(sid: str, values: dict):
         ).strip()
     elif sid == "a31b":
         seg["vo"] = seg["vo_template"].format(
-            looked_words=f"more than {words_for(values['looked'] // 100 * 100)}",
-            acted_words=times_for(values["acted"]),
+            looked_words=words_for(values["looked"] // 100 * 100),
+            acted_words=words_for(values["acted"]),
         )
     elif sid == "a31c":
         seg["vo"] = seg["vo_template"].format(corr_words=words_for(values["corr"]))
