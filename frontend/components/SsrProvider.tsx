@@ -36,6 +36,19 @@ function StaleNotice({ asOf }: { asOf: string }) {
   );
 }
 
+/** React 19 hydration resets <html data-theme> to the server value, undoing
+ *  the pre-paint boot script's ?theme= override. Shot mode hides the header
+ *  (and the theme toggle with it), so the always-mounted provider re-applies
+ *  the override — the screenshot and video pipelines depend on it. */
+function useThemeOverride() {
+  useEffect(() => {
+    const forced = window.location.search.match(/[?&]theme=(dark|light)/);
+    if (forced && document.documentElement.getAttribute("data-theme") !== forced[1]) {
+      document.documentElement.setAttribute("data-theme", forced[1]!);
+    }
+  }, []);
+}
+
 export function SsrProvider({
   fallback,
   staleAsOf,
@@ -45,6 +58,7 @@ export function SsrProvider({
   staleAsOf: string | null;
   children: React.ReactNode;
 }) {
+  useThemeOverride();
   return (
     <SWRConfig value={{ fallback }}>
       {staleAsOf && <StaleNotice asOf={staleAsOf} />}

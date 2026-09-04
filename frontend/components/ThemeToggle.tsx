@@ -13,7 +13,16 @@ export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
-    const current = document.documentElement.getAttribute("data-theme");
+    // React 19 hydration resets <html data-theme> to the server-rendered
+    // value, silently undoing the pre-paint boot script. Re-apply the URL
+    // override (?theme=) here, after hydration, where it sticks — the
+    // screenshot and video pipelines depend on it.
+    let current = document.documentElement.getAttribute("data-theme");
+    const forced = window.location.search.match(/[?&]theme=(dark|light)/);
+    if (forced && forced[1] !== current) {
+      document.documentElement.setAttribute("data-theme", forced[1]!);
+      current = forced[1]!;
+    }
     if (current === "light" || current === "dark") setTheme(current);
   }, []);
 
