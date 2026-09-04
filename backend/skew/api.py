@@ -983,14 +983,31 @@ def get_session() -> dict[str, Any]:
     session_start = datetime.combine(session_day, datetime.min.time(), tzinfo=EASTERN)
 
     counts = audit.counts_since(session_start.astimezone(UTC))
-    report = loop.last_cycle()
-    last_fill = audit.recent(limit=1, action="EXECUTED")
 
     market_open = False
     try:
         market_open = loop.get_desk().market_open()
     except Exception as exc:  # noqa: BLE001 — the summary must never 500
         log.warning("session summary: market state unavailable: %s", exc)
+
+    # "The most recent session" means the last one with anything IN it. At
+    # 4am on a trading day the calendar says today, but today holds nothing
+    # yet — and a strip reading "0 · 0 · 0 · 0" on a desk with thousands of
+    # decisions reads as broken, not early. Walk back to the session the
+    # numbers actually describe.
+    if counts["TOTAL"] == 0 and not market_open:
+        previous = session_day - timedelta(days=1)
+        while not is_trading_day(previous):
+            previous -= timedelta(days=1)
+        previous_start = datetime.combine(previous, datetime.min.time(), tzinfo=EASTERN)
+        previous_counts = audit.counts_since(previous_start.astimezone(UTC))
+        if previous_counts["TOTAL"] > 0:
+            session_day = previous
+            session_start = previous_start
+            counts = previous_counts
+
+    report = loop.last_cycle()
+    last_fill = audit.recent(limit=1, action="EXECUTED")
 
     return {
         "session_date": session_day.isoformat(),

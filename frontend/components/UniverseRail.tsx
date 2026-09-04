@@ -21,11 +21,22 @@ interface Props {
   perSymbol?: Record<string, PerSymbolSummary>;
 }
 
-const OUTCOME_DOT: Record<string, { color: string; label: string }> = {
-  EXECUTED: { color: "var(--positive)", label: "filled" },
-  REFUSED: { color: "var(--negative)", label: "refused" },
-  ABSTAINED: { color: "var(--text-faint)", label: "abstained" },
+const OUTCOME_LABEL: Record<string, string> = {
+  EXECUTED: "filled",
+  REFUSED: "refused",
+  ABSTAINED: "abstained",
 };
+
+/** Hover depth: count, last outcome and its reason. On the row itself these
+ *  doubled the rail's height while every symbol read "last abstained" — a
+ *  field that distinguishes nothing is noise, not information. */
+function railTooltip(summary: PerSymbolSummary | undefined): string | undefined {
+  if (!summary) return undefined;
+  return (
+    `${summary.total.toLocaleString()} decisions · ` +
+    `last ${OUTCOME_LABEL[summary.last_action] ?? summary.last_action}: ${summary.last_reason}`
+  );
+}
 
 export function UniverseRail({ states, selected, onSelect, loading, perSymbol }: Props) {
   if (states.length === 0) {
@@ -64,8 +75,8 @@ export function UniverseRail({ states, selected, onSelect, loading, perSymbol }:
                 type="button"
                 onClick={() => onSelect(state.symbol)}
                 aria-current={active ? "true" : undefined}
-                title={perSymbol?.[state.symbol]?.last_reason}
-                className="t-fast pulse-once flex w-full flex-col gap-0.5 px-2 py-1.5 text-left"
+                title={railTooltip(perSymbol?.[state.symbol])}
+                className="t-fast pulse-once flex w-full items-baseline gap-2 px-2 py-1.5 text-left"
                 style={{
                   background: active ? "var(--panel-alt)" : "transparent",
                   // Inactive rows dim the BAR, never the text — 85% opacity on
@@ -74,32 +85,13 @@ export function UniverseRail({ states, selected, onSelect, loading, perSymbol }:
                   borderRadius: "var(--radius)",
                 }}
               >
-                <span className="flex w-full items-baseline gap-2">
-                  <span className="mono w-11 shrink-0 text-[15px]">{state.symbol}</span>
-                  <span className="mono w-14 shrink-0 text-right text-[15px] text-[color:var(--text)]">
-                    {volPoints(state.vrp)}
-                  </span>
-                  <span className="mono flex-1 truncate text-right text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
-                    {regimeLabel(state.regime)}
-                  </span>
+                <span className="mono w-11 shrink-0 text-[15px]">{state.symbol}</span>
+                <span className="mono w-14 shrink-0 text-right text-[15px] text-[color:var(--text)]">
+                  {volPoints(state.vrp)}
                 </span>
-                {/* what the desk has actually DONE with this name — all-time
-                    count and the latest outcome, reason on hover */}
-                {perSymbol?.[state.symbol] && (
-                  <span className="mono flex w-full items-center gap-1.5 text-[11px] text-[color:var(--text-faint)]">
-                    {perSymbol[state.symbol]!.total.toLocaleString()} decisions
-                    <span
-                      className="ml-auto inline-block h-[5px] w-[5px] rounded-full"
-                      style={{
-                        background:
-                          OUTCOME_DOT[perSymbol[state.symbol]!.last_action]?.color ??
-                          "var(--text-faint)",
-                      }}
-                      aria-hidden
-                    />
-                    last {OUTCOME_DOT[perSymbol[state.symbol]!.last_action]?.label ?? "—"}
-                  </span>
-                )}
+                <span className="mono flex-1 truncate text-right text-[12px] uppercase tracking-wider text-[color:var(--text-dim)]">
+                  {regimeLabel(state.regime)}
+                </span>
               </button>
             </li>
           );

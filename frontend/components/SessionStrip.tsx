@@ -116,32 +116,31 @@ export function SessionStrip() {
         <Stat label="survived" value={session.cycle.survivors} />
       </Segment>
 
-      {/* keyed by its own numbers: a completed cycle re-mounts the segment
-          and the one-shot pulse marks the change, then settles */}
-      <span
-        key={`${counts.EXECUTED}-${closedThisSession}-${counts.REFUSED}-${counts.ABSTAINED}`}
-        className="pulse-once rounded-[var(--radius)]"
-      >
-        <Segment
-          label="Session"
-          title={`decisions since ${new Date(session.counts_since).toLocaleString()}`}
-        >
-          <Stat label="opened" value={counts.EXECUTED ?? 0} />
-          <Stat label="closed" value={closedThisSession} />
-          <Stat label="refused" value={counts.REFUSED ?? 0} />
-          <Stat label="abstained" value={counts.ABSTAINED ?? 0} />
-        </Segment>
-      </span>
-
       <LatestEvent lastFill={session.last_fill} />
       </div>
-      <SessionSentence
-        sessionDate={session.session_date}
-        opened={counts.EXECUTED ?? 0}
-        closed={closedThisSession}
-        refused={counts.REFUSED ?? 0}
-        abstained={counts.ABSTAINED ?? 0}
-      />
+      {/* Row two: the sentence carries the session counts readably — the mono
+          number row it replaced said the same four figures twice. Keyed by its
+          numbers so a completed cycle pulses once and settles; a genuinely
+          empty window says WHY instead of printing four zeros. */}
+      <span
+        key={`${counts.EXECUTED}-${closedThisSession}-${counts.REFUSED}-${counts.ABSTAINED}`}
+        className="pulse-once block rounded-[var(--radius)]"
+      >
+        {(counts.TOTAL ?? 0) === 0 ? (
+          <p className="mt-1.5 text-[13px] leading-snug text-[color:var(--text-dim)]">
+            No session activity — the market is closed and no cycle has run
+            since the session opened.
+          </p>
+        ) : (
+          <SessionSentence
+            sessionDate={session.session_date}
+            opened={counts.EXECUTED ?? 0}
+            closed={closedThisSession}
+            refused={counts.REFUSED ?? 0}
+            abstained={counts.ABSTAINED ?? 0}
+          />
+        )}
+      </span>
     </section>
   );
 }
